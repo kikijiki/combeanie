@@ -1,0 +1,193 @@
+# ColourDepthBackend parameters for the wrist camera on the tray.
+#
+# Two duties share one file and one backend: overview (from a tray survey station) and confirm (a
+# close-range inspection of one candidate). They publish on different topics, and the split is
+# load-bearing: overview publishes candidates on /perception/tray_candidates, which no world state
+# ingests, so overview evidence can never authorize a grasp; confirm publishes the replacing
+# observation on /perception/object_observations, the topic the world state admits, and is the
+# sole producer there (ground truth must be moved to
+# /perception/ground_truth/object_observations before either duty runs, or the world state's
+# single-publisher pin refuses both).
+#
+# A nadir tray view is unreachable, so a 51-degree elevation is used (survey_stations.cpp). These
+# numbers fit that elevation and the ranges its stations see (confirm: same elevation, 0.25-0.35 m
+# standoff), not the overhead pipeline's. test_tray_duty_parameters pins every band below against
+# a ray-cast of an upright catalogued product from the shipped geometry. The topic split itself is
+# pinned by test_wrist_tray_topics.py.
+
+tray_overview_perception:
+  ros__parameters:
+    use_sim_time: true
+    planning_frame: world
+    colour_topic: /wrist_camera/image
+    depth_topic: /wrist_camera/depth_image
+    camera_info_topic: /wrist_camera/camera_info
+    # Candidates, not world evidence. Never point this at the world state's ingest topic.
+    observation_topic: /perception/tray_candidates
+    detection_topic: /perception/tray_overview_detections
+    transform_timeout_ms: 60.0
+    reliable_sensor_qos: true
+
+    backend_name: wrist_rgbd_tray_overview
+    backend_version: 1.0.0
+
+    # Same chromaticity floor as the overhead pipeline: a shadow scales all three channels and
+    # leaves the ratio alone. Close-range photometric drift is not yet measured; the signatures
+    # are those that already match the catalog.
+    chromaticity_tolerance: 0.055
+    minimum_intensity: 60.0
+
+    # Tray stations span roughly 0.42 to 1.01 m of range. The wrist sensor clips at 0.05 and
+    # 2.5 m; these bounds discard the clip planes and nothing a tray product sits in.
+    minimum_depth_m: 0.20
+    maximum_depth_m: 1.40
+
+    # At the station's near range (~0.55 m) a 33 mm can is about 84 px across under the shipped
+    # wrist pinhole (fx ≈ 701). 80 px is a partially occluded product; the overhead floor of 40 px
+    # (tuned for 16 px cans at 2.06 m) would admit noise several times larger than a real return.
+    minimum_component_pixels: 80
+
+    top_face_band_m: 0.02
+    top_face_percentile: 0.92
+    minimum_top_face_points: 15
+
+    # Re-derived for an upright cylinder viewed at the shipped 51-degree tray elevation. The fit
+    # is still in planning-frame XY, so a horizontal top remains a disc in 3D; what changes is the
+    # upper barrel entering the top-face band and the foreshortened sampling. Measured in
+    # test_tray_duty_parameters on every catalogued product: mean 0.69-0.74 of nominal, extreme
+    # 1.08-1.20. The bands hold that with margin and still reject the robot's blue links.
+    minimum_mean_radius_ratio: 0.50
+    maximum_mean_radius_ratio: 0.95
+    minimum_extreme_radius_ratio: 0.75
+    maximum_extreme_radius_ratio: 1.40
+    height_tolerance_m: 0.03
+
+    translation_sigma_floor_m: 0.003
+    # Card 063: a same-colour column of a dense tray is one colour component at this 51-degree
+    # view, its top band two discs 19 mm apart. Group the band on an 8 mm world-XY grid (cells
+    # joined across edges and corners, so points under 8 mm apart always share a disc; gaps up to
+    # ~16 mm axis-aligned or ~22.6 mm diagonal can still stay joined, which is fail-closed) and
+    # judge each disc on its own, all or nothing (colour_depth_backend.hpp). Touching tops stay one.
+    top_face_split_gap_m: 0.008
+
+    # Tray usable volume plus a little clearance above the tallest product. A detection outside it
+    # is not a tray candidate, whatever its colour.
+    workspace_minimum_xyz_m: [-1.00, -1.15, 0.50]
+    workspace_maximum_xyz_m: [1.00, -0.40, 1.15]
+
+    product_classes: [can, small_bottle, large_bottle]
+    can.sku: SIM-CAN-STD
+    can.reference_rgb: [200.0, 80.0, 70.0]
+    can.nominal_radius_m: 0.033
+    can.nominal_height_m: 0.122
+    small_bottle.sku: SIM-BOTTLE-SMALL
+    small_bottle.reference_rgb: [70.0, 130.0, 190.0]
+    small_bottle.nominal_radius_m: 0.034
+    small_bottle.nominal_height_m: 0.200
+    large_bottle.sku: SIM-BOTTLE-LARGE
+    large_bottle.reference_rgb: [70.0, 140.0, 105.0]
+    large_bottle.nominal_radius_m: 0.045
+    large_bottle.nominal_height_m: 0.290
+
+tray_confirm_perception:
+  ros__parameters:
+    use_sim_time: true
+    planning_frame: world
+    colour_topic: /wrist_camera/image
+    depth_topic: /wrist_camera/depth_image
+    camera_info_topic: /wrist_camera/camera_info
+    # The replacing observation, on the topic the world state admits. Sole publisher: ground
+    # truth and the overhead pipeline must not share it while this duty runs.
+    observation_topic: /perception/object_observations
+    detection_topic: /perception/tray_confirm_detections
+    transform_timeout_ms: 60.0
+    reliable_sensor_qos: true
+
+    backend_name: wrist_rgbd_tray_confirm
+    backend_version: 1.0.0
+
+    chromaticity_tolerance: 0.055
+    minimum_intensity: 60.0
+
+    # Confirm standoff is 0.25 to 0.35 m at the same elevation the tray stations use (scaled
+    # setback/height). Depths outside that band are not a confirmation view.
+    minimum_depth_m: 0.10
+    maximum_depth_m: 0.55
+
+    # At 0.30 m a can is about 154 px across. 200 px is a partially occluded product at that
+    # range; the overhead floor of 40 px would admit noise several times over.
+    minimum_component_pixels: 200
+
+    top_face_band_m: 0.02
+    top_face_percentile: 0.92
+    minimum_top_face_points: 15
+
+    # Same elevation and measured radius-ratio population as overview.
+    minimum_mean_radius_ratio: 0.50
+    maximum_mean_radius_ratio: 0.95
+    minimum_extreme_radius_ratio: 0.75
+    maximum_extreme_radius_ratio: 1.40
+    height_tolerance_m: 0.03
+
+    # Accuracy floor on the claimed translational sigma (Milestone 10 §7, Card 035/036). The
+    # budget the attachment boundary derives from this claim is k*sigma + mechanical_margin =
+    # 3*2 + 1 = 7 mm, capped by the jaw-travel ceiling (~16 mm).
+    #
+    # Card 036 (2026-09-25) fixed the estimator that fed this claim: the published axis is now
+    # a circle fit to the top-face band's convex hull instead of the band mean, which at the
+    # shipped 51-degree elevation was pulled 2-7 mm toward the camera by upper-barrel
+    # contamination and near-rim density skew. Post-fix confirm-band re-run
+    # (benchmark-campaigns/predeclared-2026-09-25-wrist-confirm-y-bias, n=12 admitted):
+    # residual norms 0.191-0.363 mm, Y mean +0.197 mm with every |Y| <= 0.268 mm. The floor
+    # therefore returns to 0.002 m: 7 mm covers the post-fix distribution with margin while
+    # staying well under the ceiling. Card 035's 0.004 was the honest claim for the *biased*
+    # estimator (Card 004 confirm error 2.2-7.5 mm, attach residuals to 9.872 mm); those
+    # residuals are the old estimator's body, not this one's. k, the 1 mm margin, the ceiling
+    # and every physical predicate are unchanged; a future measurement that shows this floor
+    # over- or under-claims is corrected the same way.
+    translation_sigma_floor_m: 0.002
+    # Card 063: a same-colour column of a dense tray is one colour component at this 51-degree
+    # view, its top band two discs 19 mm apart. Group the band on an 8 mm world-XY grid (cells
+    # joined across edges and corners, so points under 8 mm apart always share a disc; gaps up to
+    # ~16 mm axis-aligned or ~22.6 mm diagonal can still stay joined, which is fail-closed) and
+    # judge each disc on its own, all or nothing (colour_depth_backend.hpp). Touching tops stay one.
+    top_face_split_gap_m: 0.008
+
+    workspace_minimum_xyz_m: [-1.00, -1.15, 0.50]
+    workspace_maximum_xyz_m: [1.00, -0.40, 1.15]
+
+    product_classes: [can, small_bottle, large_bottle]
+    can.sku: SIM-CAN-STD
+    can.reference_rgb: [200.0, 80.0, 70.0]
+    can.nominal_radius_m: 0.033
+    can.nominal_height_m: 0.122
+    small_bottle.sku: SIM-BOTTLE-SMALL
+    small_bottle.reference_rgb: [70.0, 130.0, 190.0]
+    small_bottle.nominal_radius_m: 0.034
+    small_bottle.nominal_height_m: 0.200
+    large_bottle.sku: SIM-BOTTLE-LARGE
+    large_bottle.reference_rgb: [70.0, 140.0, 105.0]
+    large_bottle.nominal_radius_m: 0.045
+    large_bottle.nominal_height_m: 0.290
+
+# Evaluator shared by both duties when either flag is on. It is evaluation only.
+# The node name in simulation.launch.py is tray_pose_error_evaluator and the YAML key must match,
+# or camera_optical_frame (and the rest) never loads and the range breakout stays NaN.
+tray_pose_error_evaluator:
+  ros__parameters:
+    use_sim_time: true
+    estimate_topic: /perception/object_observations
+    # Overview-range estimates never reach the ingest topic, so the evaluator reads them from the
+    # candidates topic as well; without it the overview half of the confirm/overview/far breakout
+    # would silently stop producing samples.
+    candidate_topic: /perception/tray_candidates
+    ground_truth_topic: /perception/ground_truth/object_observations
+    attachment_state_topic: /simulation_attachment/state
+    sample_topic: /perception/pose_error
+    # Wrist optical frame: the range on each sample is the camera-to-product distance at the
+    # estimate stamp.
+    camera_optical_frame: wrist_camera_optical_frame
+    association_radius_m: 0.15
+    maximum_pairing_skew_ms: 200.0
+    held_settle_ms: 1000.0
+    report_period_s: 20.0

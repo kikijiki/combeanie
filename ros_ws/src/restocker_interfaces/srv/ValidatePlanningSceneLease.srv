@@ -1,0 +1,6 @@
+# Validates that a capability still names the currently held transaction lease.
+string token
+---
+restocker_interfaces/PlanningSceneLeaseOperationStatus status
+bool has_lease
+restocker_interfaces/PlanningSceneLease lease

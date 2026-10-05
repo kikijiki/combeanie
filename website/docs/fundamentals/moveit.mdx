@@ -1,0 +1,59 @@
+---
+id: moveit
+title: MoveIt 2
+sidebar_position: 6
+---
+
+# MoveIt 2
+
+**MoveIt 2** answers: given where the robot is, where the obstacles are, and a goal pose or
+joints, find a collision-free motion and play it on the controllers.
+
+- **Planning scene:** robot state + collision objects. Geometry for safety, not a product
+  database.
+- **Collision checking:** would this joint configuration intersect anything? Sampled densely
+  along candidate paths.
+- **OMPL:** sampling-based planners. combeanie uses **RRTConnect**. They explore configuration
+  space until a valid path appears, then time-parameterize it into a trajectory.
+- **Trajectory execution:** send the timed joint path to `FollowJointTrajectory` and monitor
+  progress.
+
+## Why it matters here
+
+Every restock segment (approach, grasp lift, transfer, insert) must clear shelf geometry,
+other products, and depth-derived obstacle boxes. combeanie **projects** world knowledge into
+MoveIt; it does not let MoveIt invent inventory. Baseline is **OMPL-only** (no CHOMP/Pilz in
+the default pipeline). Obstacles are **boxes**, not octomaps.
+
+```text
+world state (+ obstacles)
+        │ projector + lease
+        ▼
+MoveIt planning scene ──OMPL──► trajectory ──► controllers
+```
+
+## This project
+
+| Piece | Path |
+| --- | --- |
+| Config builder | `restocker_moveit_config/…/configuration.py` |
+| OMPL | `…/config/ompl_planning.yaml` (RRTConnect, TOTG) |
+| Kinematics | `…/config/kinematics.yaml` (KDL) |
+| Controllers map | `…/config/moveit_controllers.yaml` |
+| SRDF | `…/config/restocker.srdf` |
+| Scene projector | `restocker_task_executor/src/planning_scene_projector_node.cpp` |
+| Motion port | `…/src/moveit_motion_port.cpp` |
+
+Planning success ≠ execution success. The motion port classifies whether anything was
+commanded and whether the arm may have moved. That classification is required for fail-closed
+recovery.
+
+## References
+
+- **Official docs:** [Motion planning concepts](https://moveit.picknik.ai/main/doc/concepts/motion_planning.html)
+- **Official docs:** [Planning Scene Monitor](https://moveit.picknik.ai/main/doc/examples/planning_scene_monitor/planning_scene_monitor_tutorial.html)
+- **Official docs:** [OMPL interface tutorial](https://moveit.picknik.ai/main/doc/examples/ompl_interface/ompl_interface_tutorial.html)
+- **Literature:** [OMPL project site](https://ompl.kavrakilab.org/) · [Şucan et al. OMPL paper (PDF)](https://www.kavrakilab.org/publications/sucan-moll2012open-motion-planning.pdf)
+- **Literature:** [Coleman et al., MoveIt case study](https://arxiv.org/abs/1404.3785)
+- **Reference implementation:** [moveit2](https://github.com/ros-planning/moveit2)
+- **This project:** [Motion planning](/docs/architecture/motion-planning) · [World state vs planning scene](./world-state-vs-scene)

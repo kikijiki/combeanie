@@ -1,0 +1,144 @@
+---
+id: task-execution
+title: Task execution
+sidebar_position: 7
+---
+
+import ControlPathDiagram from '@site/src/components/architecture/ControlPathDiagram';
+import TaskMachineDiagram from '@site/src/components/architecture/TaskMachineDiagram';
+
+# Task execution
+
+The public API is the `/restock_product` action (`RestockProduct`). Optional object and lane
+selectors may be left unset so the coordinator chooses a pair: eligible destinations are ordered
+by **largest deficit first, ties broken by rail distance from the carriage**,
+then the front row and travel cost pick the product. Feedback carries
+task state; the result is a typed terminal status. Success is asserted from authoritative
+world state, not from the action’s own claim alone.
+
+## The control path
+
+Every executed motion goes through this stack:
+
+<ControlPathDiagram />
+
+1. A client sends a `RestockProduct` goal (product and lane may be left unset).
+2. The task state machine validates the scene against **authoritative world state**.
+3. Deterministic geometry generates grasp and placement candidates.
+4. MoveIt plans and collision-checks against a projected planning scene.
+5. Trajectory execution, gripper, and attachment ports actuate through `ros2_control`.
+6. Gazebo integrates the joints and physics (including gravity-fed lane inserts).
+
+Outcomes are judged by what they prove about the world, not by which step reported success.
+
+## Task machine
+
+<TaskMachineDiagram />
+
+Names match `restock_task_machine.hpp`:
+
+```text
+Idle → ValidateScene → SelectPair → ReserveTask
+  → GenerateGrasps → PlanPreGrasp → ExecutePreGrasp
+  → OpenGripperForApproach → PlanApproach → ExecuteApproach
+  → CloseGripper → VerifyGrasp → AttachTransaction
+  → PlanRetract → ExecuteRetract
+  → ObserveDestination → GeneratePlacement
+  → PlanCarryStart → ExecuteCarryStart → PlanPreInsert → ExecutePreInsert → PlanInsert → ExecuteInsert
+  → OpenGripper → DetachTransaction (physical)
+  → PlanRetreat → ExecuteRetreat → SurveyDestination
+  → CommitDetachment (semantic) → VerifyPlacement → UpdateInventory
+  → Complete
+```
+
+Side paths: `CancelActiveMotion`, `ReleaseTask`, `Recover`, `Fault`, `RequestOperator`,
+`Canceled`, `OpenGripperForEscape`.
+
+Planning and execution are separate *task states*, but `MotionPort` plans **and** executes one
+segment in one submission. The `kPlan*` command submits; `kExecute*` records evidence in the
+state that accepts it.
+
+## Place-detach split
+
+Physical detach happens before retreat and survey. Semantic commit waits for post-release lane
+evidence. That ordering keeps camera proof on the critical path without committing inventory
+early.
+
+## Admission
+
+Clients and `just demo` wait for `/restock_action_coordinator/status` with
+`admission_ready: true`. Discovery is not authority: startup must prove the world is
+unreserved, idle, fault-free, and empty-handed before goals are admitted.
+
+## Unresolved motion (campaign)
+
+The autonomous campaign is the root of its work cycle, so it keeps an **attempt registry**: one
+record per outbound goal (lane survey, tray survey, retreat, restock) whose motion outcome is not
+proven. A record is opened when an admission wait expires with no reply (the goal may be in
+flight), when a result wait expires or returns a code that is not a delivered terminal, and when
+a delivered terminal carries neither proof that no motion was submitted nor proof that the arm
+stopped. While any record is open the campaign **sends no goal at all** and never reports
+`PHASE_COMPLETE` or `PHASE_FRONT_FULL`: it reports `PHASE_BLOCKED` with `motion_unresolved: true`
+and the retained identities, on every backoff.
+
+Only exact-identity evidence settles a record: an explicit admission rejection, or a delivered
+terminal for that goal UUID that is an arrival, a `motion_definitely_not_started` result, or a
+cancel/failure carrying `execution_reached_terminal_stop`. A late admission is canceled by its
+exact UUID and grows the record; it never starts work. Elapsed backoff, fresh observations, a
+world revision, a quiet joint-state sample, another endpoint's status, a cancel answered "goal
+unknown" and a result code `UNKNOWN` never settle. A MoveIt execution `TIMED_OUT` is not a stop:
+the adapter reports it as an execution failure with `execution_reached_terminal_stop=false`
+(only `CONTROL_FAILED` establishes a stop).
+
+The registry is **in memory only**. A restarted campaign cannot know whether its previous
+incarnation left a goal in flight, so it reports `PHASE_RECOVERING` with
+`restart_recovery_pending: true` and sends nothing until an operator acknowledges by setting the
+parameter `restart_acknowledged` to `true` (`ros2 param set /autonomous_restock_campaign
+restart_acknowledged true`, or the launch argument `campaign_restart_acknowledged:=true` for a
+fresh simulated world).
+
+What each endpoint's delivered terminal proves is deliberately narrow. A restock result settles on
+`SUCCEEDED`, the typed recoverable skip, the two selection-phase terminals that end before any
+motion (`NO_COMPATIBLE_PAIR`, `OBSERVATION_EVIDENCE_STALE`), and any failure whose result carries
+proof, like the survey results do: `motion_definitely_not_started` or
+`execution_reached_terminal_stop`. The coordinator sets the first only when no motion, gripper or
+attachment goal of the whole goal was ever commanded (a first-leg plan failure, a validation or a
+cancel before any command; a submission its backend answered with a proven-not-started outcome does
+not count) and the second only when the last command was a motion segment whose terminal controller
+result was observed with nothing commanded after it. Both default to false, and both stay false for
+operator-required, external-inconsistency, shutdown and internal-error terminals and whenever the
+coordinator is inhibited. The motion port also reports whether it ever handed a trajectory to the backend (any slice), so a backend that disappears after that point is never read as "not started" by the coordinator or by the survey results. If the motion backend is lost after the trajectory was handed to it, the coordinator no longer retries that segment with a fresh submission (the arm may still be executing the lost one): the goal takes the same refusal path as an execution failure and ends with the stop not established, so the campaign keeps it unresolved. A backend that is unavailable before anything was submitted still retries after the backoff. A planning failure from the whole-task deadline after segments ran, a
+cancel after a command, and an attach or commit refusal therefore stay unresolved; a plain
+pre-motion failure retries after the backoff as before. A tray terminal that is `CANCELED` or `UNAVAILABLE`
+never settles on its flags, because the tray server returns on a stop request or after its send
+grace without awaiting a viewpoint child leg that may still be admitted and its payload cannot say
+otherwise.
+
+Because `TIMED_OUT` is no longer a stop, the same flag change reaches two places outside the
+campaign: the coordinator's recovery refuses to replan after an execute `TIMED_OUT` (it reports the
+trajectory's terminal state at the controllers as never established), and a survey, lane or
+viewpoint result built from one leaves the arm stop unestablished, so the survey ladder classifies
+it UNSAFE instead of recoverable.
+
+:::caution Scope
+This fences the **campaign process** only. A client that calls a public endpoint (for example
+`/survey_lane`) directly is not excluded by it, and unresolved state does not survive a restart.
+Cross-endpoint exclusion and a journaled recovery are separate, later work.
+:::
+
+## This project
+
+| Piece | Path |
+| --- | --- |
+| Task machine | `restocker_task_executor/…/restock_task_machine.hpp` |
+| Coordinator | `…/src/restock_action_coordinator_node.cpp` |
+| Action | `restocker_interfaces/action/RestockProduct.action` |
+| Defaults | `restocker_task_executor/config/restock_action_coordinator.yaml` |
+
+Whole-task timeout defaults to **480 s** in YAML (`task.total_timeout_ms`).
+
+## References
+
+- **Literature:** [Correll et al., APC survey](https://arxiv.org/abs/1601.05484) · [Team Delft APC](https://arxiv.org/abs/1610.05514) · [Bohg grasp survey](https://arxiv.org/abs/1309.2660) · [Costanzo et al., shelf replenishment](https://arxiv.org/abs/1912.11018)
+- **Official docs:** [ROS 2 actions](https://docs.ros.org/en/jazzy/Concepts/Basic/About-Actions.html)
+- **This project:** [Ports](./ports)

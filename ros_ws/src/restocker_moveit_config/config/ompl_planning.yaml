@@ -1,0 +1,46 @@
+planning_plugins:
+  - ompl_interface/OMPLPlanner
+request_adapters:
+  - default_planning_request_adapters/ResolveConstraintFrames
+  - default_planning_request_adapters/ValidateWorkspaceBounds
+  - default_planning_request_adapters/CheckStartStateBounds
+  - default_planning_request_adapters/CheckStartStateCollision
+response_adapters:
+  - default_planning_response_adapters/AddTimeOptimalParameterization
+  - default_planning_response_adapters/ValidateSolution
+  - default_planning_response_adapters/DisplayMotionPath
+start_state_max_bounds_error: 0.05
+# TOTG requires a positive scalar. Kept small for both rail meters and arm radians;
+# ValidateSolution collision-checks the resampled trajectory afterward.
+totg:
+  path_tolerance: 0.001
+  resample_dt: 0.1
+  min_angle_change: 0.001
+planner_configs:
+  RRTConnectkConfigDefault:
+    type: geometric::RRTConnect
+    range: 0.0
+# The validity-checking resolution is a fraction of the state space's maximum extent, about 14 rad
+# for these seven joints. At 0.005 that is 0.07 rad between collision checks, and a link a metre
+# from its axis sweeps 0.06 m in that interval, more than twice the 0.025 m shelf divider. OMPL
+# can then accept a path it never checked inside the divider, and ValidateSolution rejects the
+# densely resampled result (seen as an isolated invalid state late in the pre-insert path, against
+# forearm_link and against the carried product, for the large bottle into lane_03).
+# 0.001 gives about 0.013 m between checks at the same lever, so the thinnest obstacle in the
+# workcell is sampled.
+manipulator:
+  planner_configs:
+    - RRTConnectkConfigDefault
+  # Joint-space rejection for the transfer AABB. Constrained state-space projection put long runs
+  # of states exactly on the box face; AddTimeOptimalParameterization moved them by floating-point
+  # noise and ValidateSolution then rejected paths OMPL had accepted. The coordinator still
+  # supplies an inset AABB and densely validates the completed path against the unmodified outer
+  # AABB before execution.
+  enforce_joint_model_state_space: true
+  projection_evaluator: joints(rail_joint,shoulder_lift_joint)
+  longest_valid_segment_fraction: 0.001
+arm:
+  planner_configs:
+    - RRTConnectkConfigDefault
+  projection_evaluator: joints(shoulder_lift_joint,elbow_joint)
+  longest_valid_segment_fraction: 0.001

@@ -1,0 +1,9 @@
+{
+  "schema_version": "restocker.reasoner.recovery.response.v1",
+  "request_id": "rec-execution-aborted",
+  "status": "ok",
+  "failure_class": "trajectory_execution_aborted",
+  "recommended_primitive": "resume_at_recovery_state",
+  "confidence": 0.9,
+  "explanation": "The controller reported a CONTROL_FAILED (-4) during the pre-grasp trajectory execution, which classifies as a trajectory_execution_aborted failure. The deterministic recovery authorization explicitly permits a bounded replan from the current state. Since the controller's default action is to resume_at_recovery_state, and this primitive is within the permitted set, it is the appropriate recovery step. This allows the system to re-evaluate the pre-grasp motion from the current arm position, potentially correcting transient errors or minor state mismatches without abandoning the task."
+}

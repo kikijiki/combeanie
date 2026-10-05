@@ -1,0 +1,50 @@
+schema_version: 1
+
+body:
+  size_xyz_m: [0.16, 0.11, 0.07]
+  center_xyz_m: [0.0, 0.0, 0.035]
+  mass_kg: 1.2
+
+grasp_center:
+  xyz_m: [0.0, 0.0, 0.14]
+  rpy_rad: [0.0, 0.0, 0.0]
+
+finger:
+  size_xyz_m: [0.035, 0.018, 0.14]
+  center_xyz_m: [0.0, 0.0, 0.07]
+  mass_kg: 0.18
+  joint:
+    lower_m: 0.0
+    upper_m: 0.035
+    effort_n: 100.0
+    velocity_mps: 0.12
+    damping_n_s_per_m: 2.0
+    friction_n: 0.5
+  left:
+    origin_xyz_m: [0.0, 0.03, 0.07]
+    axis: [0.0, 1.0, 0.0]
+  right:
+    origin_xyz_m: [0.0, -0.03, 0.07]
+    axis: [0.0, -1.0, 0.0]
+
+attachment:
+  # Physical holding is supplied by the fixed joint. The finger faces remain
+  # outside the product collision geometry to avoid competing constraints.
+  minimum_inner_clearance_m: 0.0005
+  minimum_contact_overlap_m: 0.005
+  # The motion planner pads every robot link by 1.5 mm. Keep another 1.0 mm of planned clearance
+  # outside an equal-radius product column so a held product can enter the last free lane slot
+  # without the padded fingers colliding with the column's conservative box projection.
+  hold_clearance_per_side_m: 0.0025
+  open_clearance_per_side_m: 0.005
+  # Where the jaws must be for the plugin to decouple, and the aperture the coordinator releases
+  # at. It is the widest position anything commands and deliberately below the joint's upper
+  # limit: the jaws stay parked here for the whole arm traverse of the next transfer, and at 0.035
+  # that traverse dragged them slightly past it. The world state then rejected every robot sample
+  # as out of limits and ros2_control's limiter clamped the next gripper command by nearly a
+  # centimetre, aborting the trajectory on its 0.01 m path tolerance. Only a second transfer hits
+  # this, since only then does a full-width arm motion start with the jaws already open.
+  # 0.032 keeps 0.003 m under the joint limit and still clears the widest catalogued product by
+  # 0.008 m per side: the 0.090 m large bottle needs 0.024 m of jaw travel to release, and its
+  # approach clearance of 0.029 m stays 0.003 m inside this target.
+  open_target_m: 0.032

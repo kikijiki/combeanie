@@ -1,0 +1,72 @@
+---
+id: manipulators-and-frames
+title: Manipulators and frames
+sidebar_position: 2
+---
+
+import FrameTreeDiagram from '@site/src/components/architecture/FrameTreeDiagram';
+
+# Manipulators and frames
+
+A **manipulator** is the moving arm, and here also the rail it rides on. An **end-effector**
+is what touches the product (a parallel-jaw gripper). A **workcell** is the fixed surroundings:
+shelf, gravity-fed lanes, stock tray, cameras. A **pose** is position plus orientation. A
+**frame** is a named coordinate system bolted to part of that world (`tool0`, `shelf`,
+`lane_02`).
+
+Software never says “move to (1.2, 0.3, 0.8)” without also saying *in which frame*. Think of
+frames as nested local origins in a 3D scene graph.
+
+## Why it matters here
+
+combeanie restocks cans and bottles from a rear stock tray into gravity-fed refrigerated shelf
+lanes. The robot is a **rail + 6-DoF arm + parallel-jaw gripper**. Planning goals target
+semantic datums (`grasp_center`, lane frames), not arbitrary camera pixels. Wrong frames look
+like successful plans that collide or miss the product.
+
+## This project
+
+| Piece | Path |
+| --- | --- |
+| Assembled robot | `ros_ws/src/restocker_description/urdf/robot.xacro` |
+| Rail | `…/urdf/rail.xacro` (`rail_base` → `carriage`) |
+| Arm | `…/urdf/arm.xacro` (official `ur_description` UR10e meshes and chain to `tool0`) |
+| Gripper | `…/urdf/gripper.xacro` (`grasp_center`, fingers) |
+| Beanie | `…/urdf/beanie.xacro` (decorative `shoulder_link` cap, visual only) |
+| Workcell | `…/urdf/workcell.xacro` (shelf, lanes, overhead camera) |
+| Geometry source of truth | `…/config/workcell_geometry.yaml`, `gripper_geometry.yaml` |
+| MoveIt groups | `restocker_moveit_config/config/restocker.srdf` (`manipulator`, `arm`, `gripper`) |
+
+**Teach these names:** `world`, `rail_base`, `carriage`, `base_link`, `tool0`, `grasp_center`,
+`lane_01`…`lane_06`, `*_camera_optical_frame`.
+
+<FrameTreeDiagram />
+
+```text
+world
+`-- rail_base
+    `-- carriage          (rail_joint, prismatic +X)
+        `-- base_link
+            `-- … shoulder_pan_joint → wrist_3_joint …
+                `-- flange → tool0 → grasp_center / wrist camera
+
+world
+`-- shelf → lane_01 … lane_06
+         → overhead_camera_optical_frame
+```
+
+Grasp planning targets `grasp_center`; MoveIt solves to `tool0`. Units are metres and radians
+(REP-103). Authoritative object poses live in `world`; transform observations at the
+**acquisition** stamp, never “latest,” and never invent identity transforms.
+
+The UR10e is selected because its 1.30 m reach covers the rail-to-stock and pre-grasp envelope;
+the smaller UR3e and UR5e do not without moving the cell. The standard upstream joint names are a
+cross-stack contract; there are no `joint_1`…`joint_6` compatibility aliases.
+
+## References
+
+- **Literature:** [REP-103, Standard Units and Coordinate Conventions](https://www.ros.org/reps/rep-0103.html)
+- **Literature:** [REP-105, Coordinate Frames for Mobile Platforms](https://www.ros.org/reps/rep-0105.html)
+- **Official docs:** [ROS 2 Jazzy, URDF tutorials](https://docs.ros.org/en/jazzy/Tutorials/Intermediate/URDF/URDF-Main.html)
+- **Reference implementation:** [urdf_tutorial](https://index.ros.org/p/urdf_tutorial/)
+- **This project:** [Workcell and frames](/docs/architecture/workcell-and-frames) · `restocker_description/`

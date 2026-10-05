@@ -1,0 +1,49 @@
+---
+id: workcell-and-frames
+title: Workcell and frames
+sidebar_position: 3
+---
+
+import FrameTreeDiagram from '@site/src/components/architecture/FrameTreeDiagram';
+
+# Workcell and frames
+
+For a plain description of the shelf, tray, and arm layout (with schematics and 3D), start with
+the [Introduction](/docs). This page is the frame contract: how names, stamps, and surveyed YAML
+stay consistent across description, perception, planning, and placement.
+
+<FrameTreeDiagram />
+
+## Surveyed geometry
+
+Lane frames and collision volumes come from one YAML source so semantic IDs cannot drift from
+TF names:
+
+- `restocker_description/config/workcell_geometry.yaml`
+- `restocker_description/config/gripper_geometry.yaml`
+
+Lane frames are axis-aligned to `shelf`. Roller-bed inclination is evaluated as geometry, not as
+a rotated frame. Grasp planning targets `grasp_center`; MoveIt solves to `tool0`. Viewpoints are
+poses of `wrist_camera_optical_frame`, converted to `tool0` via the mount transform from TF.
+
+## Rules that keep the tree consistent
+
+- Units: metres / radians (REP-103 / REP-105 vocabulary).
+- Store authoritative object poses in `world`.
+- Transform observations at the **acquisition** stamp, never “latest.”
+- Never invent identity transforms to paper over missing frames.
+- Image topics stamp **optical** frames (`gz_frame_id`), not body links.
+
+## This project
+
+| Topic | Path |
+| --- | --- |
+| Robot / workcell Xacro | `restocker_description/urdf/` |
+| Geometry YAML | `restocker_description/config/workcell_geometry.yaml` |
+| MoveIt groups | `restocker_moveit_config/config/restocker.srdf` |
+
+## References
+
+- **Literature:** [REP-103](https://www.ros.org/reps/rep-0103.html) · [REP-105](https://www.ros.org/reps/rep-0105.html)
+- **Official docs:** [TF2 (Jazzy)](https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Tf2/Introduction-To-Tf2.html)
+- **This project:** [Fundamentals: manipulators](/docs/fundamentals/manipulators-and-frames)

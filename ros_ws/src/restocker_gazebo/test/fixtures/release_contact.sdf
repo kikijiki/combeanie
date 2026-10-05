@@ -1,0 +1,372 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+
+<!-- The released-product contact fixture: the unmeasured half of the product-contact claim.
+
+     `test_product_contact_runtime` proves products spawned into the shipped world are solid to
+     each other, including to a `static` (pinned) one. What it cannot prove is the path a real
+     placement takes: the product is welded into the robot's skeleton by a `DetachableJoint`,
+     carried, released, and only then has to resolve contact against a pinned column. This world
+     reproduces that path at fixture scale and nothing else:
+
+       * the lane's own arithmetic -- 4 degree roller bed, bed datum at depth 0.84 m, rear
+         clearance 0.01 m, `insert_entry_clearance_m` 0.045 m -- so a can is released at lane
+         depth 0.088 m exactly where `lane_release_product_center_depth_m` puts it, 8.15 mm above
+         the bed (`lane_insertion_floor_height_m` + 0.002 m, referenced to the rear lip as the
+         real insert is), and the bed carries it forward under the same friction pair the shipped
+         shelf uses (bed mu 0.05 under tan(4 deg) = 0.0699);
+       * a pinned column of three catalogued cans standing at `lane_columns.py`'s own poses
+         against a front retainer, the rearmost one 0.521 m of feed ahead of the release point;
+       * the real attachment plugin (same four RESTOCKER_* configs as `attachment_physics.sdf`)
+         and the same gripper/product descriptions, so attach, carry, release and settle run the
+         production code path rather than a stand-in.
+
+     The carried product is `stock_can_01`: the scenario allowlist refuses any other identity.
+     It starts level on the rear pad at the pre-insert pose (release depth minus the 0.12 m
+     `preinsertion_distance_m`) and is carried in by the prismatic `carry_joint`, which stands in
+     for the arm's straight-line insert.
+
+     Deliberately loads physics, the scene broadcaster and the attachment system only: no sensors
+     system, so no OpenGL, so `test_release_contact_runtime` is not renderer-labelled and runs
+     under `nix flake check`. The Bullet collision detector is named here for the same reason
+     `worlds/restocking.sdf` names it -- DART's default narrowphase is ODE's and has no
+     cylinder/cylinder collider, and every product in this fixture is a cylinder. -->
+<sdf version="1.9">
+  <world name="restocking">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="restocker_attachment_system" name="restocker_gazebo::AttachmentSystem"/>
+
+    <physics name="release_contact_physics" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <dart>
+        <collision_detector>bullet</collision_detector>
+      </dart>
+    </physics>
+
+    <gravity>0 0 -9.80665</gravity>
+
+    <!-- Floor: the fallback surface a product that falls through the bed would come to rest on,
+         which the probe tells apart from a correct bed settle by height. -->
+    <model name="floor">
+      <static>true</static>
+      <link name="floor_link">
+        <collision name="floor_collision">
+          <pose>0 0 -0.05 0 0 0</pose>
+          <geometry><box><size>8 5 0.1</size></box></geometry>
+          <surface>
+            <friction>
+              <ode><mu>0.9</mu><mu2>0.9</mu2></ode>
+            </friction>
+          </surface>
+        </collision>
+      </link>
+    </model>
+
+    <!-- The rear pad: a level platform at the pre-insert height, standing in for the free space
+         behind the shelf where the arm holds the product before the horizontal insert. Level so
+         the can rests upright (roll pi, matching the inverted gripper's grasp frame) rather than
+         taking the bed's 4 degree lean, which the 0.03 rad attach fidelity bound would refuse.
+         mu 0.9 like the shipped floor: spawned flush with the pad top, the contact solver's
+         first lateral impulses walk a mu 0.1 contact off the pad within a second (measured: the
+         can tips, slides rearward and falls); at 0.9 it holds position under 0.3 mm for the
+         whole pre-attach window. The insert itself is welded, so this value never gates it.
+         Rear edge 0.13 m behind the lane datum so every measured stall-band release (the can
+         settles up to 41 mm behind spawn after the weld relaxes) keeps its whole base on the
+         pad instead of teetering on the edge, which would deny the settle measurement a resting
+         product. -->
+    <model name="grasp_pad">
+      <static>true</static>
+      <link name="pad_link">
+        <collision name="pad_collision">
+          <pose>0 -0.0575 0.405369261 0 0 0</pose>
+          <geometry><box><size>0.12 0.145 0.810738522</size></box></geometry>
+          <surface>
+            <friction>
+              <ode><mu>0.9</mu><mu2>0.9</mu2></ode>
+            </friction>
+          </surface>
+        </collision>
+      </link>
+    </model>
+
+    <!-- The roller bed: one slab tangent to the shipped shelf's roller surface, top face at
+         lane height (0.84 - depth) * tan(4 deg) + 0.75 m, spanning lane depth 0 to 0.87 m.
+         mu 0.05 is the shipped roller-bed value: under tan(4 deg) so a released product runs
+         forward, far enough under that it is not one perturbation from stalling. -->
+    <model name="lane_bed">
+      <static>true</static>
+      <link name="bed_link">
+        <collision name="bed_collision">
+          <pose>0 0.433604871 0.758369078 -0.069813170 0 0</pose>
+          <geometry><box><size>0.30 0.872124451 0.04</size></box></geometry>
+          <surface>
+            <friction>
+              <ode><mu>0.05</mu><mu2>0.05</mu2></ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="bed_visual">
+          <pose>0 0.433604871 0.758369078 -0.069813170 0 0</pose>
+          <geometry><box><size>0.30 0.872124451 0.04</size></box></geometry>
+          <material>
+            <ambient>0.58 0.64 0.70 1</ambient>
+            <diffuse>0.58 0.64 0.70 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- The front retainer. Face plane at lane depth 0.84 m, the bed datum, which is where
+         `lane_columns.py` stands the frontmost product of a column. -->
+    <model name="front_retainer">
+      <static>true</static>
+      <link name="retainer_link">
+        <collision name="retainer_collision">
+          <pose>0 0.86 0.83 0 0 0</pose>
+          <geometry><box><size>0.30 0.04 0.30</size></box></geometry>
+        </collision>
+        <visual name="retainer_visual">
+          <pose>0 0.86 0.83 0 0 0</pose>
+          <geometry><box><size>0.30 0.04 0.30</size></box></geometry>
+          <material>
+            <ambient>0.45 0.50 0.55 1</ambient>
+            <diffuse>0.45 0.50 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- The pinned column: three catalogued cans at `lane_columns.py` index 0/1/2 poses
+         (depth = 0.84 - radius - index * 2 * radius * cos(4 deg), roll -4 deg), leaning on the
+         retainer exactly as a standing column does. Static, as every stocked product in the
+         dense demo fixture is. The rearmost (index 2) is the one the released product must come
+         to rest against. -->
+    <model name="lane_pinned_can_01">
+      <static>true</static>
+      <pose>0 0.807000000 0.813456541 -0.069813170 0 0</pose>
+      <link name="product_body">
+        <collision name="product_collision">
+          <geometry><cylinder><radius>0.033</radius><length>0.122</length></cylinder></geometry>
+        </collision>
+        <inertial>
+          <mass>0.355</mass>
+          <inertia>
+            <ixx>0.0005</ixx><iyy>0.0005</iyy><izz>0.0002</izz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+    <model name="lane_pinned_can_02">
+      <static>true</static>
+      <pose>0 0.741160773 0.818060468 -0.069813170 0 0</pose>
+      <link name="product_body">
+        <collision name="product_collision">
+          <geometry><cylinder><radius>0.033</radius><length>0.122</length></cylinder></geometry>
+        </collision>
+        <inertial>
+          <mass>0.355</mass>
+          <inertia>
+            <ixx>0.0005</ixx><iyy>0.0005</iyy><izz>0.0002</izz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+    <model name="lane_pinned_can_03">
+      <static>true</static>
+      <pose>0 0.675321545 0.822664395 -0.069813170 0 0</pose>
+      <link name="product_body">
+        <collision name="product_collision">
+          <geometry><cylinder><radius>0.033</radius><length>0.122</length></cylinder></geometry>
+        </collision>
+        <inertial>
+          <mass>0.355</mass>
+          <inertia>
+            <ixx>0.0005</ixx><iyy>0.0005</iyy><izz>0.0002</izz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+
+    <!-- The gripper. Model pose = the grasp-center offset: the gripper frame carries roll pi
+         (inverted, fingers hanging down around the can as the real tool does), so the grasp
+         center 0.14 m along the gripper's +z lands on the can's centre at the pre-insert pose.
+         `carry_joint` stands in for the arm's 0.12 m straight-line insert: prismatic along the
+         lane's insertion axis, slow enough that the welded product arrives like a real insert.
+
+         Entity names (restocker / gripper / left_finger_joint / right_finger_joint) are the
+         attachment boundary's own names; stock_can_01 / product_body is the scenario allowlist. -->
+    <model name="restocker">
+      <pose>0 -0.032 1.011738522 3.141592654 0 0</pose>
+      <link name="gripper">
+        <inertial>
+          <mass>1.2</mass>
+          <inertia>
+            <ixx>0.0017</ixx><iyy>0.0031</iyy><izz>0.0036</izz>
+          </inertia>
+        </inertial>
+        <collision name="palm_collision">
+          <pose>0 0 0.035 0 0 0</pose>
+          <geometry><box><size>0.16 0.11 0.07</size></box></geometry>
+        </collision>
+      </link>
+      <!-- Chassis welded to the world at the model pose, so `carry_joint` is an ordinary
+           model-internal prismatic exactly like the finger joints the same controller drives.
+           A prismatic whose parent is `world` accepted commands but never moved (measured: the
+           topic published, the joint position never changed). The model pose stays put with
+           this arrangement, so the probe reads joint states rather than the model frame. -->
+      <link name="chassis">
+        <inertial>
+          <mass>20.0</mass>
+          <inertia>
+            <ixx>1.0</ixx><iyy>1.0</iyy><izz>1.0</izz>
+          </inertia>
+        </inertial>
+      </link>
+      <joint name="chassis_world_joint" type="fixed">
+        <parent>world</parent>
+        <child>chassis</child>
+      </joint>
+      <joint name="carry_joint" type="prismatic">
+        <parent>chassis</parent>
+        <child>gripper</child>
+        <axis>
+          <!-- Chassis and model frames both carry the model's roll pi, so local -y is world +y:
+               a positive position is travel toward the retainer. -->
+          <xyz>0 -1 0</xyz>
+          <limit>
+            <lower>-0.05</lower>
+            <upper>0.25</upper>
+            <effort>80</effort>
+            <velocity>0.05</velocity>
+          </limit>
+          <dynamics><damping>5</damping></dynamics>
+        </axis>
+      </joint>
+
+      <link name="left_finger">
+        <!-- Spawn at the open aperture (joint zero is 0.03, initial_position 0.032), not at the
+             joint's zero: zero puts the faces 12 mm inside the catalogued can, and with the
+             gripper inverted those faces sit beside the product, so the first physics step
+             solved a deep product-to-finger penetration and produced a non-finite pose. The
+             joint frame stays at 0.03, so the joint reads +0.032 on the first tick exactly as
+             the controller's initial_position declares. -->
+        <pose relative_to="gripper">0 0.062 0.07 0 0 0</pose>
+        <inertial>
+          <pose>0 0 0.07 0 0 0</pose>
+          <mass>0.18</mass>
+          <inertia>
+            <ixx>0.0003</ixx><iyy>0.0003</iyy><izz>0.0001</izz>
+          </inertia>
+        </inertial>
+        <!-- Collision shortened to 0.125 m (tip at grasp-local z 0.195, 6 mm short of the
+             product's base) versus gripper_geometry.yaml's 0.14 m. The YAML box runs 9 mm past
+             a can's base, which at this fixture's insert height would put the tips 7 mm inside
+             the roller-bed slab at the lane mouth and drag the whole gripper through the bed.
+             The attachment plugin's physical checks read gripper_geometry.yaml, not this
+             collision, and every predicate they gate (finger targets, inner clearance, contact
+             overlap against the catalogued can) still holds: the shortened tip keeps
+             grasp-local overlap 0.079..0.195 with the product and the joint positions are
+             unaffected. -->
+        <collision name="left_finger_collision">
+          <pose>0 0 0.0625 0 0 0</pose>
+          <geometry><box><size>0.035 0.018 0.125</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="left_finger_joint" type="prismatic">
+        <pose relative_to="gripper">0 0.03 0.07 0 0 0</pose>
+        <parent>gripper</parent>
+        <child>left_finger</child>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit><lower>0</lower><upper>0.035</upper><effort>100</effort><velocity>1</velocity></limit>
+          <dynamics><damping>2</damping></dynamics>
+        </axis>
+      </joint>
+
+      <link name="right_finger">
+        <pose relative_to="gripper">0 -0.062 0.07 0 0 0</pose>
+        <inertial>
+          <pose>0 0 0.07 0 0 0</pose>
+          <mass>0.18</mass>
+          <inertia>
+            <ixx>0.0003</ixx><iyy>0.0003</iyy><izz>0.0001</izz>
+          </inertia>
+        </inertial>
+        <collision name="right_finger_collision">
+          <pose>0 0 0.0625 0 0 0</pose>
+          <geometry><box><size>0.035 0.018 0.125</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="right_finger_joint" type="prismatic">
+        <pose relative_to="gripper">0 -0.03 0.07 0 0 0</pose>
+        <parent>gripper</parent>
+        <child>right_finger</child>
+        <axis>
+          <xyz>0 -1 0</xyz>
+          <limit><lower>0</lower><upper>0.035</upper><effort>100</effort><velocity>1</velocity></limit>
+          <dynamics><damping>2</damping></dynamics>
+        </axis>
+      </joint>
+
+      <!-- Jaws start open around the resting can, as an approach does; the probe closes them to
+           the can's hold_joint_target_m (0.0145 m) before attaching. Open target stays
+           gripper_geometry.yaml's attachment.open_target_m: the plugin decouples only there. -->
+      <plugin filename="gz-sim-joint-position-controller-system"
+              name="gz::sim::systems::JointPositionController">
+        <joint_name>left_finger_joint</joint_name>
+        <topic>/release_contact/left_finger_position</topic>
+        <initial_position>0.032</initial_position>
+        <use_velocity_commands>true</use_velocity_commands>
+        <cmd_max>1.0</cmd_max>
+      </plugin>
+      <plugin filename="gz-sim-joint-position-controller-system"
+              name="gz::sim::systems::JointPositionController">
+        <joint_name>right_finger_joint</joint_name>
+        <topic>/release_contact/right_finger_position</topic>
+        <initial_position>0.032</initial_position>
+        <use_velocity_commands>true</use_velocity_commands>
+        <cmd_max>1.0</cmd_max>
+      </plugin>
+      <plugin filename="gz-sim-joint-position-controller-system"
+              name="gz::sim::systems::JointPositionController">
+        <joint_name>carry_joint</joint_name>
+        <topic>/release_contact/carry_position</topic>
+        <initial_position>0</initial_position>
+        <use_velocity_commands>true</use_velocity_commands>
+        <!-- Command cap in newtons in velocity mode: the insert drags the welded product across
+             the mu 0.9 grasp pad (~3.1 N), so the fingers' 1.0 stalled the carry at 6.8 mm
+             (measured). 15 N clears it with margin; the joint's own 0.05 m/s velocity limit
+             still bounds the traverse, and effort 80 still bounds the actuator. -->
+        <cmd_max>15</cmd_max>
+      </plugin>
+      <!-- Joint states give the probe the carry and finger positions directly: the model pose
+           no longer tracks the gripper once the chassis is welded to the world. -->
+      <plugin filename="gz-sim-joint-state-publisher-system"
+              name="gz::sim::systems::JointStatePublisher">
+        <topic>/release_contact/joint_state</topic>
+      </plugin>
+    </model>
+
+    <!-- The carried product: the scenario allowlist's `stock_can_01`, upright-inverted (roll pi,
+         identical cylinder physics, and the orientation the inverted grasp frame authorises) at
+         the pre-insert pose, resting level on the rear pad. -->
+    <model name="stock_can_01">
+      <pose>0 -0.032 0.871738522 3.141592654 0 0</pose>
+      <link name="product_body">
+        <inertial>
+          <mass>0.355</mass>
+          <inertia>
+            <ixx>0.0005</ixx><iyy>0.0005</iyy><izz>0.0002</izz>
+          </inertia>
+        </inertial>
+        <collision name="product_collision">
+          <geometry><cylinder><radius>0.033</radius><length>0.122</length></cylinder></geometry>
+        </collision>
+      </link>
+    </model>
+  </world>
+</sdf>

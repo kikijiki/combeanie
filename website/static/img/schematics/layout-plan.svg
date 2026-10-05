@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="620" viewBox="0 0 980 620" role="img" aria-labelledby="title">
+  <title id="title">Workcell and robot plan layout</title>
+  <rect width="100%" height="100%" fill="#fbfcfd"/>
+  <text x="24.00" y="22.00" fill="#1a1f24" font-size="16" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">Combined plan: robot behind the shelf</text>
+  <text x="24.00" y="42.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">World frame. rail_base at origin; shelf from baseline workcell_pose. Arm works from rear.</text>
+  <line x1="40.00" y1="660.00" x2="40.00" y2="30.00" stroke="#eef1f3" stroke-width="1"/>
+  <line x1="190.00" y1="660.00" x2="190.00" y2="30.00" stroke="#eef1f3" stroke-width="1"/>
+  <line x1="340.00" y1="660.00" x2="340.00" y2="30.00" stroke="#eef1f3" stroke-width="1"/>
+  <line x1="490.00" y1="660.00" x2="490.00" y2="30.00" stroke="#eef1f3" stroke-width="1"/>
+  <line x1="640.00" y1="660.00" x2="640.00" y2="30.00" stroke="#eef1f3" stroke-width="1"/>
+  <line x1="790.00" y1="660.00" x2="790.00" y2="30.00" stroke="#eef1f3" stroke-width="1"/>
+  <line x1="940.00" y1="660.00" x2="940.00" y2="30.00" stroke="#eef1f3" stroke-width="1"/>
+  <line x1="130.00" y1="525.00" x2="850.00" y2="525.00" stroke="#eef1f3" stroke-width="1"/>
+  <line x1="130.00" y1="450.00" x2="850.00" y2="450.00" stroke="#eef1f3" stroke-width="1"/>
+  <line x1="130.00" y1="375.00" x2="850.00" y2="375.00" stroke="#eef1f3" stroke-width="1"/>
+  <line x1="130.00" y1="300.00" x2="850.00" y2="300.00" stroke="#eef1f3" stroke-width="1"/>
+  <line x1="130.00" y1="225.00" x2="850.00" y2="225.00" stroke="#eef1f3" stroke-width="1"/>
+  <line x1="130.00" y1="150.00" x2="850.00" y2="150.00" stroke="#eef1f3" stroke-width="1"/>
+  <rect x="190.00" y="282.00" width="600.00" height="36.00" rx="0.00" fill="#e8eaed" stroke="#2c3640" stroke-width="1.8" opacity="1.0"/>
+  <rect x="452.50" y="265.50" width="75.00" height="69.00" rx="0.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="1.8" opacity="1.0"/>
+  <text x="490.00" y="286.00" fill="#1f6b5c" font-size="11" font-weight="700" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">carriage</text>
+  <text x="490.00" y="318.00" fill="#1f6b5c" font-size="11" font-weight="700" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">rail_base</text>
+  <line x1="490.00" y1="300.00" x2="490.00" y2="254.62" stroke="#1f6b5c" stroke-width="3.0"/>
+  <line x1="490.00" y1="254.62" x2="512.50" y2="217.50" stroke="#1f6b5c" stroke-width="2.2"/>
+  <circle cx="490.00" cy="258.00" r="5.00" fill="#1f6b5c" stroke="#2c3640" stroke-width="1.2"/>
+  <rect x="310.00" y="82.50" width="360.00" height="135.00" rx="0.00" fill="#eef2f4" stroke="#2c3640" stroke-width="1.8" opacity="1.0"/>
+  <rect x="308.12" y="82.50" width="3.75" height="135.00" rx="0.00" fill="#c8d2d9" stroke="#2c3640" stroke-width="0.8" opacity="1.0"/>
+  <rect x="368.12" y="82.50" width="3.75" height="135.00" rx="0.00" fill="#c8d2d9" stroke="#2c3640" stroke-width="0.8" opacity="1.0"/>
+  <rect x="428.12" y="82.50" width="3.75" height="135.00" rx="0.00" fill="#c8d2d9" stroke="#2c3640" stroke-width="0.8" opacity="1.0"/>
+  <rect x="488.12" y="82.50" width="3.75" height="135.00" rx="0.00" fill="#c8d2d9" stroke="#2c3640" stroke-width="0.8" opacity="1.0"/>
+  <rect x="548.12" y="82.50" width="3.75" height="135.00" rx="0.00" fill="#c8d2d9" stroke="#2c3640" stroke-width="0.8" opacity="1.0"/>
+  <rect x="608.12" y="82.50" width="3.75" height="135.00" rx="0.00" fill="#c8d2d9" stroke="#2c3640" stroke-width="0.8" opacity="1.0"/>
+  <rect x="668.12" y="82.50" width="3.75" height="135.00" rx="0.00" fill="#c8d2d9" stroke="#2c3640" stroke-width="0.8" opacity="1.0"/>
+  <rect x="310.00" y="82.50" width="360.00" height="9.00" rx="0.00" fill="#2d343c" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="490.00" y="154.00" fill="#1a1f24" font-size="12" font-weight="700" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">shelf (6 lanes)</text>
+  <rect x="385.00" y="378.75" width="210.00" height="82.50" rx="0.00" fill="#dfe5ea" stroke="#1f6b5c" stroke-width="1.8" opacity="1.0"/>
+  <text x="490.00" y="424.00" fill="#1f6b5c" font-size="12" font-weight="700" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">stock_tray</text>
+  <circle cx="490.00" cy="495.00" r="7.00" fill="#1f6b5c" stroke="#2c3640" stroke-width="1.2"/>
+  <text x="502.00" y="499.00" fill="#1f6b5c" font-size="11" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">overhead_camera</text>
+  <circle cx="490.00" cy="300.00" r="3.50" fill="#1f6b5c" stroke="#1f6b5c" stroke-width="1"/>
+  <line x1="490.00" y1="300.00" x2="400.00" y2="318.00" stroke="#1f6b5c" stroke-width="1.2"/>
+  <text x="404.00" y="322.00" fill="#1f6b5c" font-size="12" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">world / rail_base</text>
+  <circle cx="490.00" cy="217.50" r="3.50" fill="#1f6b5c" stroke="#1f6b5c" stroke-width="1"/>
+  <line x1="490.00" y1="217.50" x2="504.00" y2="207.50" stroke="#1f6b5c" stroke-width="1.2"/>
+  <text x="508.00" y="211.50" fill="#1f6b5c" font-size="12" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">shelf</text>
+  <text x="24.00" y="580.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">workcell_pose = [0.0, 0.55, 0.75, ...] m · robot between tray and shelf rear</text>
+  <text x="24.00" y="596.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">+Y toward customer (front retainer) · arm inserts from rear (−Y side of shelf depth)</text>
+</svg>

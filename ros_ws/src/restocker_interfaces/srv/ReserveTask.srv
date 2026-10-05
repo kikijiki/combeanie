@@ -1,0 +1,15 @@
+# Creates the single semantic task reservation from one exact snapshot.
+string request_id
+uint64 selected_snapshot_revision
+uint64 object_id
+uint64 object_revision
+bool has_source_lane
+string source_lane_id
+uint64 source_lane_revision
+string destination_lane_id
+uint64 destination_lane_revision
+---
+restocker_interfaces/WorldStateOperationStatus status
+uint64 world_revision
+string token
+restocker_interfaces/TaskReservation reservation

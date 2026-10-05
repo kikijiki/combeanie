@@ -1,0 +1,14 @@
+uint8 STARTUP_WAITING_FOR_AUTHORITY=0
+uint8 STARTUP_PROBE_PENDING=1
+uint8 STARTUP_READY=2
+uint8 STARTUP_ORPHANED_RESERVATION=3
+uint8 STARTUP_FAULTED=4
+
+std_msgs/Header header
+uint8 startup_state
+uint64 attempt_generation
+bool admission_ready
+bool inhibited
+string detail
+bool has_orphaned_reservation
+TaskReservation orphaned_reservation

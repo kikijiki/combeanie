@@ -1,0 +1,58 @@
+---
+id: world-state-vs-scene
+title: World state vs planning scene
+sidebar_position: 8
+---
+
+import TrustBoundaryDiagram from '@site/src/components/architecture/TrustBoundaryDiagram';
+
+# World state vs planning scene
+
+Two different “maps of the world” exist on purpose:
+
+| | **Semantic world state** | **Geometric planning scene** |
+| --- | --- | --- |
+| Question | *What* is where (SKU, lane membership, held?, task phase) | *Will the robot hit* something if it moves like this? |
+| Authority | Yes: inventory / reservation source of truth | No: derived collision geometry |
+| Wrong use | Using MoveIt objects as the stock database | Letting planners invent which can is “lane 3” |
+
+A projector copies *enough geometry* from world state (+ obstacles) into MoveIt under leases,
+then verifies reconciliation. Perception may keep updating **evidence** during a reservation,
+but attachment and new lane membership require token-bearing commits. Accepted lane surveys
+can also reconcile FIFO sales and remove contents through world-state rules. For the reserved
+product itself, world state holds the pose across the pre-attach window: a fresh confirm frame
+advances freshness but replaces `pose_in_world` only past a **20 mm divergence bound**, which is
+then applied immediately. That keeps the staged grasp and the projected obstacle reading one
+pose, while a product that really moved is surfaced to the scene instead of hidden behind the
+hold.
+
+## Why it matters here
+
+Restocking is transactional: reserve → grasp → attach → insert → commit → verify. If MoveIt
+were the database, a collision-object rename would corrupt inventory. Failures also split:
+“planning scene drifted” and “inventory wrong” are different incidents.
+
+<TrustBoundaryDiagram />
+
+```text
+World state (names, lanes, reservations)
+        │ projector / lease   ✗ never reverse
+        ▼
+Planning scene (boxes for collision)
+```
+
+## This project
+
+| Piece | Path |
+| --- | --- |
+| Authority core | `restocker_world_state/src/world_state.cpp`, `world_state_node.cpp` |
+| Lane policy | `restocker_world_state/config/baseline_lanes.yaml` |
+| Projector | `restocker_task_executor/src/planning_scene_projector_node.cpp` |
+| Snapshot → geometry | `…/src/world_snapshot_projection.cpp` |
+
+## References
+
+- **Official docs:** [MoveIt Planning Scene Monitor](https://moveit.picknik.ai/main/doc/examples/planning_scene_monitor/planning_scene_monitor_tutorial.html)
+- **Literature:** [Tenorth & Beetz, KnowRob (contrast class)](https://ai.uni-bremen.de/papers/tenorth13knowrob.pdf)
+- **Literature:** [Verification-gated mission-state governance](https://arxiv.org/abs/2606.31339)
+- **This project:** [World state](/docs/architecture/world-state) · [Motion planning](/docs/architecture/motion-planning)

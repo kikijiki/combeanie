@@ -1,0 +1,33 @@
+schema_version: 1
+
+# Card 010 SC-001 acceptance table: three depleted lanes start empty and are restored from
+# the unordered mixed tray (one product per class) in
+# restocker_gazebo/config/sensor_acceptance_products.yaml. Sibling lanes declare want none
+# (target_count 0) so the section 4 deficit is exactly one unit on lane_01/02/03 and the run
+# ends at PHASE_FRONT_FULL after three transfers. Targets equal the tray's one-per-class
+# inventory so the loop never idles on STOCK_EXHAUSTED with a phantom deficit.
+lanes:
+  lane_01:
+    expected_product_class: can
+    expected_sku: SIM-CAN-STD
+    target_count: 1
+  lane_02:
+    expected_product_class: small_bottle
+    expected_sku: SIM-BOTTLE-SMALL
+    target_count: 1
+  lane_03:
+    expected_product_class: large_bottle
+    expected_sku: SIM-BOTTLE-LARGE
+    target_count: 1
+  lane_04:
+    expected_product_class: can
+    expected_sku: SIM-CAN-STD
+    target_count: 0
+  lane_05:
+    expected_product_class: small_bottle
+    expected_sku: SIM-BOTTLE-SMALL
+    target_count: 0
+  lane_06:
+    expected_product_class: large_bottle
+    expected_sku: SIM-BOTTLE-LARGE
+    target_count: 0

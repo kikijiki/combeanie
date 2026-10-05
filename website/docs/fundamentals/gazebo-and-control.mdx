@@ -1,0 +1,71 @@
+---
+id: gazebo-and-control
+title: Gazebo and ros2_control
+sidebar_position: 5
+---
+
+# Gazebo and ros2_control
+
+**Gazebo Harmonic** is the physics simulator (gz-sim 8): rigid bodies, contacts, cameras,
+custom system plugins. It is the *physical* ground truth for the baseline.
+
+**ros2_control** is the standard control stack: a **controller manager** loads controllers
+(joint trajectory, gripper position, joint-state broadcaster) that read/write hardware
+interfaces.
+
+**gz_ros2_control** is the bridge plugin: simulated joints *look like* a real robot to
+ros2_control. Controllers do not care whether the “motor” is metal or a physics engine.
+
+## Why it matters here
+
+MoveIt does not talk to Gazebo directly:
+
+```text
+MoveIt trajectory
+  → FollowJointTrajectory controllers
+  → gz_ros2_control
+  → Gazebo joints
+```
+
+Grasping uses a **custom Gazebo attachment system** (detachable joint) plus a ROS adapter,
+because beverage restock needs carry semantics beyond open/close fingers. The baseline uses wrist RGB-D confirmation for operational object poses and wrist surveys
+for lane evidence. The **ground-truth adapter** publishes separate evaluator topics by default;
+it is an explicit opt-in operational source.
+
+Arm and rail controllers are **velocity** (+ feed-forward); the gripper is **position**
+(simulation lag on the gripper is expected). The simulation clock arrives on `/clock`: use it for acquisition stamps, TF lookups,
+observation freshness and controller timing. Operation and whole-task budgets deliberately use
+a steady clock, so a paused or slow simulation can still exceed a deadline. Record both clocks
+when investigating a timeout.
+
+## This project
+
+| Piece | Path |
+| --- | --- |
+| World SDF | `restocker_gazebo/worlds/restocking.sdf` |
+| Attachment plugin | `restocker_gazebo/src/attachment_system.cpp` |
+| Ground-truth adapter | `…/src/ground_truth_adapter.cpp` |
+| Attachment ROS node | `…/src/attachment_adapter_node.cpp` |
+| Hardware tags | `restocker_description/urdf/ros2_control.xacro` |
+| Controllers | `restocker_control/config/controllers.yaml` |
+
+```text
+ros2_control                         Gazebo Harmonic
+────────────                         ───────────────
+controller_manager
+  ├─ arm_controller ──┐
+  ├─ rail_controller ─┼─► gz_ros2_control ─► joints / physics / cameras
+  ├─ gripper_controller┘
+  └─ joint_state_broadcaster
+
+attachment_system plugin ─► attachment ROS adapter
+```
+
+## References
+
+- **Official docs:** [Gazebo Harmonic get started](https://gazebosim.org/docs/harmonic/getstarted/)
+- **Official docs:** [ROS 2 interoperability (Harmonic)](https://gazebosim.org/docs/harmonic/ros2_interop/)
+- **Official docs:** [ros2_control (Jazzy)](https://control.ros.org/jazzy/)
+- **Official docs:** [gz_ros2_control (Jazzy)](https://control.ros.org/jazzy/doc/gz_ros2_control/doc/index.html)
+- **Reference implementation:** [ros-controls/gz_ros2_control](https://github.com/ros-controls/gz_ros2_control)
+- **This project:** [Simulation and control](/docs/architecture/simulation) · packages `restocker_gazebo/`, `restocker_control/`

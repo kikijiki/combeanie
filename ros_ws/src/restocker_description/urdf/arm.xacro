@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!--
+    The manipulator is the official Universal Robots UR10e description from
+    Universal_Robots_ROS2_Description 3.5.1 (Jazzy). The upstream macro owns the real visual and
+    collision meshes, calibrated link transforms, inertias and limits. This wrapper owns only
+    the cell-specific carriage mount.
+
+    UR10e is required: the fixed stock poses are 0.80 m from the rail and the pre-grasp adds
+    another 0.18 m before the gripper offset. UR3e (0.50 m reach) and UR5e (0.85 m) cannot span
+    that without moving the rail or redesigning the cell; UR10e's 1.30 m reach can.
+  -->
+  <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
+
+  <xacro:macro name="restocker_arm" params="prefix joint_limits_parameters_file">
+    <xacro:ur_robot
+      name="restocker_ur10e"
+      tf_prefix="${prefix}"
+      parent="${prefix}carriage"
+      joint_limits_parameters_file="${joint_limits_parameters_file}"
+      kinematics_parameters_file="$(find ur_description)/config/ur10e/default_kinematics.yaml"
+      physical_parameters_file="$(find ur_description)/config/ur10e/physical_parameters.yaml"
+      visual_parameters_file="$(find ur_description)/config/ur10e/visual_parameters.yaml"
+      safety_limits="false"
+      force_abs_paths="true">
+      <!-- The carriage frame is at its lower face; mount the UR10e on its 0.12 m top plate. -->
+      <origin xyz="0 0 0.12" rpy="0 0 0"/>
+    </xacro:ur_robot>
+  </xacro:macro>
+</robot>

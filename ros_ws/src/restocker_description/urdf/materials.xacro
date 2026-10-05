@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <material name="restocker_dark_gray">
+    <color rgba="0.13 0.15 0.18 1.0"/>
+  </material>
+  <material name="restocker_light_gray">
+    <color rgba="0.55 0.60 0.65 1.0"/>
+  </material>
+  <material name="restocker_orange">
+    <color rgba="0.95 0.38 0.08 1.0"/>
+  </material>
+  <material name="restocker_blue">
+    <color rgba="0.08 0.35 0.72 1.0"/>
+  </material>
+  <material name="restocker_black">
+    <color rgba="0.02 0.02 0.025 1.0"/>
+  </material>
+  <material name="restocker_camera_glass">
+    <color rgba="0.08 0.16 0.24 0.9"/>
+  </material>
+</robot>

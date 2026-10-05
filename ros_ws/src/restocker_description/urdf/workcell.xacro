@@ -1,0 +1,234 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:include filename="$(find restocker_description)/urdf/inertial_macros.xacro"/>
+
+  <xacro:macro name="restocker_workcell" params="prefix geometry">
+    <xacro:property name="shelf_width" value="${geometry.shelf.width_m}"/>
+    <xacro:property name="shelf_depth" value="${geometry.shelf.depth_m}"/>
+    <xacro:property name="support_thickness" value="${geometry.shelf.support_thickness_m}"/>
+    <xacro:property name="divider_thickness" value="${geometry.shelf.divider_thickness_m}"/>
+    <xacro:property name="divider_height" value="${geometry.shelf.divider_height_m}"/>
+    <xacro:property name="retainer_depth" value="${geometry.shelf.front_retainer_depth_m}"/>
+    <xacro:property name="retainer_height" value="${geometry.shelf.front_retainer_height_m}"/>
+    <xacro:property name="incline" value="${radians(geometry.shelf.lane_incline_deg)}"/>
+    <xacro:property name="roller_radius" value="${geometry.shelf.roller_radius_m}"/>
+    <xacro:property name="roller_pitch" value="${geometry.shelf.roller_pitch_m}"/>
+    <!-- The roller surface is zero height at the retainer face and rises behind it: height at lane
+         depth y is (bed_datum_depth - y) * tan(incline). restocker_task_executor's manipulation
+         geometry evaluates the same expression from the same survey numbers. -->
+    <xacro:property name="bed_datum_depth" value="${shelf_depth - retainer_depth}"/>
+    <!-- Slab pose. Its top face is the roller surface: as long as the shelf along the slope,
+         pitched nose-down toward the customer, centre half a thickness below the surface midpoint
+         along the surface normal (0, sin, cos). -->
+    <xacro:property name="bed_length" value="${shelf_depth / cos(incline)}"/>
+    <xacro:property name="bed_mid_height" value="${(bed_datum_depth - shelf_depth / 2.0) * tan(incline)}"/>
+    <xacro:property name="bed_center_y" value="${shelf_depth / 2.0 - (support_thickness / 2.0) * sin(incline)}"/>
+    <xacro:property name="bed_center_z" value="${bed_mid_height - (support_thickness / 2.0) * cos(incline)}"/>
+    <xacro:property name="roller_count" value="${int(shelf_depth / roller_pitch)}"/>
+    <xacro:property name="stock_tray_width" value="${geometry.stock_tray.width_m}"/>
+    <xacro:property name="stock_tray_depth" value="${geometry.stock_tray.depth_m}"/>
+    <xacro:property name="stock_tray_thickness" value="${geometry.stock_tray.thickness_m}"/>
+
+    <!-- The shelf origin is the rear insertion datum, at the roller surface height at the retainer
+         face, where a gravity-fed product comes to rest. -->
+    <link name="${prefix}shelf">
+      <xacro:macro name="divider" params="name x">
+        <visual name="${name}_visual">
+          <origin xyz="${x} ${shelf_depth / 2.0} ${divider_height / 2.0}" rpy="0 0 0"/>
+          <geometry><box size="${divider_thickness} ${shelf_depth} ${divider_height}"/></geometry>
+          <material name="workcell_divider"><color rgba="0.72 0.78 0.82 0.72"/></material>
+        </visual>
+        <collision name="${name}_collision">
+          <origin xyz="${x} ${shelf_depth / 2.0} ${divider_height / 2.0}" rpy="0 0 0"/>
+          <geometry><box size="${divider_thickness} ${shelf_depth} ${divider_height}"/></geometry>
+        </collision>
+      </xacro:macro>
+      <!-- Dividers are generated from the surveyed geometry so the lane count lives in one place
+           (six lanes need seven dividers). Each is named by its geometry key, keeping collision
+           element names stable. -->
+      <xacro:macro name="divider_series" params="names index">
+        <xacro:if value="${index &lt; python.len(names)}">
+          <xacro:divider name="${names[index]}" x="${geometry.shelf.divider_x_m[names[index]]}"/>
+          <xacro:divider_series names="${names}" index="${index + 1}"/>
+        </xacro:if>
+      </xacro:macro>
+      <xacro:divider_series names="${list(geometry.shelf.divider_x_m.keys())}" index="0"/>
+
+      <visual name="front_retainer_visual">
+        <origin xyz="0 ${shelf_depth - retainer_depth / 2.0} ${retainer_height / 2.0}" rpy="0 0 0"/>
+        <geometry><box size="${shelf_width} ${retainer_depth} ${retainer_height}"/></geometry>
+        <material name="workcell_frame"><color rgba="0.20 0.23 0.27 1.0"/></material>
+      </visual>
+      <collision name="front_retainer_collision">
+        <origin xyz="0 ${shelf_depth - retainer_depth / 2.0} ${retainer_height / 2.0}" rpy="0 0 0"/>
+        <geometry><box size="${shelf_width} ${retainer_depth} ${retainer_height}"/></geometry>
+      </collision>
+
+      <!-- Stock tray is behind the shelf, within the same surveyed workcell assembly. -->
+      <visual name="stock_tray_visual">
+        <origin xyz="${' '.join(str(value) for value in geometry.stock_tray.center_xyz_m)}" rpy="0 0 0"/>
+        <geometry><box size="${stock_tray_width} ${stock_tray_depth} ${stock_tray_thickness}"/></geometry>
+        <material name="workcell_tray"><color rgba="0.24 0.28 0.33 1.0"/></material>
+      </visual>
+      <collision name="stock_tray_collision">
+        <origin xyz="${' '.join(str(value) for value in geometry.stock_tray.center_xyz_m)}" rpy="0 0 0"/>
+        <geometry><box size="${stock_tray_width} ${stock_tray_depth} ${stock_tray_thickness}"/></geometry>
+      </collision>
+
+      <xacro:box_inertial
+        mass="20.0" x="${shelf_width}" y="${shelf_depth}" z="${divider_height}"
+        xyz="0 ${shelf_depth / 2.0} ${divider_height / 2.0}" rpy="0 0 0"/>
+    </link>
+
+    <!-- The roller bed is its own link because a URDF <gazebo reference> applies friction to a
+         whole link and the two surfaces need opposite friction: a product must stay put on the
+         stock tray and run freely down the lane. The dividers and retainer stay on the shelf link,
+         vertical, 0.42 m and 0.09 m above the shelf datum; behind the retainer face the bed rises
+         into them. -->
+    <link name="${prefix}roller_bed">
+      <visual name="roller_bed_visual">
+        <origin xyz="0 ${bed_center_y} ${bed_center_z}" rpy="${-incline} 0 0"/>
+        <geometry><box size="${shelf_width} ${bed_length} ${support_thickness}"/></geometry>
+        <material name="workcell_shelf"><color rgba="0.58 0.64 0.70 1.0"/></material>
+      </visual>
+      <!-- One slab tangent to every roller instead of the rollers themselves (rationale in
+           workcell_geometry.yaml next to roller_radius_m). -->
+      <collision name="roller_bed_collision">
+        <origin xyz="0 ${bed_center_y} ${bed_center_z}" rpy="${-incline} 0 0"/>
+        <geometry><box size="${shelf_width} ${bed_length} ${support_thickness}"/></geometry>
+      </collision>
+
+      <!-- Rollers are visual only, tangent to the slab's top face: each centre sits one radius in
+           along the surface normal (0, sin, cos) from the surface point above it. -->
+      <xacro:macro name="roller_series" params="index">
+        <xacro:if value="${index &lt; roller_count}">
+          <xacro:property name="roller_depth" value="${(index + 0.5) * roller_pitch}"/>
+          <xacro:property name="roller_surface_z" value="${(bed_datum_depth - roller_depth) * tan(incline)}"/>
+          <visual name="roller_${'%02d' % index}_visual">
+            <origin
+              xyz="0 ${roller_depth - roller_radius * sin(incline)} ${roller_surface_z - roller_radius * cos(incline)}"
+              rpy="0 ${pi / 2.0} 0"/>
+            <geometry><cylinder radius="${roller_radius}" length="${shelf_width}"/></geometry>
+            <material name="workcell_roller"><color rgba="0.42 0.46 0.52 1.0"/></material>
+          </visual>
+          <xacro:roller_series index="${index + 1}"/>
+        </xacro:if>
+      </xacro:macro>
+      <xacro:roller_series index="0"/>
+
+      <xacro:box_inertial
+        mass="12.0" x="${shelf_width}" y="${bed_length}" z="${support_thickness}"
+        xyz="0 ${bed_center_y} ${bed_center_z}" rpy="${-incline} 0 0"/>
+    </link>
+    <joint name="${prefix}roller_bed_joint" type="fixed">
+      <parent link="${prefix}shelf"/>
+      <child link="${prefix}roller_bed"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <xacro:macro name="semantic_frame" params="name x">
+      <link name="${prefix}${name}"/>
+      <joint name="${prefix}${name}_joint" type="fixed">
+        <parent link="${prefix}shelf"/>
+        <child link="${prefix}${name}"/>
+        <origin xyz="${x} 0 0" rpy="0 0 0"/>
+      </joint>
+    </xacro:macro>
+    <!-- Every lane gets a frame because placement resolves its destination lane through tf2 by
+         name. Generating them from the same map as the lane volumes keeps the two in step. -->
+    <xacro:macro name="semantic_frame_series" params="names index">
+      <xacro:if value="${index &lt; python.len(names)}">
+        <xacro:semantic_frame name="${names[index]}" x="${geometry.lanes[names[index]].center_x_m}"/>
+        <xacro:semantic_frame_series names="${names}" index="${index + 1}"/>
+      </xacro:if>
+    </xacro:macro>
+    <xacro:semantic_frame_series names="${list(geometry.lanes.keys())}" index="0"/>
+
+    <!-- Two RGB-D cameras answer different questions. This fixed one is the detection view and has
+         to contain every object at once; the wrist camera cannot, since what it sees depends on
+         where the arm already went. The wrist camera (sensors.xacro) does close-range pose
+         refinement at a pregrasp, where this camera is two metres away at a steep angle.
+
+         The pose is surveyed so one frustum contains both work regions, expressed in the shelf
+         frame like the other surveyed volumes in workcell_geometry.yaml:
+           * the stock tray usable volume, y -1.605..-1.095, z -0.180..0.170
+           * the six lane volumes,         y  0.010.. 0.860, z  0.000..0.400, x -1.183..1.183
+         The regions are 2.5 m apart in y with the robot between them, so no camera between them
+         sees both. This one stands behind the stock tray on a mast and looks forward and down
+         across the cell. The shelf is loaded from the rear, so from here the camera looks along
+         the lane insertion axis into the open end of every lane, with nothing between it and the
+         tray the robot picks from.
+
+         Reach check: this link keeps its collision box, projected into the MoveIt planning scene
+         as restocker/workcell/overhead_camera_link/camera_collision. The mast is at world
+         (0, -1.30, 2.80) once the workcell is at its scenario pose. The shoulder axis is 0.70 m up
+         and travels only in x, so the camera is always hypot(1.30, 2.10) = 2.47 m away from it,
+         and the whole arm from base_link to tool0 is 2.11 m: it cannot be struck or obstruct a
+         plan. The previous pose, (0, 0.42, 0.95) in this frame, was 1.39 m from the shoulder,
+         inside the workspace between the robot and the shelf, aimed along world +X at nothing. -->
+    <link name="${prefix}overhead_camera_link">
+      <visual name="camera_visual">
+        <geometry><box size="0.10 0.07 0.05"/></geometry>
+        <material name="workcell_camera"><color rgba="0.04 0.05 0.07 1.0"/></material>
+      </visual>
+      <collision name="camera_collision">
+        <geometry><box size="0.10 0.07 0.05"/></geometry>
+      </collision>
+      <xacro:box_inertial mass="0.35" x="0.10" y="0.07" z="0.05" xyz="0 0 0" rpy="0 0 0"/>
+    </link>
+    <!-- +X of a camera body link is the view axis: yaw turns it from world +X onto world +Y and
+         pitch drops it 55 degrees below the horizon. -->
+    <joint name="${prefix}overhead_camera_mount_joint" type="fixed">
+      <parent link="${prefix}shelf"/>
+      <child link="${prefix}overhead_camera_link"/>
+      <origin xyz="0 -1.85 2.05" rpy="0 ${55.0 * pi / 180.0} ${pi / 2.0}"/>
+    </joint>
+
+    <link name="${prefix}overhead_camera_optical_frame"/>
+    <joint name="${prefix}overhead_camera_optical_joint" type="fixed">
+      <parent link="${prefix}overhead_camera_link"/>
+      <child link="${prefix}overhead_camera_optical_frame"/>
+      <origin xyz="0 0 0" rpy="${-pi / 2.0} 0 ${-pi / 2.0}"/>
+    </joint>
+
+    <!-- gz_frame_id overrides the frame_id Gazebo would stamp on every image, depth image, cloud
+         and camera_info, which is the sensor's scoped name and not a TF frame. Consumers transform
+         observations through tf2 at the acquisition stamp, and only the optical frame follows the
+         z-forward/x-right/y-down convention of camera_info's pinhole model; naming the body link
+         would leave every projection wrong by the 90-degree optical rotation. The sensor sits at
+         the link origin, coincident with the optical frame.
+         960x720 rather than 640x480: at 1.50 rad the 33 mm can is 16 px across from 2.06 m, the
+         smallest thing this camera has to find. 6 Hz because nothing downstream reacts faster and
+         each frame is a 690k-pixel colour image plus a depth image. -->
+    <gazebo reference="${prefix}overhead_camera_link">
+      <sensor name="${prefix}overhead_camera" type="rgbd_camera">
+        <topic>${prefix}overhead_camera</topic>
+        <gz_frame_id>${prefix}overhead_camera_optical_frame</gz_frame_id>
+        <update_rate>6</update_rate>
+        <always_on>true</always_on>
+        <camera>
+          <horizontal_fov>1.50</horizontal_fov>
+          <image><width>960</width><height>720</height><format>R8G8B8</format></image>
+          <clip><near>0.20</near><far>8.0</far></clip>
+        </camera>
+      </sensor>
+    </gazebo>
+
+    <gazebo><static>true</static></gazebo>
+    <gazebo reference="${prefix}shelf">
+      <mu1>0.8</mu1>
+      <mu2>0.8</mu2>
+    </gazebo>
+    <!-- This friction makes the bed a roller bed. DART resolves a contact with the smaller of the
+         two coefficients and every catalogued product is 0.65 or above, so this value alone decides
+         how a product runs down the lane: it must be under tan(lane_incline_deg) or nothing moves,
+         and far enough under that a stalled product is not one contact perturbation away. The DART
+         runs that chose it and the angle are documented in workcell_geometry.yaml. -->
+    <gazebo reference="${prefix}roller_bed">
+      <mu1>0.05</mu1>
+      <mu2>0.05</mu2>
+    </gazebo>
+  </xacro:macro>
+</robot>

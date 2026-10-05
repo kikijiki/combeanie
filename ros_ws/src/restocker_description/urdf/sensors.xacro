@@ -1,0 +1,105 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:macro name="restocker_wrist_camera" params="prefix sensor:=true">
+    <joint name="${prefix}wrist_camera_mount_joint" type="fixed">
+      <parent link="${prefix}tool0"/>
+      <child link="${prefix}wrist_camera_link"/>
+      <origin xyz="0.11 0 0.07" rpy="0 ${-pi / 2.0} 0"/>
+    </joint>
+    <link name="${prefix}wrist_camera_link">
+      <visual>
+        <geometry><box size="0.05 0.09 0.04"/></geometry>
+        <material name="restocker_black"/>
+      </visual>
+      <collision>
+        <geometry><box size="0.05 0.09 0.04"/></geometry>
+      </collision>
+      <xacro:box_inertial mass="${0.25}" x="${0.05}" y="${0.09}" z="${0.04}" xyz="0 0 0" rpy="0 0 0"/>
+    </link>
+
+    <joint name="${prefix}wrist_camera_optical_joint" type="fixed">
+      <parent link="${prefix}wrist_camera_link"/>
+      <child link="${prefix}wrist_camera_optical_frame"/>
+      <origin xyz="0.026 0 0" rpy="${-pi / 2.0} 0 ${-pi / 2.0}"/>
+    </joint>
+    <!-- REP-103 optical frames are coordinate frames, not physical bodies. -->
+    <link name="${prefix}wrist_camera_optical_frame"/>
+
+    <!-- Close-range RGB-D, the second half of the pair described in workcell.xacro.
+         The fixed camera finds objects; this one refines the pose of the object the arm is
+         already in front of, from ~0.25 m instead of ~2 m. The camera is mounted off the grasp
+         axis for clearance, so it cannot see the grasp datum nearer than 0.214 m along its
+         optical axis; the executor's 0.18 m pre-grasp presents it at 0.224 m, a margin of 10 mm
+         (not the 35 mm suggested by the 0.2496 m straight-line range to the same point).
+
+         The renderer is on by default and can be switched off. The `wrist_camera` argument in
+         restocker_gazebo/launch/simulation.launch.py is an opt-out for runs that never look
+         through this camera (benchmarks, manipulation tests driven from ground truth). The gate
+         is here and not at the ROS bridge: `cameras:=false` only stops the bridge while Gazebo
+         keeps rendering whatever the SDF declares.
+
+         Only the renderer is gated. The link, optical frame and both joints above are
+         unconditional: the description tests check them and they cost nothing at runtime. The
+         body's 0.05 x 0.09 x 0.04 box is the clearance the large bottle needs and enlarging it
+         breaks grasping, so this adds a frame and a frustum and no geometry.
+
+         The sensor pose is the optical frame's origin in the link frame (the same 0.026 m as the
+         optical joint), restated because Gazebo cannot read the joint. Its rotation is zero
+         because a Gazebo camera looks along +X of the frame it is given, as the body link
+         already does; gz_frame_id relabels the published messages onto the optical frame, whose
+         axes match the pinhole model in camera_info. -->
+    <xacro:if value="${sensor}">
+      <gazebo reference="${prefix}wrist_camera_link">
+        <sensor name="${prefix}wrist_camera" type="rgbd_camera">
+          <pose>0.026 0 0 0 0 0</pose>
+          <topic>${prefix}wrist_camera</topic>
+          <gz_frame_id>${prefix}wrist_camera_optical_frame</gz_frame_id>
+          <update_rate>5</update_rate>
+          <always_on>true</always_on>
+          <!-- 1280x720 with horizontal_fov 1.48 (was 640x480 and 1.20). Change them together; see below.
+
+               Resolution: attachment_boundary.yaml holds the grasp to expected_translation_m
+               0.003. At 640x480, 3 mm subtended 4.7 px at 0.30 m. At 1280x720 and this FOV it is
+               7.0 px at 0.30 m, or 4.7 px at 0.45 m: the same discrimination from half again the
+               standoff, which is easier to reach and keeps the arm from shadowing the product.
+
+               FOV: 1280x720 is 16:9 where 640x480 was 4:3, so keeping horizontal_fov at 1.20
+               would cut the vertical field from 54.3 to 42.1 degrees. The camera is mounted
+               0.110 m off the grasp approach axis (the 0.11 m in the mount joint above) to clear
+               the large bottle, which puts the grasp datum near the top edge of the frame. The
+               datum enters the image beyond 0.110/tan(vfov/2) of range: 0.214 m at 54.3 degrees,
+               and the 0.18 m pre-grasp presents it at 0.224 m, 10 px inside the top edge. At 42.1
+               degrees that becomes 0.286 m and the datum is off the top of the image at the
+               commanded pose. 1.48 restores the vertical field to 54.4 degrees (84.8 x 54.4
+               degrees, close to a RealSense D435's 87 x 58 depth stream).
+               test_wrist_camera_frames_the_grasp_datum_at_the_pregrasp_standoff catches a
+               mismatch. Widening only the horizontal field brings nothing new into view: the
+               gripper fingers are excluded vertically and by the near clip.
+
+               Cost, measured over 14 interleaved rounds of a headless camera run, differenced
+               within each round. Real-time factor and total CPU are unmeasurable against this
+               machine's noise (RTF +0.000, 95% CI [-0.012, +0.013]; CPU -0.06 cores, CI
+               [-0.18, +0.06]; loadavg 6 to 49 from unrelated work). Frame rate is measurable:
+               the wrist depth stream falls from 4.47 to 3.99 Hz, CI [-0.77, -0.21], against
+               test_camera_runtime's 2.5 Hz floor. The overhead colour stream is bimodal (~5.3 Hz
+               or ~3.5 Hz) and falls into the low mode in 9 of 14 rounds, versus 2 of 14 at
+               640x480, half a hertz over its 3.0 Hz floor, because the renderer round-robins and
+               a bigger wrist frame delays it. In 5 further runs of test_camera_runtime the rate
+               assertion failed once at 640x480 and twice at 1280x720: too few to separate, but
+               the direction agrees. 1920x1080 was rejected: wrist depth 3.49 Hz mean and 2.67 Hz
+               worst, under 3 Hz in 3 of 14 rounds, plus +0.054 cores, CI [+0.034, +0.074], in the
+               bridge. The renderer is software-rasterised and does not sustain 5 Hz even at
+               640x480, so the cost lands on frame rate, not RTF. The wrist stream has no consumer
+               but the bridge today; update_rate is the cheap place to recover margin. -->
+          <camera>
+            <horizontal_fov>1.48</horizontal_fov>
+            <image><width>1280</width><height>720</height><format>R8G8B8</format></image>
+            <clip><near>0.05</near><far>2.5</far></clip>
+          </camera>
+        </sensor>
+      </gazebo>
+    </xacro:if>
+  </xacro:macro>
+</robot>

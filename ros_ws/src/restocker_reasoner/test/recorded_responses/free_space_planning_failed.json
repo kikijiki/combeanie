@@ -1,0 +1,9 @@
+{
+  "schema_version": "restocker.reasoner.recovery.response.v1",
+  "request_id": "rec-free-space-planning-failed",
+  "status": "ok",
+ "failure_class": "free_space_planning_failed",
+  "recommended_primitive": "resume_at_recovery_state",
+  "confidence": 0.95,
+  "explanation": "The failure occurred during pre-insert motion planning, indicating a free space planning issue rather than a trajectory execution error. The controller is authorized to perform a bounded replan from the current state. Since this is the first recovery attempt (1 of 2), attempting to resume and replan is the most logical step to resolve the transient planning failure. The controller's default action aligns with this recommendation."
+}

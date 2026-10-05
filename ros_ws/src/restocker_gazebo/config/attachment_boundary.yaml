@@ -1,0 +1,47 @@
+schema_version: 1
+
+robot:
+  model_name: restocker
+  parent_link: gripper
+  left_finger_joint: left_finger_joint
+  right_finger_joint: right_finger_joint
+
+products:
+  child_link: product_body
+
+transport:
+  set_service: /world/restocking/restocker/attachment/set
+  query_service: /world/restocking/restocker/attachment/query
+
+journal:
+  capacity: 64
+  detach_attempt_reserve: 3
+
+verification:
+  required_ticks: 3
+  maximum_pending_ticks: 100
+
+tolerances:
+  joint_position_m: 0.0005
+  # Applied only when the caller states no uncertainty for the observation its authorized grasp
+  # came from. It was calibrated when plan and simulator shared the same ground truth, so it is a
+  # fair bound for a caller that claims nothing and meaningless for an estimator: the overhead
+  # camera samples at 489 px/rad from 2.06 m, where 3 mm is 0.71 pixels. A caller that states a
+  # covariance is held to the budget below instead.
+  expected_translation_m: 0.003
+  expected_rotation_rad: 0.03
+  relative_linear_velocity_mps: 0.02
+  relative_angular_velocity_radps: 0.05
+  post_attach_translation_drift_m: 0.001
+  post_attach_rotation_drift_rad: 0.01
+  # tolerance = fidelity_sigma_multiplier * sqrt(largest translational eigenvalue of the
+  # authorizing observation's covariance) + fidelity_mechanical_margin_m, capped by the jaw-travel
+  # ceiling the boundary derives per product. Three sigma is the usual reading of "the estimate
+  # was as good as it claimed"; a confident and wrong claim still fails closed.
+  fidelity_sigma_multiplier: 3.0
+  # The residual is nonzero even for an exact estimate: the jaws close on the product and move it,
+  # and the grasp frame carries forward-kinematic error, neither of which is in the observation's
+  # covariance. The margin admits them. Measured ground-truth residuals over the runtime suite
+  # span 2.7 to 12 micrometres against the 0.1 mm deviation the simulator claims, so 1 mm is two
+  # orders of magnitude of headroom, sized to stay safe under load.
+  fidelity_mechanical_margin_m: 0.001

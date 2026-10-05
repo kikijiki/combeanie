@@ -1,0 +1,11 @@
+# Read-only current-state or operation-journal query.
+# Empty expected_simulator_epoch accepts the current epoch.
+# Empty operation_id requests only current physical state.
+string expected_simulator_epoch
+string operation_id
+---
+restocker_interfaces/SimulationAttachmentOperationStatus status
+string simulator_epoch
+bool operation_found
+bool has_state
+restocker_interfaces/SimulationAttachmentState state

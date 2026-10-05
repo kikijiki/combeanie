@@ -1,0 +1,59 @@
+---
+id: classical-vs-learned
+title: Classical vs learned
+sidebar_position: 9
+---
+
+import TrustBoundaryDiagram from '@site/src/components/architecture/TrustBoundaryDiagram';
+
+# Classical vs learned
+
+A **deterministic task state machine** is an explicit flowchart: select product → reserve →
+plan grasp → execute → attach → insert → survey → commit → verify (plus recover/fault). Same
+inputs → same transitions. It owns **authority**.
+
+An **advisory ML / LLM model** may *suggest* a recovery choice (`retry_segment`,
+`resume_at_recovery_state`, `abandon_task`) but cannot invent new primitives, skip
+reservations, or bypass MoveIt collision checks. Schema validation, circuit breakers, and
+re-authorization at execution time keep it untrusted.
+
+Classical perception here is also deterministic vision, not a learned controller. Remote learned
+inference is a future boundary: still advisory and perception-shaped, never the task authority.
+
+## Why it matters here
+
+**Models advise; C++ state machines and MoveIt decide.** The reasoner is **off by default** and
+can only choose among the enumerated, more cautious recovery primitives.
+
+<TrustBoundaryDiagram />
+
+```text
+┌──────────────────────────────────────┐
+│  Task SM + MoveIt + world state     │  ← authority
+└────────────────▲─────────────────────┘
+                 │ enumerated primitives only
+┌────────────────┴─────────────────────┐
+│  Optional reasoner (HTTP, audited)   │  ← advisory, default off
+└──────────────────────────────────────┘
+```
+
+## This project
+
+| Piece | Path |
+| --- | --- |
+| Task SM | `restocker_task_executor/…/restock_task_machine.hpp` |
+| Coordinator | `…/src/restock_action_coordinator_node.cpp` |
+| Candidates | `grasp_candidates.cpp`, `placement_candidates.cpp` |
+| Recovery gate | `…/src/recovery_advice_gate.cpp` |
+| Reasoner | `restocker_reasoner/` |
+
+The reasoner is an advisory sidecar: it may only choose among enumerated recovery primitives.
+Any remote inference stays behind the same observation/advice contracts.
+
+## References
+
+- **Official docs:** [ROS 2 actions](https://docs.ros.org/en/jazzy/Concepts/Basic/About-Actions.html)
+- **Official docs:** [NIST AI RMF 1.0](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf) (oversight / fail-safe framing)
+- **Literature:** [Modular safety guardrails for FM robots](https://arxiv.org/abs/2602.04056)
+- **Literature:** [Large Action Models with verification](https://arxiv.org/abs/2512.11620)
+- **This project:** [Perception and models](/docs/architecture/perception-and-models) · [Task execution](/docs/architecture/task-execution)

@@ -1,0 +1,83 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!--
+    The combeanie: a visual-only knit beanie worn over the UR10e shoulder cap (Card 027).
+
+    Visual geometry only. No <collision>, no <inertial>: sdformat's fixed-joint reduction merges
+    the visuals into shoulder_link at launch, so the simulated model gains pixels and no body,
+    mass, or collision surface. Nothing in planning, ros2_control, or the attachment plugin can
+    see this link.
+
+    Size and seat: the cap is ~0.153 m across (shoulder mesh x +/-0.076, y -0.095..+0.076 in the
+    shoulder frame). The hat is centred on that footprint (seat at y -0.010, the cap's own centre)
+    with a 142 mm cuff - cap diameter, not a thimble - tilted -0.087 rad to follow the cap's own
+    slope (the top falls ~13 mm from y -0.065 to y +0.05). The cuff's base circle is buried
+    4-13 mm inside the cap surface all the way round, so nothing floats; 21-30 mm of orange cuff
+    wall stands proud above the surface, with two stacked rib rings (r 0.0735, 2.5 mm proud) for
+    the folded-brim read. A blue dome (r 0.064) crowns the cuff and an orange pom-pom (r 0.015)
+    caps it. Everything stays inside the shoulder's own silhouette (|x| <= 0.0735 <= 0.076,
+    y -0.083..+0.065 inside -0.095..+0.076).
+
+    Why not bigger or elsewhere: the shoulder cap is the only place on the robot with a
+    head-shaped surface wide enough; the base_link_inertia top carries only a ~19 mm annulus
+    outside the rotating shoulder foot (cap diameter cannot seat there without sweeping through
+    the shoulder as it turns), and the carriage top reads as a hat on a shelf, not on the robot.
+
+    Arm clearance, with numbers (bands are shoulder-frame y at any configuration, because every
+    post-shoulder joint axis is parallel to shoulder y; measured from ur_description 3.5.1):
+    upper_arm_link stays at y <= -0.0948 and wrist_1_link at y <= -0.1059 - the hat's -0.083 rim
+    clears both by 11.8 mm and more, so those two links can never touch it at any pose.
+    forearm_link spans y <= +0.0189 and wrist_2_link sweeps y up to +0.139 about its vertical
+    axis: their bands overlap any cap-covering hat, because the forearm-free strip (y > 0.019)
+    is only 57 mm wide against a 153 mm cap. Grazing either in an extreme fold is visual-only -
+    the forearm and wrist_2 still have to stay outside shoulder_link's collision mesh to get
+    there, and per the manager's rework decision (Card 027) only camera occlusion and
+    self-filter/perception effects are blocking. Those two are asserted in
+    test_robot_description.py: the wrist frustum is clear at the default and simulator-initial
+    poses, the hat's overhead image never overlaps the tray or lane regions across the full
+    rail x pan sweep, and every sampled point of the hat stays inside the shoulder self-filter
+    capsule (0.130 + 0.020 m) that depth_obstacle_node applies - worst sampled point 0.109 m
+    (the pom-pom top), 41 mm of margin - so obstacle extraction never sees it.
+  -->
+  <xacro:macro name="restocker_beanie" params="prefix parent">
+    <joint name="${prefix}beanie_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${prefix}beanie"/>
+      <!-- Seat centre on the cap, tilted with the cap's slope (surface falls toward +y). -->
+      <origin xyz="0 -0.010 0.090" rpy="-0.087 0 0"/>
+    </joint>
+    <link name="${prefix}beanie">
+      <!-- Cuff band: cap-diameter, buried 4-13 mm at the base so the rim never floats. -->
+      <visual name="beanie_cuff_visual">
+        <origin xyz="0 0 0.004" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.071" length="0.034"/></geometry>
+        <material name="restocker_orange"/>
+      </visual>
+      <!-- Folded-cuff ribs: two stacked rings, 2.5 mm proud of the cuff. -->
+      <visual name="beanie_rib_lower_visual">
+        <origin xyz="0 0 0.006" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.0735" length="0.006"/></geometry>
+        <material name="restocker_orange"/>
+      </visual>
+      <visual name="beanie_rib_upper_visual">
+        <origin xyz="0 0 0.016" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.0735" length="0.006"/></geometry>
+        <material name="restocker_orange"/>
+      </visual>
+      <!-- Crown: blue dome emerging from the cuff (equator at the cuff top, r inside the cuff). -->
+      <visual name="beanie_crown_visual">
+        <origin xyz="0 0 0.021" rpy="0 0 0"/>
+        <geometry><sphere radius="0.064"/></geometry>
+        <material name="restocker_blue"/>
+      </visual>
+      <!-- Pom-pom, overlapping the crown by 3 mm. -->
+      <visual name="beanie_pom_visual">
+        <origin xyz="0 0 0.097" rpy="0 0 0"/>
+        <geometry><sphere radius="0.015"/></geometry>
+        <material name="restocker_orange"/>
+      </visual>
+    </link>
+  </xacro:macro>
+</robot>

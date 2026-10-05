@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+<robot name="restocker" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="prefix" default=""/>
+  <xacro:include filename="$(find restocker_description)/urdf/robot.xacro"/>
+
+  <!-- MoveIt 2.12 keeps a fixed SRDF virtual joint's child link as its model frame.
+       An explicit empty world root is therefore required for world-frame planning. -->
+  <link name="world"/>
+  <xacro:restocker_robot_with_parent
+    prefix="$(arg prefix)"
+    parent="world"
+    joint_limits_parameters_file="$(find ur_description)/config/ur10e/joint_limits.yaml">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </xacro:restocker_robot_with_parent>
+</robot>

@@ -1,0 +1,20 @@
+# Releases a stage/revision-bound safely terminal RESERVED or reconciled DETACHED task.
+uint8 OUTCOME_SUCCEEDED=0
+uint8 OUTCOME_CANCELED=1
+uint8 OUTCOME_FAILED_SAFE=2
+
+uint8 EXPECTED_STAGE_RESERVED=0
+uint8 EXPECTED_STAGE_ATTACHED=1
+uint8 EXPECTED_STAGE_DETACHED=2
+
+string token
+string operation_id
+uint64 expected_reservation_id
+uint8 expected_reservation_stage
+uint64 expected_reservation_revision
+uint8 outcome
+uint8 terminal_task_phase
+uint8 terminal_fault_state
+---
+restocker_interfaces/WorldStateOperationStatus status
+uint64 world_revision

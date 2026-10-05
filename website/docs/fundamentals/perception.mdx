@@ -1,0 +1,87 @@
+---
+id: perception
+title: Perception
+sidebar_position: 7
+---
+
+# Perception
+
+**RGB-D** means a color image plus a depth image from one camera (and `CameraInfo`
+intrinsics). **Pose estimation** answers where a product is in 3D and which way it faces.
+**Obstacle extraction** turns depth into geometric volumes MoveIt can avoid.
+
+Perception outputs are **observations with uncertainty**, not truth. Downstream code decides
+what becomes inventory evidence versus what becomes a collision box.
+
+## Why it matters here
+
+Two cameras exist in the description: **overhead** (obstacle detection) and **wrist**
+(tray / lane survey). The shipped baseline is **sensor-driven**: the wrist confirm duty feeds
+the world state's object ingest topic and the wrist lane survey its lane topic, while **Gazebo
+ground truth is demoted** to `/perception/ground_truth/*`, which only the error evaluators read.
+Ground-truth-path launches pin GT back onto the ingest topic and turn the tray duties off (one
+producer per topic).
+
+**The overhead camera stays, and it is obstacles-only on the default path.** Its depth stream
+feeds `depth_obstacle_node` (`obstacle_perception`, on by default), which turns unmodelled
+geometry into AABB boxes projected into MoveIt. Its *object* perception — `perception:=true`,
+the `perception` node running `ColourDepthBackend` — stays **off** by default, so no product pose
+on the default path comes from the overhead camera; that classical pipeline is optional and
+**not a neural net** (chromaticity + cylinder depth fit).
+
+The wrist camera also drives the **two-tier tray survey**: the overview duty publishes
+candidate hypotheses on `/perception/tray_candidates` (never ingested by the world state),
+and only the confirm duty's close-range observation lands on
+`/perception/object_observations`, the topic the world state admits. The read-only
+`survey_tray` action coordinates overview stations → selection → confirmation viewpoint →
+confirmed or typed-refuted result; it composes `/survey_viewpoint` and adds no motion
+authority of its own.
+
+```text
+wrist camera ── confirm duty (ColourDepthBackend) ─► /perception/object_observations (admitted)
+wrist camera ── overview duty ────────────────────► /perception/tray_candidates
+                                                    (hypotheses only; never ingested)
+wrist camera ── lane survey ──────────────────────► /perception/lane_observations    (admitted)
+overhead depth ── depth_obstacle_node ────────────► /perception/obstacle_observations
+overhead RGB-D ── perception node                 ► /perception/object_observations
+                 (perception:=true — OFF on the default path)
+ground_truth_adapter ────────────────────────────► /perception/ground_truth/*
+                                                    (error evaluators only)
+                                    │
+                                    ▼
+                           world_state gates
+```
+
+When two producers publish on the same ingest topic, evidence is contested — and the world
+state's single-publisher pin refuses both. That is why ground truth ships aside and every
+ground-truth-path caller pins its topics explicitly (see [How to run](/docs/run/scenarios)).
+
+## This project
+
+| Piece | Path |
+| --- | --- |
+| Main pose node | `restocker_perception/src/perception_node.cpp` |
+| Classical backend | `…/src/colour_depth_backend.cpp` |
+| Tray duties (overview/confirm) | `…/config/wrist_tray_perception.yaml` |
+| Confirmation viewpoint solver | `…/src/survey_stations.cpp` |
+| Depth → boxes | `…/src/depth_obstacle_node.cpp` |
+| Lane evidence | `…/src/lane_observation_node.cpp` |
+| Coordinated tray survey | `restocker_task_executor/src/tray_survey_node.cpp` |
+| Config | `…/config/overhead_rgbd_perception.yaml`, `lane_survey.yaml` |
+| Topics | wrist duties → `/perception/tray_candidates` and `/perception/object_observations`; lane survey → `/perception/lane_observations`; overhead → `/perception/obstacle_observations` (obstacles, always) and `/perception/object_observations` only with `perception:=true` (off by default) |
+| Future ML | Same observation contracts; still advisory, never task authority |
+
+Every spatial observation carries frame, acquisition stamp, backend provenance, confidence,
+and covariance. Category ≠ SKU. A `LaneObservation` never rewrites `ShelfLane.contents`
+directly: when the world state accepts one, it reconciles the measured column against the
+FIFO ledger itself — popping front entries as sales or marking the ledger unreliable — see
+[World state](/docs/architecture/world-state).
+
+## References
+
+- **Literature:** [REP-103 optical frame convention](https://www.ros.org/reps/rep-0103.html)
+- **Literature:** [Milella et al., depth OSA on shelves](https://doi.org/10.1109/ACCESS.2020.2968175)
+- **Literature:** [FoundationPose](https://arxiv.org/abs/2312.08344) (optional future pose sidecar)
+- **Official docs:** [sensor_msgs conventions](https://docs.ros.org/en/jazzy/p/sensor_msgs/)
+- **Official docs:** [Gazebo ↔ ROS 2 interop](https://gazebosim.org/docs/harmonic/ros2_interop/)
+- **This project:** [Perception and models](/docs/architecture/perception-and-models) · [Manipulators and frames](./manipulators-and-frames)

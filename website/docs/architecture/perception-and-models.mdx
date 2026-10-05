@@ -1,0 +1,94 @@
+---
+id: perception-and-models
+title: Perception and models
+sidebar_position: 10
+---
+
+import TrustBoundaryDiagram from '@site/src/components/architecture/TrustBoundaryDiagram';
+
+# Perception and models
+
+Perception supplies **untrusted observations** that world state validates; wrist product/lane
+perception and overhead obstacle evidence are required on the sensor-driven default path.
+The recovery reasoner is optional and advisory. Neither can emit joint commands, unchecked
+trajectories, or inventory commits.
+
+<TrustBoundaryDiagram />
+
+## Observation topics
+
+| Topic (defaults) | Role |
+| --- | --- |
+| `/perception/object_observations` | Sole camera producer → world state (wrist confirm duty on the default path; the overhead pipeline only with `perception:=true`) |
+| `/perception/ground_truth/object_observations` | GT when the camera owns the ingest topic |
+| `/perception/tray_candidates` | Tray **overview** hypotheses only — never ingested by the world state |
+| `/perception/lane_observations` | Camera lane survey |
+| `/perception/ground_truth/lane_observations` | GT / evaluator |
+| `/perception/obstacle_observations` | Depth obstacles → projector |
+
+Ground truth is demoted by default: it publishes on `/perception/ground_truth/object_observations`
+and the wrist confirm duty owns the object ingest topic
+(`/perception/object_observations`), which the world state admits. The world state pins exactly
+one publisher per ingest topic, so running a different producer there (for example the overhead
+`perception:=true` pipeline) means moving ground truth off the ingest topic — it already is — and
+turning the confirm duty off.
+
+**The overhead camera stays, for obstacle detection only.** Its depth stream feeds
+`depth_obstacle_node` (`obstacle_perception`, on by default) and the projector requires that
+evidence before certifying the scene; its *object* pipeline (`perception:=true`) stays **off** on
+the default path, so no default-path product pose comes from the overhead camera.
+
+### The two-tier tray survey
+
+The wrist tray duties split their outputs on purpose. `tray_overview_perception:=true` runs the
+overview duty, which publishes **candidates** on `/perception/tray_candidates` — hypotheses with
+no world identity, invisible to the world state, so no transfer can be planned from overview
+evidence alone. `tray_confirm_perception:=true` runs the confirm duty on the ingest topic; only
+its close-range, admissible-confirmation observations become world evidence.
+
+The `survey_tray` action (`tray_survey:=true`, which also starts `survey_viewpoint`) is the
+survey coordinator (it commands arm motion but does not commit inventory): it visits the
+overview stations through `/survey_viewpoint`, selects one candidate, solves an admissible confirmation viewpoint, and answers `OUTCOME_CONFIRMED` with the
+replacing observation or a typed `OUTCOME_REFUTED` (`CLASS_MISMATCH`, `SKU_MISMATCH`,
+`ABSENT`). Cancellation abandons unvisited stations and retains collected candidates. A cancellation
+request alone is not proof that arm motion stopped; inspect terminal motion evidence before
+issuing another behavior. Timeout and late-result reconciliation remain limitations.
+
+The shipped camera backend is classical (`ColourDepthBackend`), not a neural net. Future
+learned pose/detection backends stay behind the same message contracts.
+
+A predeclared 12-launch campaign on seeded trays measured confirmation-range translation error at 2.2–7.5 mm
+(median 7.3 mm) against the covariance-derived attachment budget: 9 of 12 admitted confirmations
+within budget, none fail-closed. The estimator was then fixed's systematic world-Y bias at
+the tray's 51° view — the published axis is now a circle fit to the top-face band's silhouette
+rather than its mean — and a predeclared re-run of the same confirm cells measured **0.19–0.36
+mm** (12 admitted, world-Y bounded at ≤ 0.27 mm, 12 of 12 within budget). The confirm duty's
+claimed sigma floor is calibrated to that measured accuracy giving
+**3 × 2 + 1 = 7 mm before the per-product jaw ceiling (17/16/5 mm for can/small/large)** —
+it covers the measured
+distribution without loosening the formula, multiplier, margin, or any physical predicate. Overview does not
+separate touching same-class products; close-neighbour and non-upright cells refuse rather than
+admit a wrong pose. The tray duties ship **on** by default (`tray_overview_perception` and
+`tray_confirm_perception` are the sensor-driven default's product source); what stays off is the
+overhead object pipeline (`perception:=false`).
+
+## Obstacle boxes
+
+`obstacle_perception` (default **on**) starts `depth_obstacle_node` and makes the projector
+require obstacle evidence; both additionally gate on `cameras`, so a cameraless composition
+never demands evidence nothing can produce. Stale boxes are retained under degradation. This is
+the overhead camera's standing role on the default path: **the overhead camera stays, for
+obstacle detection only**, while its object perception stays off.
+
+## Advisory reasoner
+
+`reasoner_enabled:=false` by default. When enabled, the reasoner may only select among
+enumerated recovery primitives and may not escalate aggressiveness past deterministic policy.
+It uses a private mailbox, because sharing the coordinator inbox would turn inbox pressure
+into a safety fault.
+
+## References
+
+- **Literature:** [FoundationPose](https://arxiv.org/abs/2312.08344) · [Grounding DINO](https://arxiv.org/abs/2303.05499) · [SAM 2](https://arxiv.org/abs/2408.00714)
+- **Official docs:** [NIST AI RMF](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf)
+- **This project:** [Fundamentals: perception](/docs/fundamentals/perception)

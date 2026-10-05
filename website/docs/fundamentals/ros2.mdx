@@ -1,0 +1,64 @@
+---
+id: ros2
+title: ROS 2
+sidebar_position: 3
+---
+
+# ROS 2
+
+ROS 2 is a **graph of processes** that talk over typed interfaces. combeanie pins **Jazzy**
+(`ROS_DISTRO=jazzy` in `flake.nix`).
+
+| Concept | Analogy | When to use |
+| --- | --- | --- |
+| **Package** | Library / crate with `package.xml` | Ships code, config, launch |
+| **Node** | Long-running process with one job | Perception, world state, coordinator |
+| **Topic** | Pub/sub stream | `/joint_states`, images, observations |
+| **Service** | Request/response RPC | Reserve a lane, get a snapshot |
+| **Action** | Long job with feedback + cancel | Restock a product; survey a lane |
+| **Launch** | Process supervisor | Start sim + MoveIt + task stack together |
+
+## Why it matters here
+
+The restock pipeline is not one program. Benchmarks send a **`RestockProduct` action** goal; the
+coordinator talks to **world-state services**, MoveIt, and Gazebo adapters over **topics**.
+Debugging is graph debugging: `ros2 node list`, `topic echo`, `action list`.
+
+## This project
+
+```text
+                    /restock_product (action)
+                              │
+                    restock_action_coordinator
+                     │        │         │
+          world_state svc   move_group   attachment / gripper topics
+                     │
+              world_state_node ← /perception/*_observations
+```
+
+| Package | Owns |
+| --- | --- |
+| `restocker_interfaces` | `.msg` / `.srv` / `.action` |
+| `restocker_description` | URDF/Xacro + geometry YAML |
+| `restocker_gazebo` | World, spawn, GT + attachment |
+| `restocker_control` | Controllers + telemetry |
+| `restocker_moveit_config` | MoveIt / `move_group` |
+| `restocker_world_state` | Semantic inventory authority |
+| `restocker_perception` | RGB-D → observations |
+| `restocker_task_executor` | Task SM, projector, surveys |
+| `restocker_reasoner` | Optional advisory HTTP client |
+| `restocker_bringup` | Composition launches |
+| `restocker_benchmarks` | Scenario client / metrics |
+
+**Public surface examples:** `/restock_product`, `/world_state/get_snapshot`,
+`/perception/object_observations`, `/restock_action_coordinator/status`.
+
+Composition entrypoint: `ros_ws/src/restocker_bringup/launch/baseline.launch.py`.
+
+## References
+
+- **Official docs:** [ROS 2 Jazzy, Basic Concepts](https://docs.ros.org/en/jazzy/Concepts/Basic.html)
+- **Official docs:** [Nodes](https://docs.ros.org/en/jazzy/Concepts/Basic/About-Nodes.html) · [Topics](https://docs.ros.org/en/jazzy/Concepts/Basic/About-Topics.html) · [Services](https://docs.ros.org/en/jazzy/Concepts/Basic/About-Services.html) · [Actions](https://docs.ros.org/en/jazzy/Concepts/Basic/About-Actions.html)
+- **Official docs:** [Understanding actions (CLI)](https://docs.ros.org/en/jazzy/Tutorials/Beginner-CLI-Tools/Understanding-ROS2-Actions/Understanding-ROS2-Actions.html)
+- **Official docs:** [Launch](https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Launch-Main.html)
+- **This project:** [Package map](/docs/reference/packages) · [Task execution](/docs/architecture/task-execution)

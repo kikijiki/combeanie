@@ -1,0 +1,17 @@
+# Capability-authorized, single-revision evidence for motion submission validation.
+string token
+uint64 expected_reservation_id
+uint64 expected_reservation_revision
+uint64 expected_object_id
+string expected_destination_lane_id
+---
+restocker_interfaces/WorldStateOperationStatus status
+uint64 world_revision
+string planning_frame
+bool has_proof
+restocker_interfaces/TaskReservation reservation
+restocker_interfaces/TrackedObject object
+restocker_interfaces/ShelfLane destination_lane
+bool has_source_lane
+restocker_interfaces/ShelfLane source_lane
+restocker_interfaces/RobotExecutionState robot

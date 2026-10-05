@@ -1,0 +1,22 @@
+# Pollable, capability-authorized simulated physical attachment mutation.
+uint8 COMMAND_UNSET=0
+uint8 COMMAND_ATTACH=1
+uint8 COMMAND_DETACH=2
+
+uint8 command
+string operation_id
+uint64 object_id
+string reservation_token
+string planning_scene_lease_token
+# Required and unit-quaternion normalized for attach; default/ignored for detach.
+geometry_msgs/Pose expected_grasp_center_to_child
+# Covariance of the observation the expected grasp was derived from, in the
+# geometry_msgs/PoseWithCovariance order (x, y, z, rotation about X, Y, Z), row major. The
+# boundary sizes its fidelity budget from the largest translational eigenvalue of this matrix.
+# All zeros means no uncertainty was stated and the boundary falls back to its configured
+# constant. Ignored for detach.
+float64[36] expected_pose_covariance
+---
+restocker_interfaces/SimulationAttachmentOperationStatus status
+bool has_state
+restocker_interfaces/SimulationAttachmentState state

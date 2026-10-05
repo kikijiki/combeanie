@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+# Copyright 2026 Matteo Bernacchia <dev@kikijiki.com>
+# SPDX-License-Identifier: MIT
+
+"""Entry point for aggregating a benchmark campaign."""
+
+import sys
+
+from restocker_benchmarks.report import main
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,7 @@
+schema_version: 1
+products:
+  - model_name: unknown_can
+    source_object_id: sim:unknown_can
+    geometry_key: missing.geometry
+    product_class: can
+    sku: SIM-CAN-STD

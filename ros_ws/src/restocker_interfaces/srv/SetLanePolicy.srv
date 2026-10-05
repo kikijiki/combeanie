@@ -1,0 +1,16 @@
+# Replace one lane's desired stocking policy under a caller-captured lane revision.
+# The revision fence makes the change all-or-nothing: a stale expected_lane_revision is refused
+# without changing the lane or the persisted policy document, and a persistence failure applies
+# nothing. A policy change bumps the lane revision and invalidates that lane's depletion evidence
+# until the next accepted LaneObservation. An in-flight reservation keeps the policy it was
+# granted under; a reservation not yet granted fails on the existing revision-conflict path.
+
+string lane_id
+uint64 expected_lane_revision
+uint8 expected_product_class
+bool has_expected_sku
+string expected_sku
+uint32 target_count
+---
+restocker_interfaces/WorldStateOperationStatus status
+uint64 world_revision

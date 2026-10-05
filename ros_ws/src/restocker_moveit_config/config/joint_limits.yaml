@@ -1,0 +1,77 @@
+# Position limits are one connected revolution (+/- 3.121593 rad, 0.02 rad inside +/- pi) for every
+# revolute joint. The UR10e URDF allows +/- 2 pi, but duplicated windings put equivalent IK
+# solutions at opposite ends of the bounded OMPL space, which stalls sampling. Velocities are
+# below the UR10e limits (2.094 rad/s shoulder, 3.142 rad/s elsewhere).
+joint_limits:
+  rail_joint:
+    has_position_limits: true
+    min_position: -1.680000
+    max_position: 1.680000
+    has_velocity_limits: true
+    max_velocity: 0.5
+    has_acceleration_limits: true
+    max_acceleration: 0.5
+  shoulder_pan_joint:
+    has_position_limits: true
+    min_position: -3.121593
+    max_position: 3.121593
+    has_velocity_limits: true
+    max_velocity: 1.8
+    has_acceleration_limits: true
+    max_acceleration: 2.0
+  shoulder_lift_joint:
+    has_position_limits: true
+    min_position: -3.121593
+    max_position: 3.121593
+    has_velocity_limits: true
+    max_velocity: 1.8
+    has_acceleration_limits: true
+    max_acceleration: 2.0
+  elbow_joint:
+    has_position_limits: true
+    min_position: -3.121593
+    max_position: 3.121593
+    has_velocity_limits: true
+    max_velocity: 2.8
+    has_acceleration_limits: true
+    max_acceleration: 2.0
+  wrist_1_joint:
+    has_position_limits: true
+    min_position: -3.121593
+    max_position: 3.121593
+    has_velocity_limits: true
+    max_velocity: 2.8
+    has_acceleration_limits: true
+    max_acceleration: 3.0
+  wrist_2_joint:
+    has_position_limits: true
+    min_position: -3.121593
+    max_position: 3.121593
+    has_velocity_limits: true
+    max_velocity: 2.8
+    has_acceleration_limits: true
+    max_acceleration: 3.0
+  wrist_3_joint:
+    has_position_limits: true
+    min_position: -3.121593
+    max_position: 3.121593
+    has_velocity_limits: true
+    max_velocity: 2.8
+    has_acceleration_limits: true
+    max_acceleration: 4.0
+  left_finger_joint:
+    has_position_limits: true
+    min_position: 0.001000
+    max_position: 0.034000
+    has_velocity_limits: true
+    max_velocity: 0.08
+    has_acceleration_limits: true
+    max_acceleration: 0.5
+  right_finger_joint:
+    has_position_limits: true
+    min_position: 0.001000
+    max_position: 0.034000
+    has_velocity_limits: true
+    max_velocity: 0.08
+    has_acceleration_limits: true
+    max_acceleration: 0.5

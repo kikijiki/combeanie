@@ -1,0 +1,10 @@
+project:
+  ros_distribution: jazzy
+  planning_frame: world
+  use_sim_time: false
+quality:
+  cpp_standard: 20
+  build_type: RelWithDebInfo
+runtime:
+  baseline_requires_model_services: false
+  model_service_timeout_s: 5.0

@@ -1,0 +1,57 @@
+schema_version: 1
+pose_topic: /world/restocking/pose/info
+frame_id: world
+backend:
+  name: gazebo_ground_truth
+  version: harmonic_pose_v1
+pose_covariance_diagonal: [1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8]
+workcell_pose: [0.0, 0.55, 0.75, 0.0, 0.0, 0.0]
+# Two cans of exactly the same size with different labels. Every other shipped scenario stocks at
+# most one product per class, and every geometry_key in the catalog had one SKU, so a product's
+# identity followed from its diameter and height and a camera never had to choose between two.
+# Here both cylinders are 0.033 m by 0.122 m and the only difference is the word printed on the
+# wrap.
+#
+# The labels are the same picture in the same colours with a different word in the middle
+# (tools/generate_product_labels.py). Nothing that classifies by colour histogram, mean hue or
+# dominant channel can separate them; the word is the whole signal.
+#
+# Run it with the matching lane policy, which makes recognition an observable outcome:
+#
+#   ros2 launch restocker_bringup simulation.launch.py \
+#     scenario_config:=$(ros2 pkg prefix --share restocker_gazebo)/config/same_shape_products.yaml \
+#     lane_semantics:=$(ros2 pkg prefix --share restocker_world_state)/config/same_shape_lanes.yaml
+#
+# lane_01 takes SIM-CAN-STD and lane_04 takes SIM-CAN-CITRUS, so a run that reads the labels
+# correctly fills both lanes and a run that swaps them delivers nothing: task selection skips a
+# pair whose SKU the lane refuses, and the run ends in NoEligiblePair rather than a placement
+# that can be scored.
+#
+# `rgba` is white on both because an albedo map is modulated by the material colour under it, and
+# a red base tints the label's white band red and removes the contrast the word needs. The colour
+# of a textured product is the label's, not this field's.
+#
+# Poses are two of the surveyed baseline tray positions, unchanged, so the grasps are the
+# measured ones. They stand 0.42 m apart, far outside both the 0.02 m seating separation and the
+# jaw approach corridor.
+products:
+  - model_name: stock_can_01
+    source_object_id: sim:stock_can_01
+    geometry_key: can.standard
+    product_class: can
+    sku: SIM-CAN-STD
+    mass_kg: 0.355
+    rgba: [1.0, 1.0, 1.0, 1.0]
+    label_texture: can_classic_label.png
+    friction: 0.65
+    spawn_pose: [-0.42, -0.80, 0.631, 0.0, 0.0, 0.0]
+  - model_name: stock_can_02
+    source_object_id: sim:stock_can_02
+    geometry_key: can.citrus
+    product_class: can
+    sku: SIM-CAN-CITRUS
+    mass_kg: 0.355
+    rgba: [1.0, 1.0, 1.0, 1.0]
+    label_texture: can_citrus_label.png
+    friction: 0.65
+    spawn_pose: [0.0, -0.80, 0.631, 0.0, 0.0, 0.0]

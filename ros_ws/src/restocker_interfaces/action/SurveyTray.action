@@ -1,0 +1,185 @@
+# Coordinated read-only tray survey: visit the overview stations, collect candidates, select
+# one, move to an admissible confirmation viewpoint, and answer with either the replacing
+# confirmed observation or an explicit typed refutation.
+#
+# It composes existing boundaries and adds no authority of its own:
+#   * every motion leg is an ordinary /survey_viewpoint goal under the same planning-scene
+#     authority gate every other segment uses;
+#   * overview candidates are read from /perception/tray_candidates, the topic the tray-overview
+#     duty publishes on, which no world state ingests, so overview evidence can never authorize
+#     a transfer;
+#   * the confirmed observation is whatever the tray-confirm duty published on
+#     /perception/object_observations, the topic the world state admits, associated back to the
+#     selected candidate.
+# Nothing here mutates world state directly. Only OUTCOME_CONFIRMED carries a grasp-authorizing
+# observation, and a refutation never does.
+#
+# Cancellation abandons unvisited stations. Candidates already collected are returned, every
+# read-only observation already published stays published, and the canceled result is not
+# delivered until the outstanding /survey_viewpoint goal has reached a terminal state, so no
+# motion goal outlives this action.
+
+# Overview stations to visit, in order. Empty derives the tray stations from the workcell
+# geometry (tray_1, tray_2, ...), numbered along increasing shelf X. Every name must be a
+# nominal survey station.
+string[] overview_stations
+
+# Selection intent for the one candidate to confirm. product_class 0 accepts any class; a set
+# has_sku additionally requires that SKU. Selection among matches is deterministic: highest
+# confidence, then smallest X, Y, then Z in the planning frame.
+uint8 PRODUCT_CLASS_ANY=0
+uint8 product_class
+bool has_sku
+string sku
+
+# Stop after the overview legs: return the collected candidates without selecting, without
+# sending a confirmation leg, and without confirming anything.
+bool overview_only
+
+# Overview candidates refuted earlier this cycle (confirm-refutations). A candidate whose
+# position lands within the survey's candidate-merge radius of one of these planning-frame
+# points is never selected, so a refuted hypothesis is not re-proposed and re-refuted in a
+# loop; the caller re-enters SURVEY_TRAY with the mark instead. Empty accepts every candidate.
+# These marks are never lifted by the skip-recovery rung (Milestone 10 §6, Card 058).
+geometry_msgs/Point[] refuted_positions
+
+# Campaign product skip marks (Card 051 rung 5), carried separately from refuted_positions so
+# the result detail can tell the kinds apart (Milestone 10 §6, Card 058). Selection treats them
+# identically to refuted_positions — a candidate within the merge radius of either field is
+# never selected — but they mean "try others first", not "never again": the skip-recovery rung
+# re-enters this goal with qualifying marks lifted while refuted_positions stays in force.
+geometry_msgs/Point[] skip_mark_positions
+
+# Planning-frame positions of tray products the caller currently counts as back stock
+# (Milestone 10 §6, Card 069). When the overview loop completes, the result reports one
+# absence_probe_verdicts entry per probe, in order. Empty requests no verdicts.
+geometry_msgs/Point[] absence_probe_positions
+# Planning-frame positions of every other tracked tray object (fallen, retired or otherwise
+# uncounted): potential occluders of a probe's line of sight, never probed themselves.
+geometry_msgs/Point[] absence_occluder_positions
+
+# Zero takes the /survey_viewpoint server's configured default for each.
+float64 position_tolerance_m
+float64 orientation_tolerance_rad
+---
+# Stable terminal status. Consumers branch on outcome, never on detail.
+uint8 OUTCOME_UNSET=0
+# The close view observed the selected candidate and its identity agrees with the overview
+# hypothesis. confirmed_observation carries the replacing observation the confirm duty
+# published on /perception/object_observations. This is the only outcome that authorizes a
+# grasp.
+uint8 OUTCOME_CONFIRMED=1
+# The overview legs finished but no candidate matched the request. Nothing was selected, no
+# confirmation leg was attempted, and nothing authorizes a grasp.
+uint8 OUTCOME_NO_CANDIDATE=2
+# The close view contradicted the overview hypothesis; refutation says how. The candidate is
+# refused for this cycle and nothing authorizes a grasp.
+uint8 OUTCOME_REFUTED=3
+# overview_only: the overview legs finished and candidates were collected. The result carries
+# no confirmed observation and authorizes nothing.
+uint8 OUTCOME_OVERVIEW_ONLY=4
+# A motion leg to an overview station or to the confirmation viewpoint did not arrive.
+uint8 OUTCOME_VIEWPOINT_UNREACHED=5
+# The confirmation viewpoint was reached but no confirm-duty observation arrived after the arm
+# stopped, so the survey could not look: this is a dead sensor or a missing duty, not a
+# refutation, and nothing authorizes a grasp.
+uint8 OUTCOME_ACQUISITION_FAILED=6
+uint8 OUTCOME_CANCELED=7
+# The /survey_viewpoint server or a required perception topic was not available. No motion was
+# attempted.
+uint8 OUTCOME_UNAVAILABLE=8
+# The request itself was malformed: an unknown overview station, or no confirmation viewpoint
+# could be solved for the selected candidate.
+uint8 OUTCOME_INVALID_REQUEST=9
+
+uint8 outcome
+string detail
+
+# Overview stations visited to completion, in order. Empty when cancellation or failure
+# preceded the first station.
+string[] overview_stations_visited
+# Per-station acquisition accounting for each visited station, parallel to
+# overview_stations_visited (Stage 4, Card 050): images, duty detection frames, proposals,
+# published observations and the admitted count for that station's dwell window, so a zero
+# admitted count names the stage that lost the frames. Reporting only — admission is unchanged.
+restocker_interfaces/TrayStationAcquisition[] overview_station_reports
+# Distinct candidates merged from the overview legs. Hypotheses only: they were never admitted
+# to world state and never authorize a grasp.
+restocker_interfaces/ObjectObservation[] overview_candidates
+# The hypothesis chosen for confirmation. Set once selection succeeded; empty for
+# OUTCOME_NO_CANDIDATE and for failures before selection.
+restocker_interfaces/ObjectObservation selected_candidate
+# Set only when outcome is OUTCOME_CONFIRMED: the replacing close-range observation.
+restocker_interfaces/ObjectObservation confirmed_observation
+# Set when outcome is OUTCOME_REFUTED and the close view saw something at the candidate's
+# place. Empty for REFUTATION_ABSENT, where by definition there is nothing to report.
+restocker_interfaces/ObjectObservation refuting_observation
+uint8 REFUTATION_NONE=0
+# The close view saw a product at the candidate's place with a different product class.
+uint8 REFUTATION_CLASS_MISMATCH=1
+# The close view saw the same class with a different SKU.
+uint8 REFUTATION_SKU_MISMATCH=2
+# The close view saw the tray but nothing at the candidate's place.
+uint8 REFUTATION_ABSENT=3
+uint8 refutation
+
+# First-hand motion evidence for the campaign's recovery classification (Milestone 10 §6,
+# Card 052). Same rule as SurveyLane: either flag on a delivered terminal result establishes
+# the arm's state for classification; neither does not. motion_definitely_not_started holds
+# until some leg's own machinery may have issued a joint command; a visited (arrived) station
+# sets execution_reached_terminal_stop, since arrival is the controllers reporting success.
+bool motion_definitely_not_started
+bool execution_reached_terminal_stop
+# The station (a tray_* overview name) or "confirmation" whose leg failed; empty when no leg
+# failed (the failure was pre-motion or post-selection).
+string failed_station
+# Milestone 10 §6, Card 066: how many class/SKU-matching overview candidates, not themselves
+# refuted or skip-marked, selection passed over only because another tray product stands ahead of
+# them in their feed column. The coordinator refuses a product behind a front, so the survey
+# nominates only fronts. Non-zero on OUTCOME_NO_CANDIDATE means stock stands behind a front this
+# survey could not nominate, not that the tray is empty.
+uint32 feed_blocked_candidates
+# Parallel to overview_candidates (Card 066 × Card 058): true when the candidate is STATUS_OK and
+# no other overview candidate stands ahead of it in its feed column, so it would be nominable
+# once its marks were lifted. The campaign's skip-mark lift reads it; empty when selection did not
+# run (overview only, or a failure before selection).
+bool[] overview_candidate_feed_front
+# Milestone 10 §6, Card 066 (review cmbrev066b N1): class/SKU-matching candidates under a
+# refutation or skip mark that ALSO stand behind another candidate in their feed column. Non-zero
+# on OUTCOME_NO_CANDIDATE means marked stock stands behind a front: not stock exhaustion.
+uint32 marked_feed_blocked_candidates
+# The first blocked matching candidate (marked or not) and the candidate standing ahead of it:
+# class and planning-frame position of each. Empty when nothing matching was blocked.
+string feed_block_example
+# Milestone 10 §6, Card 066 (review cmbrev066b N2): the candidate-merge radius the server applied
+# to this goal's marks, so the campaign matches marks with the same radius. Zero when unset.
+float64 candidate_merge_radius_m
+
+# Per-probe absence verdicts, parallel to goal.absence_probe_positions (Milestone 10 §6,
+# Card 069). Filled only when every requested overview station was visited; empty otherwise
+# (an incomplete overview is never evidence). Only PROBE_VIEWED_EMPTY is evidence of absence:
+# a healthy station (images and detector frames in the window, proposals in some frame, and at
+# least one admitted observation — the station demonstrably sees products) framed the probe
+# with a clear line of sight and no overview candidate of any class lies within the survey's
+# absence_seen_radius_m.
+uint8 PROBE_NOT_EVALUATED=0
+# An overview candidate of any class lies within absence_seen_radius_m: something is there.
+uint8 PROBE_SEEN=1
+uint8 PROBE_VIEWED_EMPTY=2
+# Framed by a healthy station, but a nearer probe or candidate blocks every such line of sight.
+uint8 PROBE_OCCLUDED=3
+# No visited station frames the probe.
+uint8 PROBE_NOT_COVERED=4
+# Framed only by stations whose acquisition was not healthy.
+uint8 PROBE_NO_EVIDENCE=5
+uint8[] absence_probe_verdicts
+---
+uint8 PHASE_OVERVIEW=0
+uint8 PHASE_SELECTING=1
+uint8 PHASE_CONFIRMING=2
+
+uint8 phase
+# The overview station being visited during PHASE_OVERVIEW; empty in the other phases.
+string current_station
+# Distinct candidates collected so far, reported as the survey progresses.
+uint32 candidates_collected

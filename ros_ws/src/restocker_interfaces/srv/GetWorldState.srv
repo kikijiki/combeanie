@@ -1,0 +1,4 @@
+bool include_removed
+bool include_events
+---
+restocker_interfaces/WorldStateSnapshot snapshot

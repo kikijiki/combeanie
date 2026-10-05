@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+<robot name="restocker_product" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="radius" default="0.033"/>
+  <xacro:arg name="height" default="0.122"/>
+  <xacro:arg name="mass" default="0.355"/>
+  <xacro:arg name="rgba" default="0.78 0.12 0.08 1.0"/>
+  <xacro:arg name="friction" default="0.65"/>
+  <!-- A product the simulation is not allowed to move. Products a run picks up and places are
+       dynamic. This exists for the one scenario that stages a lane obstruction: lanes are
+       gravity-feed roller beds, so a free product runs to the front rail and counts as an
+       occupied lane, not an obstructed one. -->
+  <xacro:arg name="static" default="false"/>
+  <!-- Absolute path to the label image wrapped around the lateral surface, or empty for a plain
+       colour. The launch file resolves the scenario's `label_texture` filename against
+       restocker_gazebo's installed materials/textures directory; a relative path would resolve
+       against the Gazebo server's working directory. -->
+  <xacro:arg name="label_texture" default=""/>
+  <xacro:include filename="$(find restocker_description)/urdf/inertial_macros.xacro"/>
+
+  <xacro:property name="product_radius" value="$(arg radius)"/>
+  <xacro:property name="product_height" value="$(arg height)"/>
+  <xacro:property name="product_mass" value="$(arg mass)"/>
+  <xacro:property name="label_texture" value="$(arg label_texture)"/>
+
+  <link name="product_body">
+    <!-- The visual is named `product_body_visual` because sdformat's URDF parser only merges a
+         `<gazebo reference>` extension into a visual whose generated SDF name contains
+         `<link>_visual`. A visual named `product_visual` becomes
+         `product_body_fixed_joint_lump__product_visual_visual`, the match fails, and the material
+         extension below is silently dropped (see `gz sdf -p`). The collision keeps its own name
+         deliberately; see the note on the extension block. -->
+    <visual name="product_body_visual">
+      <geometry><cylinder radius="${product_radius}" length="${product_height}"/></geometry>
+      <material name="product_material"><color rgba="$(arg rgba)"/></material>
+    </visual>
+    <collision name="product_collision">
+      <geometry><cylinder radius="${product_radius}" length="${product_height}"/></geometry>
+    </collision>
+    <xacro:cylinder_inertial
+      mass="${product_mass}" radius="${product_radius}" length="${product_height}"
+      xyz="0 0 0" rpy="0 0 0"/>
+  </link>
+
+  <!-- The friction and contact entries here have never reached Gazebo: sdformat drops them
+       because the collision is named `product_collision` and the parser looks for
+       `product_body_collision`. They are left as is because enabling them would change the
+       contact behaviour that every grasp, benchmark and attachment tolerance was measured
+       against. Renaming the collision is the whole fix. -->
+  <gazebo reference="product_body">
+    <mu1>$(arg friction)</mu1>
+    <mu2>$(arg friction)</mu2>
+    <kp>100000</kp>
+    <kd>1</kd>
+    <xacro:unless value="${label_texture == ''}">
+      <!-- Gazebo unwraps a cylinder's lateral surface with u once around the circumference and v
+           along the axis, so a plain image is enough for a label and no mesh is needed. The metal
+           workflow with zero metalness gives matte paper; the default metalness renders a mirror
+           that reflects the tray. -->
+      <visual>
+        <material>
+          <pbr>
+            <metal>
+              <albedo_map>${label_texture}</albedo_map>
+              <metalness>0.0</metalness>
+              <roughness>0.9</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+    </xacro:unless>
+  </gazebo>
+  <gazebo><static>$(arg static)</static></gazebo>
+</robot>

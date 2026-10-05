@@ -1,0 +1,87 @@
+---
+id: how-they-fit
+title: How the pieces fit
+sidebar_position: 10
+---
+
+import ControlPathDiagram from '@site/src/components/architecture/ControlPathDiagram';
+import StackDependencyDiagram from '@site/src/components/architecture/StackDependencyDiagram';
+
+# How the pieces fit
+
+This page shows what talks to what when the robot restocks a product, and what each layer may
+decide.
+
+## One sentence per layer
+
+| Layer | Job in this project |
+| --- | --- |
+| [Manipulator + frames](./manipulators-and-frames) | Names the bodies and poses you plan about (`tool0`, `grasp_center`, `lane_03`) |
+| [URDF / Xacro / TF2](./urdf-and-tf) | Describes those bodies and publishes live transforms from joint angles |
+| [ROS 2](./ros2) | Connects processes with topics, services, and the `RestockProduct` action |
+| [Gazebo + ros2_control](./gazebo-and-control) | Simulates physics; controllers move simulated joints as if they were hardware |
+| [MoveIt 2](./moveit) | Finds collision-free motions and sends timed trajectories to those controllers |
+| [Perception](./perception) | Publishes observations (poses, lanes, obstacle boxes), not joint commands |
+| [World state vs planning scene](./world-state-vs-scene) | World state owns inventory semantics; MoveIt's scene owns collision geometry only |
+| [Classical vs learned](./classical-vs-learned) | The task machine owns authority; models may advise, never bypass planning |
+
+Nothing below may skip the layers above it. A camera pose does not become a motor command. A
+model suggestion does not become a trajectory without MoveIt and world-state checks.
+
+## The runtime path
+
+When a client sends `/restock_product`, work flows down this stack:
+
+<ControlPathDiagram />
+
+Read it bottom-up for dependencies:
+
+1. **Gazebo** must exist for joints, contacts, and sensor images.
+2. **ros2_control** / **gz_ros2_control** turn planned trajectories into joint motion the sim
+   accepts.
+3. **TF2** (from the URDF + joint states) tells every other node where `grasp_center` and the
+   lanes are *right now*.
+4. **World state** stores what is true for the task: which object, which lane contents, whether
+   something is held, whether a reservation is active.
+5. **Wrist perception** feeds operational product/lane observations into world state; overhead
+   depth supplies obstacle evidence. Ground truth is a labelled opt-in. Accepted lane surveys
+   may reconcile FIFO sales through world-state rules, never direct inventory writes.
+6. **Planning-scene projection** copies collision shapes into MoveIt from that authoritative
+   picture. MoveIt never becomes the stock database.
+7. **MoveIt** plans and executes motion segments against that scene.
+8. **The task state machine** (on ROS actions/services) sequences reserve → grasp → attach →
+   place → commit, and refuses when evidence is missing or stale.
+
+## Who depends on whom
+
+<StackDependencyDiagram />
+
+Solid arrows are required for a baseline restock. The dashed advisory branch can be absent
+without changing behaviour. Boxes link to the matching page.
+
+## Shared contracts that glue the stack
+
+- **Frames:** every pose names a frame. Perception transforms at acquisition time into `world`.
+  Grasp planning targets `grasp_center`; MoveIt solves to `tool0`. See
+  [URDF, Xacro, and TF2](./urdf-and-tf).
+- **Time:** simulation uses `/clock`. Controllers, TF, and observations must agree on that clock
+  or freshness checks fail closed. Operation and whole-task deadlines instead use steady time.
+- **Actions vs services:** long jobs (`RestockProduct`, motion segments) are actions. Snapshots
+  and reservations are services. Streams (`/joint_states`, observations) are topics. See
+  [ROS 2](./ros2).
+- **Two maps of the world:** semantic inventory in world state; collision geometry in MoveIt.
+  Do not conflate them. See
+  [World state vs planning scene](./world-state-vs-scene).
+
+## What “done” means here
+
+A transfer is not done when MoveIt reports path success. It is done when world state can prove
+the intended semantic outcome (for example: attachment and lane membership match what the task
+committed). That is why verification and fail-closed checks sit above Gazebo and MoveIt, not
+inside them.
+
+## Next
+
+- [Architecture](/docs/architecture): how this project packages the same stack (ports,
+  coordinator, launches).
+- [How to run](/docs/run): bring the composition up and drive a goal.

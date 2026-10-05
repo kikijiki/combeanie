@@ -1,0 +1,105 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:macro name="restocker_gripper" params="prefix">
+    <xacro:property name="geometry" value="${restocker_gripper_geometry}"/>
+    <xacro:property name="body_size" value="${' '.join(str(value) for value in geometry.body.size_xyz_m)}"/>
+    <xacro:property name="body_center" value="${' '.join(str(value) for value in geometry.body.center_xyz_m)}"/>
+    <xacro:property name="finger_size" value="${' '.join(str(value) for value in geometry.finger.size_xyz_m)}"/>
+    <xacro:property name="finger_center" value="${' '.join(str(value) for value in geometry.finger.center_xyz_m)}"/>
+    <joint name="${prefix}gripper_mount_joint" type="fixed">
+      <parent link="${prefix}tool0"/>
+      <child link="${prefix}gripper"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- SDFormat lumps a fixed joint's child into its parent, which would delete the gripper link
+         from the simulated model. The attachment plugin resolves this link by name and expresses
+         grasp transforms in its frame (attachment_boundary.yaml parent_link,
+         gripper_from_grasp_center), so the link must survive the URDF-to-SDF reduction. -->
+    <gazebo reference="${prefix}gripper_mount_joint">
+      <preserveFixedJoint>true</preserveFixedJoint>
+    </gazebo>
+
+    <link name="${prefix}gripper">
+      <visual>
+        <origin xyz="${body_center}" rpy="0 0 0"/>
+        <geometry><box size="${body_size}"/></geometry>
+        <material name="restocker_dark_gray"/>
+      </visual>
+      <collision>
+        <origin xyz="${body_center}" rpy="0 0 0"/>
+        <geometry><box size="${body_size}"/></geometry>
+      </collision>
+      <xacro:box_inertial
+        mass="${geometry.body.mass_kg}"
+        x="${geometry.body.size_xyz_m[0]}"
+        y="${geometry.body.size_xyz_m[1]}"
+        z="${geometry.body.size_xyz_m[2]}"
+        xyz="${body_center}" rpy="0 0 0"/>
+    </link>
+
+    <!-- Semantic grasp datum at the center of the finger contact region. -->
+    <joint name="${prefix}grasp_center_joint" type="fixed">
+      <parent link="${prefix}gripper"/>
+      <child link="${prefix}grasp_center"/>
+      <origin
+        xyz="${' '.join(str(value) for value in geometry.grasp_center.xyz_m)}"
+        rpy="${' '.join(str(value) for value in geometry.grasp_center.rpy_rad)}"/>
+    </joint>
+    <link name="${prefix}grasp_center"/>
+
+    <joint name="${prefix}left_finger_joint" type="prismatic">
+      <parent link="${prefix}gripper"/>
+      <child link="${prefix}left_finger"/>
+      <origin xyz="${' '.join(str(value) for value in geometry.finger.left.origin_xyz_m)}" rpy="0 0 0"/>
+      <axis xyz="${' '.join(str(value) for value in geometry.finger.left.axis)}"/>
+      <limit lower="${restocker_gripper_lower}" upper="${restocker_gripper_upper}" effort="${restocker_gripper_effort}" velocity="${restocker_gripper_velocity}"/>
+      <dynamics damping="${geometry.finger.joint.damping_n_s_per_m}" friction="${geometry.finger.joint.friction_n}"/>
+    </joint>
+    <link name="${prefix}left_finger">
+      <visual>
+        <origin xyz="${finger_center}" rpy="0 0 0"/>
+        <geometry><box size="${finger_size}"/></geometry>
+        <material name="restocker_orange"/>
+      </visual>
+      <collision>
+        <origin xyz="${finger_center}" rpy="0 0 0"/>
+        <geometry><box size="${finger_size}"/></geometry>
+      </collision>
+      <xacro:box_inertial
+        mass="${geometry.finger.mass_kg}"
+        x="${geometry.finger.size_xyz_m[0]}"
+        y="${geometry.finger.size_xyz_m[1]}"
+        z="${geometry.finger.size_xyz_m[2]}"
+        xyz="${finger_center}" rpy="0 0 0"/>
+    </link>
+
+    <joint name="${prefix}right_finger_joint" type="prismatic">
+      <parent link="${prefix}gripper"/>
+      <child link="${prefix}right_finger"/>
+      <origin xyz="${' '.join(str(value) for value in geometry.finger.right.origin_xyz_m)}" rpy="0 0 0"/>
+      <axis xyz="${' '.join(str(value) for value in geometry.finger.right.axis)}"/>
+      <limit lower="${restocker_gripper_lower}" upper="${restocker_gripper_upper}" effort="${restocker_gripper_effort}" velocity="${restocker_gripper_velocity}"/>
+      <dynamics damping="${geometry.finger.joint.damping_n_s_per_m}" friction="${geometry.finger.joint.friction_n}"/>
+    </joint>
+    <link name="${prefix}right_finger">
+      <visual>
+        <origin xyz="${finger_center}" rpy="0 0 0"/>
+        <geometry><box size="${finger_size}"/></geometry>
+        <material name="restocker_orange"/>
+      </visual>
+      <collision>
+        <origin xyz="${finger_center}" rpy="0 0 0"/>
+        <geometry><box size="${finger_size}"/></geometry>
+      </collision>
+      <xacro:box_inertial
+        mass="${geometry.finger.mass_kg}"
+        x="${geometry.finger.size_xyz_m[0]}"
+        y="${geometry.finger.size_xyz_m[1]}"
+        z="${geometry.finger.size_xyz_m[2]}"
+        xyz="${finger_center}" rpy="0 0 0"/>
+    </link>
+  </xacro:macro>
+</robot>

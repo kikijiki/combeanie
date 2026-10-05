@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:macro name="restocker_rail" params="prefix">
+    <link name="${prefix}rail_base">
+      <visual>
+        <origin xyz="0 0 0.08" rpy="0 0 0"/>
+        <geometry><box size="4.0 0.24 0.16"/></geometry>
+        <material name="restocker_dark_gray"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0.08" rpy="0 0 0"/>
+        <geometry><box size="4.0 0.24 0.16"/></geometry>
+      </collision>
+      <xacro:box_inertial mass="${80.0}" x="${4.0}" y="${0.24}" z="${0.16}" xyz="0 0 0.08" rpy="0 0 0"/>
+    </link>
+
+    <joint name="${prefix}rail_joint" type="prismatic">
+      <parent link="${prefix}rail_base"/>
+      <child link="${prefix}carriage"/>
+      <origin xyz="0 0 0.16" rpy="0 0 0"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="${restocker_rail_lower}" upper="${restocker_rail_upper}" effort="${restocker_rail_effort}" velocity="${restocker_rail_velocity}"/>
+      <dynamics damping="25.0" friction="8.0"/>
+    </joint>
+
+    <link name="${prefix}carriage">
+      <visual>
+        <origin xyz="0 0 0.06" rpy="0 0 0"/>
+        <geometry><box size="0.50 0.46 0.12"/></geometry>
+        <material name="restocker_orange"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0.06" rpy="0 0 0"/>
+        <geometry><box size="0.50 0.46 0.12"/></geometry>
+      </collision>
+      <xacro:box_inertial mass="${42.0}" x="${0.50}" y="${0.46}" z="${0.12}" xyz="0 0 0.06" rpy="0 0 0"/>
+    </link>
+
+  </xacro:macro>
+</robot>

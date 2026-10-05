@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+<robot name="restocker_workcell" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="prefix" default=""/>
+  <xacro:arg
+    name="geometry_config"
+    default="$(find restocker_description)/config/workcell_geometry.yaml"/>
+  <xacro:include filename="$(find restocker_description)/urdf/workcell.xacro"/>
+  <xacro:property
+    name="workcell_geometry"
+    value="${xacro.load_yaml('$(arg geometry_config)')}"/>
+  <xacro:restocker_workcell prefix="$(arg prefix)" geometry="${workcell_geometry}"/>
+</robot>

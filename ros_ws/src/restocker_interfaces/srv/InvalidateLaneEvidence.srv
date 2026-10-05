@@ -1,0 +1,9 @@
+# Mark a lane's depletion evidence unusable until the next accepted LaneObservation.
+# Used when a placement or policy change means the last survey no longer describes the lane.
+# Selection and reservation refuse invalidated evidence even inside its validity horizon.
+
+string lane_id
+uint64 expected_lane_revision
+---
+restocker_interfaces/WorldStateOperationStatus status
+uint64 world_revision

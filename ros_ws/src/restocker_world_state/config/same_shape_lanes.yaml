@@ -1,0 +1,40 @@
+schema_version: 1
+
+# The lane policy that goes with restocker_gazebo/config/same_shape_products.yaml.
+#
+# It differs from baseline_lanes.yaml in one field: lane_04 expects SIM-CAN-CITRUS where the
+# baseline expects a second SIM-CAN-STD. Under the baseline policy either lane would take either
+# can, so nothing depends on telling them apart. Here each can has exactly one destination,
+# chosen by its label text. A run that misreads the labels delivers nothing: task selection skips
+# a pair the lane's expected SKU refuses (restocker_task_executor/src/task_selection.cpp) and
+# reports NoEligiblePair, which is a clean outcome rather than a fault, so the failure is silent.
+#
+# All six lanes are restated because the loader requires the semantic lane IDs to be exactly the
+# workcell geometry's lane IDs (restocker_world_state/src/lane_config.cpp). Lanes 02, 03, 05 and
+# 06 are the baseline's, unchanged. target_count matches the baseline's declared want of six
+# per lane.
+lanes:
+  lane_01:
+    expected_product_class: can
+    expected_sku: SIM-CAN-STD
+    target_count: 6
+  lane_02:
+    expected_product_class: small_bottle
+    expected_sku: SIM-BOTTLE-SMALL
+    target_count: 6
+  lane_03:
+    expected_product_class: large_bottle
+    expected_sku: SIM-BOTTLE-LARGE
+    target_count: 6
+  lane_04:
+    expected_product_class: can
+    expected_sku: SIM-CAN-CITRUS
+    target_count: 6
+  lane_05:
+    expected_product_class: small_bottle
+    expected_sku: SIM-BOTTLE-SMALL
+    target_count: 6
+  lane_06:
+    expected_product_class: large_bottle
+    expected_sku: SIM-BOTTLE-LARGE
+    target_count: 6

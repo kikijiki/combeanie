@@ -1,0 +1,124 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+<sdf version="1.9">
+  <world name="restocking">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="restocker_attachment_system" name="restocker_gazebo::AttachmentSystem"/>
+
+    <gravity>0 0 0</gravity>
+    <!-- Deliberately does not carry the `<dart><collision_detector>` that worlds/restocking.sdf
+         names. The only contact here is a box jaw against a cylinder, which every detector
+         dispatches, so it would add no contact; it would change the contact points under the
+         jaws, and every tolerance in config/attachment_boundary.yaml was measured against the
+         current ones. Aligning is a re-baselining decision. -->
+    <physics name="attachment_test_physics" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <model name="restocker">
+      <link name="gripper">
+        <inertial>
+          <mass>1.2</mass>
+          <inertia>
+            <ixx>0.0017</ixx><iyy>0.0031</iyy><izz>0.0036</izz>
+          </inertia>
+        </inertial>
+        <collision name="palm_collision">
+          <pose>0 0 0.035 0 0 0</pose>
+          <geometry><box><size>0.16 0.11 0.07</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="gripper_world_joint" type="fixed">
+        <parent>world</parent>
+        <child>gripper</child>
+      </joint>
+
+      <link name="left_finger">
+        <pose relative_to="gripper">0 0.03 0.07 0 0 0</pose>
+        <inertial>
+          <pose>0 0 0.07 0 0 0</pose>
+          <mass>0.18</mass>
+          <inertia>
+            <ixx>0.0003</ixx><iyy>0.0003</iyy><izz>0.0001</izz>
+          </inertia>
+        </inertial>
+        <collision name="left_finger_collision">
+          <pose>0 0 0.07 0 0 0</pose>
+          <geometry><box><size>0.035 0.018 0.14</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="left_finger_joint" type="prismatic">
+        <pose relative_to="gripper">0 0.03 0.07 0 0 0</pose>
+        <parent>gripper</parent>
+        <child>left_finger</child>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit><lower>0</lower><upper>0.035</upper><effort>100</effort><velocity>1</velocity></limit>
+          <dynamics><damping>2</damping></dynamics>
+        </axis>
+      </joint>
+
+      <link name="right_finger">
+        <pose relative_to="gripper">0 -0.03 0.07 0 0 0</pose>
+        <inertial>
+          <pose>0 0 0.07 0 0 0</pose>
+          <mass>0.18</mass>
+          <inertia>
+            <ixx>0.0003</ixx><iyy>0.0003</iyy><izz>0.0001</izz>
+          </inertia>
+        </inertial>
+        <collision name="right_finger_collision">
+          <pose>0 0 0.07 0 0 0</pose>
+          <geometry><box><size>0.035 0.018 0.14</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="right_finger_joint" type="prismatic">
+        <pose relative_to="gripper">0 -0.03 0.07 0 0 0</pose>
+        <parent>gripper</parent>
+        <child>right_finger</child>
+        <axis>
+          <xyz>0 -1 0</xyz>
+          <limit><lower>0</lower><upper>0.035</upper><effort>100</effort><velocity>1</velocity></limit>
+          <dynamics><damping>2</damping></dynamics>
+        </axis>
+      </joint>
+
+      <!-- The can's hold_joint_target_m, which the plugin requires both fingers to be within
+           0.0005 m of before it will attach. Derived from gripper_geometry.yaml's
+           hold_clearance_per_side_m (0.0025), so it moves with that. -->
+      <plugin filename="gz-sim-joint-position-controller-system"
+              name="gz::sim::systems::JointPositionController">
+        <joint_name>left_finger_joint</joint_name>
+        <topic>/attachment_test/left_finger_position</topic>
+        <initial_position>0.0145</initial_position>
+        <use_velocity_commands>true</use_velocity_commands>
+        <cmd_max>1.0</cmd_max>
+      </plugin>
+      <plugin filename="gz-sim-joint-position-controller-system"
+              name="gz::sim::systems::JointPositionController">
+        <joint_name>right_finger_joint</joint_name>
+        <topic>/attachment_test/right_finger_position</topic>
+        <initial_position>0.0145</initial_position>
+        <use_velocity_commands>true</use_velocity_commands>
+        <cmd_max>1.0</cmd_max>
+      </plugin>
+    </model>
+
+    <model name="stock_can_01">
+      <pose>0 0 0.14 0 0 0</pose>
+      <link name="product_body">
+        <inertial>
+          <mass>0.355</mass>
+          <inertia>
+            <ixx>0.0005</ixx><iyy>0.0005</iyy><izz>0.0002</izz>
+          </inertia>
+        </inertial>
+        <collision name="product_collision">
+          <geometry><cylinder><radius>0.033</radius><length>0.122</length></cylinder></geometry>
+        </collision>
+      </link>
+    </model>
+  </world>
+</sdf>

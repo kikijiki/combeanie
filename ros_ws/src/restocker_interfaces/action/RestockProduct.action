@@ -1,0 +1,120 @@
+# Selector semantics (Milestone 10 §1 confirmed-identity contract, Card 037). Presence and
+# value must agree per field (has_* true with a nonzero ID / nonempty lane name).
+#   * both unset  — the coordinator picks the (object, lane) pair, destination-first (§4);
+#   * object set, lane unset — the product is named and only the destination is chosen, among
+#     the lanes compatible with that object (§4 ordering still applies). This is how a
+#     close-confirmed candidate is transferred: selection can never substitute a different
+#     product for a named one, and a name that is no longer eligible fails closed with a typed
+#     status instead of drifting to whatever else is eligible;
+#   * both set — the pair is explicit and is checked against the same eligibility predicate;
+#   * lane without object — refused (requested_identity_incomplete).
+bool has_object_id
+uint64 object_id
+bool has_lane_id
+string lane_id
+---
+# Stable terminal status. Consumers branch on status, never detail.
+uint16 STATUS_UNSET=0
+uint16 STATUS_SUCCEEDED=1
+uint16 STATUS_CANCELED=2
+uint16 STATUS_NO_COMPATIBLE_PAIR=3
+uint16 STATUS_VALIDATION_FAILED=4
+uint16 STATUS_PLANNING_FAILED=5
+uint16 STATUS_EXECUTION_FAILED=6
+uint16 STATUS_VERIFICATION_FAILED=7
+uint16 STATUS_RECOVERY_EXHAUSTED=8
+uint16 STATUS_EXTERNAL_INCONSISTENCY=9
+uint16 STATUS_OPERATOR_REQUIRED=10
+uint16 STATUS_SHUTDOWN=11
+# Observation, lane, or robot evidence has aged out. Distinct from STATUS_NO_COMPATIBLE_PAIR,
+# which means nothing eligible was found among usable evidence; this means the evidence itself
+# went quiet, matching PlanningSceneProjectionStatus.ERROR_OBSERVATION_EVIDENCE_STALE.
+uint16 STATUS_OBSERVATION_EVIDENCE_STALE=12
+# Graded recovery, rung 5 (Milestone 10 §6, Card 051): the goal ended with the typed
+# recoverable skip — nothing irreversible happened, the reservation was released (or never
+# existed) and the arm is at a verified safe state; the campaign skips this product and
+# continues. Distinct from STATUS_CANCELED (an operator asked) and from operator latches.
+uint16 STATUS_SKIPPED_RECOVERABLE=13
+uint16 STATUS_INTERNAL_ERROR=255
+
+uint16 status
+string detail
+uint64 initial_world_revision
+uint64 final_world_revision
+uint32 attempt_count
+uint32 retry_count
+builtin_interfaces/Duration elapsed_sim_time
+float64 minimum_clearance_m
+# The world-state object this goal was transferring when it terminated; 0 when selection never
+# named one. A recoverable skip carries it so the campaign can charge max_product_skips.
+uint64 selected_object_id
+# Card 086 stage 1b (CMB-SPEC-13): first-hand motion evidence, named and used like the survey results'
+# fields of the same names. Both default false, which is the fail-closed "unknown": a consumer must
+# not infer anything from false.
+#   * motion_definitely_not_started: the coordinator proves that no motion, gripper or attachment goal
+#     of this whole goal was ever commanded (a submission that its backend answered with a
+#     proven-not-started outcome, such as a plan refusal, does not count as commanded). A failure
+#     before the first command, a cancel before it, a first-leg plan failure.
+#   * execution_reached_terminal_stop: some goal was commanded, the LAST command was a motion segment
+#     and its terminal controller result (arrival, or a failure that carries the backend's stop
+#     flag) was observed, and nothing was commanded after it.
+# Both stay false for STATUS_OPERATOR_REQUIRED, STATUS_EXTERNAL_INCONSISTENCY, STATUS_SHUTDOWN and
+# STATUS_INTERNAL_ERROR and whenever the coordinator is inhibited, whatever the history was.
+bool motion_definitely_not_started
+bool execution_reached_terminal_stop
+---
+# Stable task-state identifiers mirror the pure C++ task-machine contract.
+uint8 STATE_IDLE=0
+uint8 STATE_VALIDATE_SCENE=1
+uint8 STATE_SELECT_PAIR=2
+uint8 STATE_RESERVE_TASK=3
+uint8 STATE_GENERATE_GRASPS=4
+uint8 STATE_PLAN_PRE_GRASP=5
+uint8 STATE_EXECUTE_PRE_GRASP=6
+uint8 STATE_PLAN_APPROACH=7
+uint8 STATE_EXECUTE_APPROACH=8
+uint8 STATE_CLOSE_GRIPPER=9
+uint8 STATE_VERIFY_GRASP=10
+uint8 STATE_ATTACH_TRANSACTION=11
+uint8 STATE_PLAN_RETRACT=12
+uint8 STATE_EXECUTE_RETRACT=13
+uint8 STATE_OBSERVE_DESTINATION=14
+uint8 STATE_GENERATE_PLACEMENT=15
+uint8 STATE_PLAN_PRE_INSERT=16
+uint8 STATE_EXECUTE_PRE_INSERT=17
+uint8 STATE_PLAN_INSERT=18
+uint8 STATE_EXECUTE_INSERT=19
+uint8 STATE_OPEN_GRIPPER=20
+uint8 STATE_DETACH_TRANSACTION=21
+uint8 STATE_VERIFY_PLACEMENT=22
+uint8 STATE_PLAN_RETREAT=23
+uint8 STATE_EXECUTE_RETREAT=24
+uint8 STATE_UPDATE_INVENTORY=25
+uint8 STATE_CANCEL_ACTIVE_MOTION=26
+uint8 STATE_RELEASE_TASK=27
+uint8 STATE_RECOVER=28
+uint8 STATE_FAULT=29
+uint8 STATE_REQUEST_OPERATOR=30
+uint8 STATE_COMPLETE=31
+uint8 STATE_CANCELED=32
+# Appended rather than inserted so existing state identifiers keep their values.
+uint8 STATE_OPEN_GRIPPER_FOR_APPROACH=33
+uint8 STATE_SURVEY_DESTINATION=34
+uint8 STATE_COMMIT_DETACHMENT=35
+# Short Cartesian stock-side egress between retract and PreInsert.
+uint8 STATE_PLAN_CARRY_START=36
+uint8 STATE_EXECUTE_CARRY_START=37
+# Jaws open to the closed candidate's approach clearance before leaving a failed grasp
+# (Milestone 10 §6, Card 062).
+uint8 STATE_OPEN_GRIPPER_FOR_ESCAPE=38
+
+uint8 state
+uint32 attempt
+uint32 recovery_attempt
+builtin_interfaces/Duration elapsed_sim_time
+bool has_selected_object_id
+uint64 selected_object_id
+bool has_selected_lane_id
+string selected_lane_id
+uint16 latest_status
+string detail

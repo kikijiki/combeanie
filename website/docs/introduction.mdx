@@ -1,0 +1,118 @@
+---
+id: introduction
+title: Introduction
+sidebar_position: 1
+slug: /
+---
+
+import RobotViewer from '@site/src/components/visuals/RobotViewer';
+import WorkcellViewer from '@site/src/components/visuals/WorkcellViewer';
+import RestockingCellViewer from '@site/src/components/visuals/RestockingCellViewer';
+
+# Introduction
+
+combeanie is a **simulation-first** robotics project: a rail-mounted arm restocks cans and
+bottles into a refrigerated retail shelf from the rear. It is vendor-neutral, and its behaviour
+is checked by tests you can run.
+
+After this page, go to [How to run](/docs/run), then [Fundamentals](/docs/fundamentals) if the
+stack is new to you, then [Architecture](/docs/architecture).
+
+<RestockingCellViewer height={480} eager />
+
+## The problem
+
+Retail beverage shelves are restocked from behind the display: staff open the cabinet back,
+place cans and bottles into gravity-fed lanes, and products roll forward to the customer face.
+That work is repetitive, happens in a tight corridor behind the fridge, and must keep lanes
+sorted by product without wedging or tipping stock.
+
+combeanie studies that job in simulation first: pick from a stock tray, plan a safe motion,
+place into a compatible lane mouth, and check the outcome in world state. If the outcome cannot
+be verified, the task refuses instead of guessing.
+
+A restock succeeds only when world state shows the product in the intended lane. Collisions, lost reservations, stale
+geometry, and ambiguous perception stop the task.
+
+Out of scope for now: physical store hardware, learned policies that command joints directly,
+and a single launch that turns every optional subsystem on without saying so.
+
+## The scenario
+
+The default simulated cell is a rear-access refrigerated display:
+
+| Element | Role |
+| --- | --- |
+| Gravity-fed shelf | Six lanes behind a front retainer; roller bed inclined about 4° so stock settles at the customer face |
+| Stock tray | Staging area behind the shelf where products wait to be grasped |
+| Rail-mounted arm | Travels along a rail behind the shelf so one arm covers every lane |
+| Cameras | Overhead RGB-D mast (obstacle detection only) plus wrist camera (the sensor-driven default's product and lane evidence) |
+
+Products in the catalog are cans and bottles of a few sizes. Lanes are paired by class so the
+task has a choice when one lane is full or blocked. Geometry comes from surveyed YAML, not
+invented mesh sizes.
+
+World-frame plan with `rail_base` at the origin and the shelf at the baseline workcell pose
+(`0, 0.55, 0.75` m). The arm stands behind the shelf, between the stock tray and the lane mouths.
+
+![Combined workcell and robot plan](/img/schematics/layout-plan.svg)
+
+## The robot
+
+One arm covers the whole shelf by riding a horizontal rail behind the display. A carriage on
+that rail carries a six-axis manipulator and a parallel-jaw gripper. The planning tip is
+`tool0`; grasp geometry is centered on `grasp_center`, a fixed offset beyond the tool flange.
+A decorative beanie (hence the name) sits on the shoulder cap: visual only, with no
+collision, no mass, no effect on planning or perception.
+
+Side (YZ) and front (XZ) views in the zero pose. Rail span is 4.0 m.
+`grasp_center` sits 0.14 m beyond `tool0` along the gripper axis.
+
+![Robot orthographic schematic](/img/schematics/robot-orthographic.svg)
+
+| Frame | Meaning |
+| --- | --- |
+| `rail_base` | Fixed rail origin in the world |
+| `carriage` | Sliding mount that carries the arm |
+| `tool0` | MoveIt / control tip frame |
+| `grasp_center` | Where fingers close on a product |
+| `beanie` | Decorative shoulder-cap beanie (visual only) |
+
+Drag to orbit, scroll to zoom, reset the camera from the toolbar. Switch between home
+(upright) and a reach toward `lane_03`. Labels follow the visual components in each pose; they mark mesh centers, not TF origins.
+The [frame tree](/docs/architecture/workcell-and-frames) describes frame ancestry.
+
+<RobotViewer />
+
+## The workcell
+
+Six gravity-fed lanes, a front retainer, a stock tray, and an overhead camera mast. Products
+released near a lane mouth roll forward on the roller bed and settle against the retainer.
+
+Top and side views (shelf `z = 0` at the retainer face):
+
+![Workcell top and side schematic](/img/schematics/workcell-top-side.svg)
+
+Lane cross-section: inclined bed, retainer, and a settled large bottle leaning with the bed.
+
+![Lane cross-section schematic](/img/schematics/lane-cross-section.svg)
+
+Shelf, tray, mast, and the dense demo products:
+
+<WorkcellViewer />
+
+## Stack
+
+```text
+Gazebo Harmonic  +  ROS 2 Jazzy  +  ros2_control  +  MoveIt 2
+        │
+        └── Nix flake pins the toolchain; just drives build/test/launch
+```
+
+No host ROS install is required. Physical hardware is out of scope for this version.
+
+## Next
+
+- [How to run](/docs/run)
+- [Fundamentals](/docs/fundamentals)
+- [Architecture](/docs/architecture)

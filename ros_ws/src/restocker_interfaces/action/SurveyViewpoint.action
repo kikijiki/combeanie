@@ -1,0 +1,78 @@
+# Aim the wrist camera at one viewpoint: plan and execute a free-space segment that puts
+# wrist_camera_optical_frame at a commanded pose.
+#
+# A viewpoint is a camera pose, never a tool pose. The conversion to a tool0 goal happens behind
+# the ViewpointPort, through the fixed mount transform read from the robot's own description, so
+# no client composes that transform itself.
+
+# Name a nominal survey station (lane_01 .. lane_06, tray_1, tray_2) and leave
+# camera_optical_pose unset. The station table is derived from the workcell's own geometry, so a
+# client that names one gets the same viewpoint the survey scheduler would.
+string station
+
+# An explicit pose of wrist_camera_optical_frame, used when station is empty. Its frame_id must be
+# the planning frame; the header stamp is ignored, because a viewpoint is a command, not a
+# measurement.
+geometry_msgs/PoseStamped camera_optical_pose
+
+# Names this survey in first-hand logs and failure details. Empty falls back to the station name.
+string label
+
+# Zero takes the server's configured default for each.
+float64 position_tolerance_m
+float64 orientation_tolerance_rad
+---
+# Stable terminal status. Consumers branch on outcome, never on detail.
+uint8 OUTCOME_UNSET=0
+uint8 OUTCOME_ARRIVED=1
+# The viewpoint could not be turned into a tool goal: the mount transform was unavailable, or the
+# requested pose was malformed. Nothing was commanded.
+uint8 OUTCOME_VIEWPOINT_UNRESOLVED=2
+# No collision-free plan to the tool goal was found. Nothing was commanded.
+uint8 OUTCOME_PLANNING_FAILED=3
+# A plan existed but execution did not complete, or the backend was lost after it had been handed
+# the trajectory, or the survey layer refused the goal as busy because an earlier survey may still be
+# moving the arm (Card 086 stage 1b). In every case the arm may have moved: no stop is claimed, and
+# a client that used to retry on OUTCOME_UNAVAILABLE for a busy refusal must not retry on this.
+uint8 OUTCOME_EXECUTION_FAILED=4
+uint8 OUTCOME_CANCELED=5
+uint8 OUTCOME_TIMED_OUT=6
+# The motion or viewpoint backend was not available BEFORE anything was handed to it, so no motion
+# was attempted. A backend lost after the trajectory was submitted is OUTCOME_EXECUTION_FAILED, and so
+# is a busy refusal (Card 086 stage 1b).
+uint8 OUTCOME_UNAVAILABLE=7
+# The request itself was malformed (an unknown station, a pose in the wrong frame).
+uint8 OUTCOME_INVALID_REQUEST=8
+# The server shut down while the survey was in flight (review F2, Card 052). Claims neither
+# that no motion was attempted nor that the controllers stopped: consumers must fail closed
+# on it — the campaign's leg helpers map unknown constants through their default branches to
+# "may have moved" / "stop not established". Never reuse OUTCOME_UNAVAILABLE for a shutdown
+# abort: that constant means the backend never engaged.
+uint8 OUTCOME_SHUTDOWN=9
+
+uint8 outcome
+string detail
+string station
+
+# The camera pose that was asked for, after station resolution.
+geometry_msgs/PoseStamped commanded_camera_optical_pose
+# The tool0 pose the mount transform turned it into, and the pose actually sent to MoveIt.
+geometry_msgs/PoseStamped commanded_tool0_pose
+# Where wrist_camera_optical_frame actually ended up, read from TF after the segment finished.
+# Populated whenever TF could answer, including after a failure, since where the arm stopped is
+# evidence either way.
+bool achieved_pose_measured
+geometry_msgs/PoseStamped achieved_camera_optical_pose
+float64 achieved_translation_error_m
+float64 achieved_rotation_error_rad
+
+# True only when the backend established that this segment's execution reached a terminal state
+# and the controllers were stopped. A necessary condition for replanning from the current state,
+# not a sufficient one.
+bool execution_reached_terminal_stop
+---
+uint8 PHASE_RESOLVING_VIEWPOINT=0
+uint8 PHASE_MOVING=1
+uint8 PHASE_MEASURING=2
+
+uint8 phase

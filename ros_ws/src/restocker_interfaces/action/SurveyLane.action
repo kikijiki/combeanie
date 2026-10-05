@@ -1,0 +1,59 @@
+# Survey one shelf lane: aim the wrist camera at that lane's station, take one acquisition, and
+# publish the LaneObservation it produces.
+#
+# Composes existing pieces and adds no authority of its own: the motion is an ordinary
+# SurveyViewpoint segment under the same planning-scene authority gate, and the measurement is
+# one AcquireLaneObservation call against the perception node that owns the depth stream.
+
+string lane_id
+
+# Zero takes the server's configured defaults.
+float64 position_tolerance_m
+float64 orientation_tolerance_rad
+
+# Skip the motion and measure from wherever the arm already is. Used to re-measure a lane the
+# camera is already aimed at, and to exercise the acquisition without moving a robot.
+bool measure_only
+---
+uint8 OUTCOME_UNSET=0
+# The camera was aimed and an observation was published. The observation's own status says
+# whether the camera could actually see the lane.
+uint8 OUTCOME_OBSERVED=1
+uint8 OUTCOME_UNKNOWN_LANE=2
+# The arm never got to the viewpoint. No acquisition was attempted, and nothing was published.
+uint8 OUTCOME_VIEWPOINT_UNREACHED=3
+# The arm arrived but the acquisition produced nothing. Nothing was published.
+uint8 OUTCOME_ACQUISITION_FAILED=4
+uint8 OUTCOME_CANCELED=5
+uint8 OUTCOME_UNAVAILABLE=6
+uint8 OUTCOME_INVALID_REQUEST=7
+
+uint8 outcome
+string detail
+string lane_id
+
+# The survey result for the aiming half, so a caller sees the achieved camera pose that produced
+# the measurement as well as the measurement.
+bool viewpoint_measured
+geometry_msgs/PoseStamped achieved_camera_optical_pose
+float64 achieved_translation_error_m
+float64 achieved_rotation_error_rad
+
+# Populated only when outcome is OUTCOME_OBSERVED.
+restocker_interfaces/LaneObservation observation
+
+# First-hand motion evidence for the campaign's recovery classification (Milestone 10 §6,
+# Card 052). motion_definitely_not_started: this attempt's own machinery proves no joint
+# command was issued. execution_reached_terminal_stop: the backend established this
+# attempt's terminal stop at the controllers (or the aim arrived — controllers reported
+# success). A delivered terminal result carrying either flag establishes the arm's state for
+# classification; a result carrying neither does not. Both are false after a backend loss once the
+# trajectory was handed to it (the outcome is then OUTCOME_VIEWPOINT_UNREACHED, "unreached" does not
+# mean "never moved") and for a busy refusal (OUTCOME_UNAVAILABLE with no proof; Card 086 stage 1b).
+bool motion_definitely_not_started
+bool execution_reached_terminal_stop
+---
+uint8 PHASE_AIMING=0
+uint8 PHASE_ACQUIRING=1
+
+uint8 phase

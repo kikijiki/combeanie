@@ -1,0 +1,126 @@
+schema_version: 1
+pose_topic: /world/restocking/pose/info
+frame_id: world
+backend:
+  name: gazebo_ground_truth
+  version: harmonic_pose_v1
+pose_covariance_diagonal: [1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8]
+workcell_pose: [0.0, 0.55, 0.75, 0.0, 0.0, 0.0]
+products:
+  - model_name: stock_can_01
+    source_object_id: sim:stock_can_01
+    geometry_key: can.standard
+    product_class: can
+    sku: SIM-CAN-STD
+    mass_kg: 0.355
+    rgba: [0.78, 0.12, 0.08, 1.0]
+    friction: 0.65
+    spawn_pose: [-0.42, -0.80, 0.631, 0.0, 0.0, 0.0]
+  - model_name: stock_small_bottle_01
+    source_object_id: sim:stock_small_bottle_01
+    geometry_key: bottle.small.standard
+    product_class: small_bottle
+    sku: SIM-BOTTLE-SMALL
+    mass_kg: 0.500
+    rgba: [0.10, 0.42, 0.82, 0.82]
+    friction: 0.72
+    spawn_pose: [0.0, -0.80, 0.670, 0.0, 0.0, 0.0]
+  - model_name: stock_large_bottle_01
+    source_object_id: sim:stock_large_bottle_01
+    geometry_key: bottle.large.standard
+    product_class: large_bottle
+    sku: SIM-BOTTLE-LARGE
+    mass_kg: 1.100
+    rgba: [0.12, 0.68, 0.34, 0.82]
+    friction: 0.76
+    spawn_pose: [0.42, -0.80, 0.715, 0.0, 0.0, 0.0]
+
+# Bounds for seeded scenario generation. The `products:` list above is the surveyed fixed
+# scenario and is spawned verbatim whenever `scenario_seed:=fixed`, the launch default, so
+# randomization is opt-in and recorded baselines keep their poses. With a numeric seed,
+# restocker_gazebo.scenario_random replaces `products:` with a draw from these bounds; the same
+# seed and bounds always produce the same document.
+randomization:
+  # Version 2 dropped the per-product destination lane draw. Version 3 widened the pairwise
+  # separation rule to include the jaw approach corridor. Version 4 measured that corridor with
+  # the planner's robot padding (the finger MoveIt collision-checks). Version 5 measured it along
+  # the approach and over every link that sweeps it rather than the fingers alone, refused a
+  # placement whose pre-grasp the arm cannot reach, and stopped drawing a class more times than
+  # the shelf has lanes for it. See restocker_gazebo/scenario_random.py. Seeds recorded against
+  # versions 1 to 4 do not replay here.
+  generator_version: 5
+  stock_region:
+    # The placement envelope is the description-owned stock tray usable volume, read from
+    # restocker_description/config/workcell_geometry.yaml so a generated pose cannot disagree with
+    # the volume the occupancy checks measure against.
+    source: stock_tray.usable_volume
+    # Horizontal inset from the envelope walls, on top of the product's catalog radius. A product
+    # placed exactly against a tray wall is in contact from the first physics step and gets
+    # nudged off the seeded pose.
+    wall_margin_m: 0.01
+    # Minimum surface-to-surface gap between two products. Cylinders spawned touching push each
+    # other apart once physics starts, moving them off the seeded pose and making the run
+    # unreplayable.
+    #
+    # This is the seating bound only, and usually not the one that binds. Reaching a product means
+    # running the arm down a straight line into the tray, and every link from wrist_2_link forward
+    # sweeps a tube about that line (0.1015 m radius as MoveIt collision-checks it), so a neighbour
+    # must stand further than that plus its own radius across the approach or the line is blocked
+    # from every arm configuration. That bound is asymmetric, per-pair and measured on one axis
+    # rather than on the centre distance, so it cannot be folded into this scalar; the generator
+    # derives it from restocker_description/config/gripper_geometry.yaml and arm.xacro's coaxial
+    # links and applies it alongside this gap. Raising this value cannot substitute for it: it
+    # would push products apart in every direction, and a value covering the worst pair would
+    # leave far fewer than six products able to stand in the tray.
+    surface_separation_m: 0.02
+    # A draw that breaks containment, separation or the approach corridor is rejected and redrawn.
+    # Exhausting the budget fails the launch instead of emitting a scenario that cannot be seated
+    # or reached into.
+    #
+    # 1024 rather than 256 because version 5's corridor rule leaves a much smaller admissible set
+    # for the last of six products. Over seeds 0..19999 the budget was exhausted for 11 seeds at
+    # 256 and 6 at 1024, converging on 4 by 16384. Those four are draws the tray cannot finish
+    # (the first five products land where no sixth position clears every corridor), so the
+    # residual is geometry, not sampling luck, and every one drew the maximum count. Five always
+    # place.
+    max_placement_attempts: 1024
+  product_count:
+    minimum: 1
+    maximum: 6
+  variants:
+    # Physical and visual properties are copied from the fixed products above so a randomized run
+    # differs from the baseline only in which products exist and where they stand.
+    # `destination_lanes` lists every lane that accepts the variant: exactly the lanes
+    # restocker_world_state's baseline_lanes.yaml gives the same expected class and SKU;
+    # test_scenario_random.py checks it against that file.
+    #
+    # It is a constraint, not an instruction. A seeded run varies which products exist and where
+    # they stand, not where they end up: the coordinator picks a destination at runtime in
+    # task_selection.cpp from the world state and never opens this file. (The generator once drew
+    # a lane per product into `destination_lane`; nothing read it, so version 2 removed it.) The
+    # list still stops a variant being declared with a class the shelf has no lane for, which
+    # could be spawned and grasped but never delivered.
+    - geometry_key: can.standard
+      product_class: can
+      sku: SIM-CAN-STD
+      mass_kg: 0.355
+      rgba: [0.78, 0.12, 0.08, 1.0]
+      friction: 0.65
+      model_name_stem: stock_can
+      destination_lanes: [lane_01, lane_04]
+    - geometry_key: bottle.small.standard
+      product_class: small_bottle
+      sku: SIM-BOTTLE-SMALL
+      mass_kg: 0.500
+      rgba: [0.10, 0.42, 0.82, 0.82]
+      friction: 0.72
+      model_name_stem: stock_small_bottle
+      destination_lanes: [lane_02, lane_05]
+    - geometry_key: bottle.large.standard
+      product_class: large_bottle
+      sku: SIM-BOTTLE-LARGE
+      mass_kg: 1.100
+      rgba: [0.12, 0.68, 0.34, 0.82]
+      friction: 0.76
+      model_name_stem: stock_large_bottle
+      destination_lanes: [lane_03, lane_06]

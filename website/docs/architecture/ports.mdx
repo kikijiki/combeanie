@@ -1,0 +1,67 @@
+---
+id: ports
+title: Manipulation ports
+sidebar_position: 9
+---
+
+import PortsDiagram from "@site/src/components/architecture/PortsDiagram";
+
+# Manipulation ports
+
+The coordinator drives manipulation through four ports that share one shape: submit a correlated
+goal, receive exactly one completion, never block the orchestration pump. Each port has a
+ROS-backed implementation and a deterministic fake for tests. Isolating them keeps blocking
+clients (especially `MoveGroupInterface`) off the coordinator's callback groups.
+
+<PortsDiagram />
+
+| Port               | Contract shape                                                                                                                     | Trust note                                                                                                                                                      |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **WorldStatePort** | Opaque reservation **token** only on mutation replies; snapshots are token-free                                                    | Token never logged/snapshotted; idempotency journal fail-closed                                                                                                 |
+| **MotionPort**     | Submit correlated goal → exactly one completion; free-space vs linear Cartesian; optional path AABB/orientation on free-space only | Outcomes classify “nothing commanded” vs “arm may have moved”; Cartesian carry-start is collision-checked and constrained PreInsert never retries unconstrained |
+| **GripperPort**    | Symmetric jaw metres; verify both fingers vs attachment band (0.5 mm)                                                              | Controller success ≠ attachable grasp                                                                                                                           |
+| **AttachmentPort** | Full attach/detach; PhysicalOnly → SemanticOnly placement detach                                                                   | Physical-only detach retains the lease for its continuation; unresolved physical/semantic agreement requires an operator                                        |
+
+## Attachment settlement
+
+A successful `PhysicalOnly` placement detach retains the planning-scene lease and the boundary's
+release stamp. The coordinator uses that capability for the retreat, surveys the destination,
+then passes the same lease and stamp to `SemanticOnly` to commit placement. This is an intentional
+scoped success; semantic detachment follows the survey.
+
+For full attachment, the port prepares the semantic request before sending the physical command.
+Retries keep the same operation ID, reservation capability and grasp transform. After retaining a
+verified physical receipt, settlement sends only semantic commit requests. The
+[world-state temporal-readiness reply](./world-state#attachment-time-and-clock-authority) allows
+that request to be retried within the semantic phase's original steady-clock deadline. RPC waits,
+poll waits and response admission use that deadline, even while ROS time is paused.
+
+During full attach settlement, a definite refusal describes only its own call; it cannot clear
+an earlier missing reply. Exact successful replay can resolve that uncertainty. Clock-inhibited
+replies, including historical success receipts, and success first handled after the deadline
+require operator reconciliation without lease release or task continuation. An unsafe attach
+completion keeps one in-memory record of its request, available physical evidence, submission uncertainty and lease disposition;
+new attach or detach submissions cannot replace it. This is current-process diagnostic retention,
+with no automatic recovery or persistent restart handoff.
+
+Physical/semantic success and lease-release acknowledgement are separate facts. A missing release
+acknowledgement does not make a proven semantic commit uncommitted, and a release acknowledgement
+can precede projector convergence. Subsequent motion still requires projector authority: an
+active lease without its capability or an unresolved projection cannot authorize execution.
+
+## Headers
+
+| Port        | Headers                                                       |
+| ----------- | ------------------------------------------------------------- |
+| World state | `world_state_port_contract.hpp`, `world_state_async_port.hpp` |
+| Motion      | `motion_port.hpp`, `moveit_motion_port.hpp`                   |
+| Gripper     | `gripper_port.hpp`, `ros_gripper_port.hpp`                    |
+| Attachment  | `attachment_port.hpp`, `ros_attachment_port.hpp`              |
+
+`attachment_transaction_machine.hpp` is retained as a design record; the shipped order relies on
+projector convergence after commit rather than a compensatable multi-branch transaction.
+
+## References
+
+- **Literature:** [Correll APC survey](https://arxiv.org/abs/1601.05484) · [Team Delft](https://arxiv.org/abs/1610.05514)
+- **This project:** [Task execution](./task-execution)

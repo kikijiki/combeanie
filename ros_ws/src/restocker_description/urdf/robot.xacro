@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:include filename="$(find restocker_description)/urdf/materials.xacro"/>
+  <xacro:include filename="$(find restocker_description)/urdf/inertial_macros.xacro"/>
+  <xacro:include filename="$(find restocker_description)/urdf/joint_properties.xacro"/>
+  <xacro:include filename="$(find restocker_description)/urdf/rail.xacro"/>
+  <xacro:include filename="$(find restocker_description)/urdf/arm.xacro"/>
+  <xacro:include filename="$(find restocker_description)/urdf/gripper.xacro"/>
+  <xacro:include filename="$(find restocker_description)/urdf/sensors.xacro"/>
+  <xacro:include filename="$(find restocker_description)/urdf/beanie.xacro"/>
+  <xacro:include filename="$(find restocker_description)/urdf/ros2_control.xacro"/>
+
+  <xacro:property
+    name="restocker_gripper_geometry"
+    value="${xacro.load_yaml('$(find restocker_description)/config/gripper_geometry.yaml')}"/>
+  <xacro:property name="restocker_gripper_lower" value="${restocker_gripper_geometry.finger.joint.lower_m}"/>
+  <xacro:property name="restocker_gripper_upper" value="${restocker_gripper_geometry.finger.joint.upper_m}"/>
+  <xacro:property name="restocker_gripper_effort" value="${restocker_gripper_geometry.finger.joint.effort_n}"/>
+  <xacro:property name="restocker_gripper_velocity" value="${restocker_gripper_geometry.finger.joint.velocity_mps}"/>
+
+  <xacro:macro
+    name="restocker_robot"
+    params="prefix joint_limits_parameters_file wrist_camera_sensor:=true">
+    <xacro:restocker_rail prefix="${prefix}"/>
+    <xacro:restocker_arm
+      prefix="${prefix}"
+      joint_limits_parameters_file="${joint_limits_parameters_file}"/>
+    <xacro:restocker_gripper prefix="${prefix}"/>
+    <xacro:restocker_wrist_camera prefix="${prefix}" sensor="${wrist_camera_sensor}"/>
+    <xacro:restocker_beanie prefix="${prefix}" parent="${prefix}shoulder_link"/>
+  </xacro:macro>
+
+  <xacro:macro
+    name="restocker_robot_with_parent"
+    params="prefix parent joint_limits_parameters_file wrist_camera_sensor:=true *origin">
+    <joint name="${prefix}rail_base_mount_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${prefix}rail_base"/>
+      <xacro:insert_block name="origin"/>
+    </joint>
+
+    <xacro:restocker_robot
+      prefix="${prefix}"
+      joint_limits_parameters_file="${joint_limits_parameters_file}"
+      wrist_camera_sensor="${wrist_camera_sensor}"/>
+  </xacro:macro>
+</robot>

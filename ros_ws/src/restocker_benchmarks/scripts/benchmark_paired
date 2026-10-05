@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+# Copyright 2026 Matteo Bernacchia <dev@kikijiki.com>
+# SPDX-License-Identifier: MIT
+
+"""Entry point for the predeclared paired transfer-reliability campaign."""
+
+import sys
+
+from restocker_benchmarks.paired_campaign import main
+
+if __name__ == "__main__":
+    sys.exit(main())

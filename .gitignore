@@ -1,0 +1,41 @@
+# ROS workspace outputs
+/ros_ws/build/
+/ros_ws/install/
+/ros_ws/log/
+/ros_ws/build-*/
+/ros_ws/install-*/
+/ros_ws/log-*/
+/log/
+
+# Nix and direnv
+/.direnv/
+/result
+/result-*
+
+# Editors and operating systems
+.cache/
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# Test and Python caches
+.coverage
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+
+# Generated diagnostics and benchmark output
+/artifacts/
+/bags/
+/benchmark-results/
+/*.pdf
+.claude/
+.cursor/
+
+# Runtime lane policy state (/world_state/set_lane_policy); the default launch path lands in the
+# package's config directory under a symlinked install, and machine-local owner intent is not source
+/ros_ws/src/restocker_world_state/config/lane_policy_state.yaml
+/ros_ws/src/restocker_world_state/config/lane_policy_state.yaml.tmp

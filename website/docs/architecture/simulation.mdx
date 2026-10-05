@@ -1,0 +1,55 @@
+---
+id: simulation
+title: Simulation and control
+sidebar_position: 4
+---
+
+import CompositionDiagram from '@site/src/components/architecture/CompositionDiagram';
+
+# Simulation and control
+
+Gazebo Harmonic is the acceptance simulator. The classical control path below MoveIt
+is `ros2_control` → `gz_ros2_control` → Gazebo joints.
+
+```text
+FollowJointTrajectory (arm / rail / gripper)
+        │
+        ▼
+controller_manager  →  gz_ros2_control  →  Gazebo joints
+        │
+        └── joint_state_broadcaster → /joint_states
+                                      → joint_state_telemetry_adapter → RobotTelemetry
+```
+
+## Deployed composition
+
+`just launch-baseline` starts the stack below, **sensor-driven by default**: the wrist tray
+duties own the world state's object ingest topic and the wrist lane survey its lane topic, with
+simulator ground truth demoted to `/perception/ground_truth/*` for the evaluators. The overhead
+camera stays on and is used for **obstacle detection only** (`depth_obstacle_node`, obstacle
+boxes on); the overhead *object* pipeline and the reasoner are off by default.
+
+<CompositionDiagram />
+
+`just launch-sim` starts Gazebo + control + world state (+ optional perception) without MoveIt
+or the coordinator. See [How to run](/docs/run/scenarios).
+
+## What simulation owns
+
+| Concern | Package / artifact |
+| --- | --- |
+| World SDF, products, scenarios | `restocker_gazebo` |
+| Attachment system plugin | `attachment_system.cpp` |
+| Ground-truth observations | `ground_truth_adapter` |
+| Attachment ROS adapter | `attachment_adapter_node` (baseline) |
+| Controllers | `restocker_control/config/controllers.yaml` |
+
+Arm and rail use velocity (+ feed-forward) controllers; the gripper stays position-controlled.
+Attachment is capability-authorized through the ROS adapter; do not call raw Gazebo Transport
+set APIs from application code.
+
+## References
+
+- **Official docs:** [Gazebo Harmonic](https://gazebosim.org/docs/harmonic/) · [ros2_control Jazzy](https://control.ros.org/jazzy/)
+- **Reference implementation:** [gz_ros2_control](https://github.com/ros-controls/gz_ros2_control) · [ros_gz](https://github.com/gazebosim/ros_gz)
+- **This project:** [Fundamentals: Gazebo](/docs/fundamentals/gazebo-and-control)

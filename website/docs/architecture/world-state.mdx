@@ -1,0 +1,201 @@
+---
+id: world-state
+title: World state
+sidebar_position: 5
+---
+
+import TrustBoundaryDiagram from "@site/src/components/architecture/TrustBoundaryDiagram";
+
+# World state
+
+The C++ world-state store is the inventory and task authority. It tracks objects
+(id, class, SKU, pose, covariance, grasp/tracking state), lanes (compatibility, depth,
+obstruction, semantic `contents`), robot execution semantics, revisions, and reservations.
+
+## Trust boundaries
+
+<TrustBoundaryDiagram />
+
+| Boundary                     | Owns                                                                              | Must not                               |
+| ---------------------------- | --------------------------------------------------------------------------------- | -------------------------------------- |
+| **World state**              | Product identity, lane `contents`, task/fault, attachment semantics, reservations | Learned inference                      |
+| **MoveIt planning scene**    | Collision geometry for planning                                                   | Act as inventory database              |
+| **Perception / models**      | Observations and advisory suggestions                                             | Joint commands, unchecked trajectories |
+| **Gazebo attachment plugin** | Multi-tick physical coupling evidence                                             | Accept world-state tokens directly     |
+
+Discovery is not authority. On every coordinator start, a snapshot probe must prove the world is
+unreserved, idle, fault-free, and empty-handed before goals are admitted.
+
+## Evidence vs contents
+
+Lane **evidence** (depth, obstruction, source IDs) may refresh from perception. Semantic
+`contents` change only through reservation-authorized attachment/detachment commits and through
+the world state's own FIFO ledger reconciliation of an accepted survey (below). That split
+is why MoveIt is not used as a stock database.
+
+Object evidence refreshes the same way, with one reservation-scoped rule: while a reservation is
+at its pre-attach `Reserved` stage, the **reserved** product's pose is held. Fresh observations
+still advance its stamp, tracking state, identity, revision and events, but `pose_in_world` is
+replaced only when the observation is farther than `reserved_pose_divergence_bound_m`
+(default **0.020 m**) from the held pose — inside that bound, confirm-frame noise cannot rewrite
+the collision object under a grasp that was staged once and frozen; beyond it the new pose is
+applied immediately, so a product that really moved reaches the planning scene instead of being
+hidden. The hold ends at attach and at reservation release.
+
+## Lane ledger and deficits
+
+A gravity-fed lane is a FIFO column: placements push at the back, customers pop at the front.
+Each accepted lane survey reconciles the measured column length (`depth_m - available_depth_m`)
+against the settled contents at the catalogued product pitch:
+
+- Agreement within **half a pitch** — nothing changes. An in-flight Attached placement counts
+  only toward the growth bound, so pre-insert surveys at the old column length neither invent a
+  sale nor withdraw trust.
+- Shorter than the settled contents by one or more whole pitches — that many **front entries pop
+  as sales**; the sold objects are marked removed so they stop counting as stock.
+- Growth beyond what the contents plus an in-flight placement can explain, or a shortfall with no
+  whole front-entry sale to pop — the ledger is marked **unreliable**
+  (`ShelfLane.ledger_unreliable`, surfaced as a `LANE_LEDGER_UNRELIABLE` snapshot event). Identity
+  trust is withdrawn and latched; the measured geometry stands, so depth evidence, the
+  occupied-volume projection, and geometry-safe placements continue.
+- A ledger whose entries the current policy does not accept is left untouched by length
+  reconciliation: the new intent's pitch does not describe the old column.
+
+Deficits are computed from that geometry against the owner's want:
+`held = round(column_length / pitch)`, `deficit = max(0, target_count - held)`. Task selection
+routes against them: **largest deficit first, ties broken by rail distance from the carriage**,
+then the existing front-row and travel-cost rules choose the product. A lane whose ledger names
+products the current policy no longer accepts is reported and skipped (`lane_wrong_product`)
+rather than routed into; a lane whose expected product has no catalogued pitch fails closed
+instead of inheriting a sibling's.
+
+## Lane intent
+
+`expected_product_class`, `expected_sku`, and `target_count` on each `ShelfLane` are the owner's
+declared want, loaded from `baseline_lanes.yaml` and editable at runtime through
+`/world_state/set_lane_policy`. The service is revision-fenced: a stale expected revision or a
+failed write changes neither the lane nor the persisted `lane_policy_state` document, which is
+written atomically (temp file + fsync + rename) and overlaid on the baseline at the next startup.
+A policy change bumps the lane revision and invalidates that lane's evidence until re-surveyed;
+a reservation already granted keeps the destination policy it captured at grant, so in-flight
+transfers finish under their original policy while new selections see the new intent.
+
+## Services that matter
+
+| Service                             | Purpose                                                   |
+| ----------------------------------- | --------------------------------------------------------- |
+| `/world_state/get_snapshot`         | Immutable snapshot + revision                             |
+| `/world_state/reserve_task`         | Opaque reservation capability                             |
+| `/world_state/validate_reservation` | Revalidate reserved stage                                 |
+| `/world_state/commit_attachment`    | Semantic attach under token                               |
+| `/world_state/commit_detachment`    | Semantic place (needs post-release lane evidence)         |
+| `/world_state/release_reservation`  | Release capability                                        |
+| `/world_state/set_lane_policy`      | Revision-fenced runtime lane intent, persisted atomically |
+
+Mutation replies carry opaque tokens that must never be logged or snapshotted. An orphaned
+reservation permanently inhibits coordinator admission until the operator clears the cause;
+there is no force-release shortcut.
+
+## Attachment time and clock authority
+
+Object capture timestamps remain source evidence, including the existing bounded allowance for
+observations slightly ahead of their receipt time. An attachment never commits before the current
+object transition or robot telemetry timestamp. If only an admitted object observation is ahead,
+the store can return `ATTACHMENT_CLOCK_NOT_READY`: it requires matching object revision, original
+receipt provenance, and the same active, started managed ROS clock lineage. It changes no world
+revision, reservation stage, held identity, or journal entry. Ordinary system-time operation still
+works; missing managed-clock provenance does not qualify for this retry disposition.
+
+The node orders clock sampling and admission under the clock update mutex, then the store mutex.
+A managed backward clock change or ROS override change inhibits temporal admission once live
+evidence or a reservation exists. Static configured lanes alone do not arm that latch. Their configuration timestamp does not
+fence the first actual observation; subsequent observations still require strictly newer evidence. Runtime
+`use_sim_time` changes remain rejected; reconfiguration requires a controlled restart. This
+lineage does not authenticate `/clock` publisher identity or detect every positive replacement
+of that publisher.
+
+Exact attachment replay includes the capability and every post-conversion transform coefficient.
+Equivalent quaternion signs and signed zero produce the same transform identity; different finite
+values conflict even below pose tolerances. After clock inhibition, an original committed receipt
+is still available under `CLOCK_AUTHORITY_INHIBITED`, with its original revision and attached
+stage. It is reconciliation evidence and never ordinary success. An OK reply produced before an
+unseen later reset is outside this server-ordering guarantee.
+
+`ValidateExecutionWorldAuthority` also refuses while clock authority is inhibited. It currently
+has no production motion consumer, so that API check is not a motion-dispatch fence. Coordinated
+motion ownership, queued commands and restart recovery need their own authority boundary.
+
+## Journal capacity and cleanup
+
+Operation journals retain accepted IDs and results for replay; they do not evict old records to
+admit new work. A reservation needs room for reserve, semantic attach, semantic detach, and release
+before admission. Checkpoints use only capacity beyond the remaining lifecycle entries. Thus a
+checkpoint cannot consume the entries needed to cancel or settle an admitted task, and semantic
+attachment cannot run out of journal space after physical attachment has succeeded. All existing
+identity, revision, evidence, and terminal-outcome checks still apply to cleanup.
+
+The ROS attachment adapter and simulator have separate journals. Each protects the configured
+`detach_attempt_reserve` when admitting attach (**three attempts** in the shipped boundary
+configuration). At the adapter, only detaches for the held object under its original reservation
+capability may use protected entries. Detach acquires a fresh scene lease, which is checked by
+live authorization. Other requests, including rejected authorization attempts from another owner,
+can consume only unreserved capacity. Exact replays consume no additional entries.
+
+The retry allowance is finite: each distinct admitted owner detach consumes an attempt, including
+one rejected by authorization or physical validation. After those attempts and ordinary free
+entries are exhausted, a new detach is refused; retained results remain queryable and the held
+object still requires explicit reconciliation. The journal does not authorize a force release.
+Safe attach rejection and verified detach free unused reserved entries, while preserving their
+operation records. New tasks eventually receive `ResourceExhausted` as retained history fills;
+coordinated journal rollover and restart recovery are not implemented.
+
+### Retention bounds and the read-only snapshot
+
+Each journal states its bound and exports a read-only **retention snapshot** (no tokens, no
+payloads) so that the bound can be asserted rather than inferred. A snapshot reports the journal
+name, `capacity`, `size`, `open_obligations`, `terminal_receipts`, `reserved_credits`, an
+`epoch_id`, an `inhibited` flag, and whether the journal is `evicting` (drops its oldest record
+when full). Reading a snapshot never changes admission, eviction or replay behavior.
+
+`open_obligations` counts **journal records only**: a record is open while it carries an
+unsettled side effect, a reserved credit, or an unknown outcome, and terminal once it is settled
+and kept only so an exact retry can replay, so `open_obligations + terminal_receipts = size`.
+An obligation that is carried as state without a record is reported by a separate explicit field,
+so `open_obligations == 0` never means "nothing owed". `reserved_credits` are entries held back for
+settlement and are not part of `size`. The state-carried signals are `held_attachment` (simulator
+and adapter: a physical attachment is held, whether or not a record still references it) and
+`active_lease_phase` (planner lease: `none`, `draining`, `held` or `releasing`).
+
+Within an epoch no operation journal evicts either kind of record: a full journal refuses new
+admission instead. There is no age-based expiry.
+
+| Journal                | Bound                               | Open record                                                                                              | State-carried signal                                       | `inhibited` means                                                                  | Epoch / restart                                                                                  |
+| ---------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| World-state operations | `operation_journal_capacity` (4096) | Entries of the active reservation until its release                                                      | `reserved_credits` (3, 2, 1 by stage, else 0)              | The store's clock authority is latched after a discontinuity                       | Per-process `epoch_id` (diagnostic only); empty after restart                                    |
+| World-state events     | `event_capacity` (256)              | None (audit records, all counted terminal)                                                               | None                                                       | Same single clock flag as the operations journal                                   | Evicts oldest; empty after restart                                                               |
+| Adapter operations     | Adapter journal capacity (64)       | Any non-terminal or inconsistent record, and the attach record that owns the held object's detach credit | `reserved_credits`, `held_attachment`                      | Adapter motion is inhibited; true until startup reconciliation proves a clean state | Per-process `epoch_id`; empty after restart; `initialize` re-derives inhibition                  |
+| Simulator attachment   | Boundary journal capacity (64)      | Any in-flight, inconsistent or unknown record, and the attach record backing a held object               | `reserved_credits`, `held_attachment` (survives rotation)  | The attachment motion gate is not valid                                            | `simulator_epoch`; records are cleared on rotation, a held object stays visible as state         |
+| Planner scene lease    | `operation_journal_capacity` (4096) | Acquire and release entries of the active lease                                                          | `reserved_credits` (2, 1, 0), `active_lease_phase`         | No verified, clean scene proof exists. A freshly constructed, idle lease is inhibited; this is not a fault | `projector_epoch`; a new process has no lease and old tokens are invalid                         |
+
+Operation IDs are scoped to one authority and one epoch; they are not durable identities. After a
+process restart the journals are empty and an old ID is answered as unknown, never as success: a
+caller that survives a peer restart must treat the miss as an unknown prior outcome and reconcile
+against physical and semantic state. The `epoch_id` of the world-state store and the adapter is a
+diagnostic value, not a wire field. A clock discontinuity latches the clock authority but is not a
+new epoch.
+
+## This project
+
+| Piece             | Path                                                                 |
+| ----------------- | -------------------------------------------------------------------- |
+| Domain            | `restocker_world_state/…/world_state.hpp`                            |
+| Node              | `…/src/world_state_node.cpp`                                         |
+| Lane policy       | `…/config/baseline_lanes.yaml` (shipped default)                     |
+| Lane policy state | `…/config/lane_policy_state.yaml` (runtime `set_lane_policy` writes) |
+
+## References
+
+- **Literature:** [KnowRob (contrast)](https://ai.uni-bremen.de/papers/tenorth13knowrob.pdf)
+- **Literature:** [Verification-gated mission state](https://arxiv.org/abs/2606.31339)
+- **Official docs:** [MoveIt planning scene (what we are _not_)](https://moveit.picknik.ai/main/doc/concepts/planning_scene_monitor.html) · [NIST AI RMF 1.0](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf)
+- **This project:** [Fundamentals: world state vs scene](/docs/fundamentals/world-state-vs-scene)

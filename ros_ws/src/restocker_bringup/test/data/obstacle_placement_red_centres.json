@@ -1,0 +1,32 @@
+{
+  "provenance": "Card 059: the three test_dynamic_obstacle_runtime red receipts from Card 010's independent review at 837817e (section 5b) — chosen obstacle centres, tool0 clearances and assertion-4 contacts as receipted — plus the green far-side placement from the owner's gate run 2 at 7972246. parked_tool is the Card 043 recorded fixture's parked tool (evidence/cmbompl-043/placement-samples-1790452001.json), the posture the arm still holds at assertion 4.",
+  "parked_tool": [-1.0020656314527057, -0.029548477956121255, 1.4409042501168277],
+  "invalid_centres": [
+    {
+      "centre": [-0.998, 0.048, 0.843],
+      "recorded_clearance_m": 0.3175,
+      "contacts": ["upper_arm_link"],
+      "run": "owner gate 837817e"
+    },
+    {
+      "centre": [-0.985, 0.042, 0.820],
+      "recorded_clearance_m": 0.3419,
+      "contacts": ["upper_arm_link"],
+      "run": "reviewer rerun 1 837817e"
+    },
+    {
+      "centre": [-0.927, 0.047, 0.684],
+      "recorded_clearance_m": 0.4822,
+      "contacts": ["shoulder_link", "upper_arm_link"],
+      "run": "reviewer rerun 2 837817e"
+    }
+  ],
+  "valid_centres": [
+    {
+      "centre": [0.642, -0.327, 1.568],
+      "recorded_clearance_m": 1.54,
+      "contacts": [],
+      "run": "owner gate run 2 7972246 PASS"
+    }
+  ]
+}

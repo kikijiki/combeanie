@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="780" viewBox="0 0 1000 780" role="img" aria-labelledby="title">
+  <title id="title">Workcell top and side schematic</title>
+  <rect width="100%" height="100%" fill="#fbfcfd"/>
+  <text x="24.00" y="22.00" fill="#1a1f24" font-size="16" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">Workcell schematic (shelf frame)</text>
+  <text x="24.00" y="42.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">From workcell_geometry.yaml and workcell.xacro. Shelf origin is the rear insertion datum.</text>
+  <text x="40.00" y="72.00" fill="#5a6570" font-size="14" font-weight="600" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">Top view</text>
+  <circle cx="500.00" cy="91.75" r="7.00" fill="#1f6b5c" stroke="#2c3640" stroke-width="1.2"/>
+  <text x="512.00" y="95.75" fill="#1f6b5c" font-size="11" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">overhead_camera</text>
+  <line x1="500.00" y1="91.75" x2="500.00" y2="157.00" stroke="#1f6b5c" stroke-width="1.4"/>
+  <rect x="398.50" y="124.38" width="203.00" height="79.75" rx="0.00" fill="#dfe5ea" stroke="#1f6b5c" stroke-width="1.8" opacity="1.0"/>
+  <text x="500.00" y="168.25" fill="#1f6b5c" font-size="12" font-weight="700" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">stock_tray</text>
+  <rect x="326.00" y="360.00" width="348.00" height="130.50" rx="0.00" fill="#eef2f4" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <rect x="324.19" y="360.00" width="3.62" height="130.50" rx="0.00" fill="#c8d2d9" stroke="#2c3640" stroke-width="1" opacity="1.0"/>
+  <rect x="382.19" y="360.00" width="3.62" height="130.50" rx="0.00" fill="#c8d2d9" stroke="#2c3640" stroke-width="1" opacity="1.0"/>
+  <rect x="440.19" y="360.00" width="3.62" height="130.50" rx="0.00" fill="#c8d2d9" stroke="#2c3640" stroke-width="1" opacity="1.0"/>
+  <rect x="498.19" y="360.00" width="3.62" height="130.50" rx="0.00" fill="#c8d2d9" stroke="#2c3640" stroke-width="1" opacity="1.0"/>
+  <rect x="556.19" y="360.00" width="3.62" height="130.50" rx="0.00" fill="#c8d2d9" stroke="#2c3640" stroke-width="1" opacity="1.0"/>
+  <rect x="614.19" y="360.00" width="3.62" height="130.50" rx="0.00" fill="#c8d2d9" stroke="#2c3640" stroke-width="1" opacity="1.0"/>
+  <rect x="672.19" y="360.00" width="3.62" height="130.50" rx="0.00" fill="#c8d2d9" stroke="#2c3640" stroke-width="1" opacity="1.0"/>
+  <rect x="326.00" y="481.80" width="348.00" height="8.70" rx="0.00" fill="#2d343c" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="355.00" y="429.25" fill="#1f6b5c" font-size="11" font-weight="700" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">L01</text>
+  <text x="413.00" y="429.25" fill="#1f6b5c" font-size="11" font-weight="700" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">L02</text>
+  <text x="471.00" y="429.25" fill="#1f6b5c" font-size="11" font-weight="700" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">L03</text>
+  <text x="529.00" y="429.25" fill="#1f6b5c" font-size="11" font-weight="700" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">L04</text>
+  <text x="587.00" y="429.25" fill="#1f6b5c" font-size="11" font-weight="700" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">L05</text>
+  <text x="645.00" y="429.25" fill="#1f6b5c" font-size="11" font-weight="700" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">L06</text>
+  <circle cx="500.00" cy="360.00" r="3.50" fill="#1f6b5c" stroke="#1f6b5c" stroke-width="1"/>
+  <line x1="500.00" y1="360.00" x2="514.00" y2="346.00" stroke="#1f6b5c" stroke-width="1.2"/>
+  <text x="518.00" y="350.00" fill="#1f6b5c" font-size="12" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">shelf origin</text>
+  <text x="40.00" y="512.50" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">shelf 2.4 m × 0.9 m · 6 lanes · retainer 0.06 m deep</text>
+  <text x="40.00" y="528.50" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">tray 1.40×0.55 m at shelf (0.00, -1.35, -0.20) m</text>
+  <text x="40.00" y="544.50" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">overhead_camera mount at shelf (0.00, -1.85, 2.05) m</text>
+  <text x="40.00" y="560.50" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">+Y toward customer / front retainer · wrist camera offset from tool0 (0.11, 0.0, 0.07) m</text>
+  <text x="80.00" y="590.50" fill="#5a6570" font-size="14" font-weight="600" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">Side view (lane incline)</text>
+  <line x1="80.00" y1="729.43" x2="231.20" y2="740.00" stroke="#2c3640" stroke-width="2.2"/>
+  <line x1="80.00" y1="749.00" x2="242.00" y2="749.00" stroke="#5a6570" stroke-width="1" stroke-dasharray="4 3"/>
+  <rect x="231.20" y="723.80" width="10.80" height="16.20" rx="0.00" fill="#2d343c" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <rect x="80.00" y="664.40" width="162.00" height="75.60" rx="0.00" fill="none" stroke="#5a6570" stroke-width="1" opacity="1.0" stroke-dasharray="3 3"/>
+  <rect x="215.00" y="687.93" width="16.20" height="52.07" rx="0.00" fill="#c5ddd7" stroke="#1f6b5c" stroke-width="1.6" opacity="1.0"/>
+  <text x="80.00" y="762.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">incline 4.0° · retainer 0.09 m · large bottle 0.290 m leans 0.014 m past rail face</text>
+  <text x="80.00" y="778.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">rear bed rise 0.059 m · workcell_pose world [0.0, 0.55, 0.75]</text>
+  <circle cx="231.20" cy="740.00" r="3.50" fill="#1f6b5c" stroke="#1f6b5c" stroke-width="1"/>
+  <line x1="231.20" y1="740.00" x2="243.20" y2="756.00" stroke="#1f6b5c" stroke-width="1.2"/>
+  <text x="247.20" y="760.00" fill="#1f6b5c" font-size="12" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">shelf z=0 at retainer face</text>
+</svg>

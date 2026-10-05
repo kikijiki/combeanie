@@ -1,0 +1,7 @@
+# Copyright 2026 Matteo Bernacchia <dev@kikijiki.com>
+# SPDX-License-Identifier: MIT
+
+# Causal read serialized with projector apply/verify/lease transitions.
+# The response preserves the evidence timestamp; a read never refreshes its authority.
+---
+PlanningSceneProjectionStatus status

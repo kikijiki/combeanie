@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420" role="img" aria-labelledby="title">
+  <title id="title">Lane cross-section schematic</title>
+  <rect width="100%" height="100%" fill="#fbfcfd"/>
+  <text x="24.00" y="22.00" fill="#1a1f24" font-size="16" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">Lane cross-section: incline, retainer, settled product</text>
+  <text x="24.00" y="42.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">Numbers from workcell_geometry.yaml and product_collision_catalog.yaml (large bottle).</text>
+  <polygon points="60.00,341.20 328.80,360.00 329.69,372.77 60.89,353.97" fill="#eef2f4" stroke="#2c3640" stroke-width="1.6"/>
+  <circle cx="69.40" cy="344.75" r="2.88" fill="#9aa6b0" stroke="#2c3640" stroke-width="1"/>
+  <circle cx="88.60" cy="346.09" r="2.88" fill="#9aa6b0" stroke="#2c3640" stroke-width="1"/>
+  <circle cx="107.80" cy="347.43" r="2.88" fill="#9aa6b0" stroke="#2c3640" stroke-width="1"/>
+  <circle cx="127.00" cy="348.78" r="2.88" fill="#9aa6b0" stroke="#2c3640" stroke-width="1"/>
+  <circle cx="146.20" cy="350.12" r="2.88" fill="#9aa6b0" stroke="#2c3640" stroke-width="1"/>
+  <circle cx="165.40" cy="351.46" r="2.88" fill="#9aa6b0" stroke="#2c3640" stroke-width="1"/>
+  <circle cx="184.60" cy="352.80" r="2.88" fill="#9aa6b0" stroke="#2c3640" stroke-width="1"/>
+  <circle cx="203.80" cy="354.15" r="2.88" fill="#9aa6b0" stroke="#2c3640" stroke-width="1"/>
+  <circle cx="223.00" cy="355.49" r="2.88" fill="#9aa6b0" stroke="#2c3640" stroke-width="1"/>
+  <circle cx="242.20" cy="356.83" r="2.88" fill="#9aa6b0" stroke="#2c3640" stroke-width="1"/>
+  <circle cx="261.40" cy="358.17" r="2.88" fill="#9aa6b0" stroke="#2c3640" stroke-width="1"/>
+  <circle cx="280.60" cy="359.52" r="2.88" fill="#9aa6b0" stroke="#2c3640" stroke-width="1"/>
+  <circle cx="299.80" cy="360.86" r="2.88" fill="#9aa6b0" stroke="#2c3640" stroke-width="1"/>
+  <circle cx="319.00" cy="362.20" r="2.88" fill="#9aa6b0" stroke="#2c3640" stroke-width="1"/>
+  <rect x="328.80" y="331.20" width="19.20" height="28.80" rx="0.00" fill="#2d343c" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <line x1="60.00" y1="225.60" x2="348.00" y2="225.60" stroke="#5a6570" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="76.00" y="217.60" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">divider height 0.42 m</text>
+  <polygon points="300.07,357.99 306.54,265.42 335.27,267.43 328.80,360.00" fill="#c5ddd7" stroke="#1f6b5c" stroke-width="1.8"/>
+  <circle cx="328.80" cy="360.00" r="3.50" fill="#1f6b5c" stroke="#1f6b5c" stroke-width="1"/>
+  <line x1="328.80" y1="360.00" x2="308.80" y2="382.00" stroke="#1f6b5c" stroke-width="1.2"/>
+  <text x="312.80" y="386.00" fill="#1f6b5c" font-size="12" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">retainer face (z=0)</text>
+  <circle cx="314.44" cy="308.08" r="3.50" fill="#1f6b5c" stroke="#1f6b5c" stroke-width="1"/>
+  <line x1="314.44" y1="308.08" x2="214.44" y2="300.08" stroke="#1f6b5c" stroke-width="1.2"/>
+  <text x="218.44" y="304.08" fill="#1f6b5c" font-size="12" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">large bottle</text>
+  <text x="24.00" y="400.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">incline 4.0° · rear rise 0.059 m · lean past rail 0.014 m (height 0.290 m − retainer 0.09 m) × tan(incline)</text>
+  <text x="24.00" y="416.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">rollers radius 0.009 m pitch 0.06 m (visual); collision is the inclined plane</text>
+</svg>

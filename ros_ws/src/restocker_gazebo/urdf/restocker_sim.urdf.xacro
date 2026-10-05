@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+<robot name="restocker_sim" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="prefix" default=""/>
+  <xacro:arg name="controller_config" default=""/>
+  <!-- Renders the wrist RGB-D. On by default; the `wrist_camera` launch argument is the opt-out. -->
+  <xacro:arg name="wrist_camera_sensor" default="true"/>
+  <xacro:include filename="$(find restocker_description)/urdf/robot.xacro"/>
+
+  <!-- gz_ros2_control drives ideal velocity motors whose effort clamp is a numerical actuator
+       envelope, not a hardware torque rating. Keep that simulator-only setting out of the
+       planning and visualization descriptions. -->
+  <xacro:restocker_robot
+    prefix="$(arg prefix)"
+    joint_limits_parameters_file="$(find restocker_description)/config/ur10e_sim_joint_limits.yaml"
+    wrist_camera_sensor="$(arg wrist_camera_sensor)"/>
+  <xacro:restocker_ros2_control prefix="$(arg prefix)" controller_config="$(arg controller_config)"/>
+</robot>

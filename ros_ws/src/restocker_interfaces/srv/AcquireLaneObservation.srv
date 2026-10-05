@@ -1,0 +1,38 @@
+# Take one RGB-D acquisition of one lane from wherever the camera already is, and publish the
+# LaneObservation it produces.
+#
+# The service does not move the arm and does not check that the camera is aimed at the lane.
+# Aiming is the survey's job. This is the acquisition half, split out so it can be exercised
+# (including with a camera that returns nothing) without a planner, controller or simulator.
+
+string lane_id
+
+# Ignore any depth frame stamped before this. A survey passes the instant its motion stopped, so
+# the measured frame cannot predate the arm settling. Zero takes the next frame the camera
+# produces after this call: never a frame already buffered, because the transform is read at the
+# frame's own stamp and a buffered frame describes an earlier scene than the caller's.
+builtin_interfaces/Time not_before
+
+# How long to wait for a usable frame. Zero takes the server's configured default.
+builtin_interfaces/Duration timeout
+---
+uint8 OUTCOME_UNSET=0
+# An observation was published. Its own status field carries the verdict; a published observation
+# may still say the camera could not see the lane.
+uint8 OUTCOME_PUBLISHED=1
+uint8 OUTCOME_UNKNOWN_LANE=2
+# No depth frame stamped at or after not_before arrived inside the timeout. This means a dead
+# sensor, distinct from a live sensor that sees nothing: nothing was published.
+uint8 OUTCOME_NO_FRAME=3
+# The lane <- camera transform could not be resolved at the frame's own stamp. Nothing was
+# published.
+uint8 OUTCOME_NO_TRANSFORM=4
+# The frame arrived but could not be interpreted: missing camera info, a size or frame mismatch
+# between the depth image and the calibration, an unusable encoding.
+uint8 OUTCOME_UNUSABLE_FRAME=5
+uint8 OUTCOME_INVALID_REQUEST=6
+
+uint8 outcome
+string detail
+# Populated only when outcome is OUTCOME_PUBLISHED, and identical to what was published.
+restocker_interfaces/LaneObservation observation

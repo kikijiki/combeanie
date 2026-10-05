@@ -1,0 +1,44 @@
+schema_version: 1
+pose_topic: /world/restocking/pose/info
+frame_id: world
+backend:
+  name: gazebo_ground_truth
+  version: harmonic_pose_v1
+pose_covariance_diagonal: [1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8]
+workcell_pose: [0.0, 0.55, 0.75, 0.0, 0.0, 0.0]
+# Two small bottles and a can, so one lane can be asked to take two products of the same class:
+# a column, which is what a gravity-fed lane holds. The baseline scenario stocks one product per
+# class, so no lane ever has a second of anything to take. The can is what is left for the
+# unaddressed goal, with a lane already two deep in front of it.
+#
+# Poses are the surveyed baseline tray positions, unchanged, so this scenario inherits their
+# measured reachability. The two bottles sit 0.42 m apart, far outside the 0.02 m surface
+# separation the tray requires.
+products:
+  - model_name: stock_small_bottle_01
+    source_object_id: sim:stock_small_bottle_01
+    geometry_key: bottle.small.standard
+    product_class: small_bottle
+    sku: SIM-BOTTLE-SMALL
+    mass_kg: 0.500
+    rgba: [0.10, 0.42, 0.82, 0.82]
+    friction: 0.72
+    spawn_pose: [-0.42, -0.80, 0.670, 0.0, 0.0, 0.0]
+  - model_name: stock_small_bottle_02
+    source_object_id: sim:stock_small_bottle_02
+    geometry_key: bottle.small.standard
+    product_class: small_bottle
+    sku: SIM-BOTTLE-SMALL
+    mass_kg: 0.500
+    rgba: [0.10, 0.42, 0.82, 0.82]
+    friction: 0.72
+    spawn_pose: [0.0, -0.80, 0.670, 0.0, 0.0, 0.0]
+  - model_name: stock_can_01
+    source_object_id: sim:stock_can_01
+    geometry_key: can.standard
+    product_class: can
+    sku: SIM-CAN-STD
+    mass_kg: 0.355
+    rgba: [0.78, 0.12, 0.08, 1.0]
+    friction: 0.65
+    spawn_pose: [0.42, -0.80, 0.631, 0.0, 0.0, 0.0]

@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia (dev@kikijiki.com) -->
+<!-- SPDX-License-Identifier: MIT -->
+<package format="3">
+  <name>restocker_reasoner</name>
+  <version>0.1.0</version>
+  <description>Optional advisory model client with constrained structured recommendations.</description>
+  <maintainer email="dev@kikijiki.com">Matteo Bernacchia</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

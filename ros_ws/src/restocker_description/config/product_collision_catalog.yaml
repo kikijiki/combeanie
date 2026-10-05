@@ -1,0 +1,43 @@
+schema_version: 1
+geometries:
+  - geometry_key: can.standard
+    product_class: can
+    sku: SIM-CAN-STD
+    class_fallback: true
+    shape:
+      type: cylinder
+      radius_m: 0.033
+      height_m: 0.122
+  # The same can in another flavour. The shape is `can.standard`'s to the millimetre: the two are
+  # told apart only by their labels, which gives product identification something to decide
+  # (every other geometry_key has exactly one SKU).
+  #
+  # It is a second geometry_key rather than a second SKU under `can.standard` because the key is
+  # the catalog's primary key (restocker_task_executor/src/scene_geometry.cpp, this package's
+  # Python loader, restocker_gazebo/src/attachment_config.cpp and lane_evidence.cpp each reject a
+  # duplicate), and a compound key would change the identity model. `class_fallback` is false
+  # because `can.standard` already holds it; an unknown can SKU falls back to the same cylinder.
+  - geometry_key: can.citrus
+    product_class: can
+    sku: SIM-CAN-CITRUS
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.033
+      height_m: 0.122
+  - geometry_key: bottle.small.standard
+    product_class: small_bottle
+    sku: SIM-BOTTLE-SMALL
+    class_fallback: true
+    shape:
+      type: cylinder
+      radius_m: 0.034
+      height_m: 0.200
+  - geometry_key: bottle.large.standard
+    product_class: large_bottle
+    sku: SIM-BOTTLE-LARGE
+    class_fallback: true
+    shape:
+      type: cylinder
+      radius_m: 0.045
+      height_m: 0.290

@@ -1,0 +1,29 @@
+---
+id: index
+title: Architecture Overview
+sidebar_position: 1
+---
+
+# Architecture Overview
+
+How the software is put together once you already know the [Introduction](/docs)
+(problem, scenario, robot, and workcell).
+
+Classical planning and world state stay authoritative. Wrist perception and overhead depth
+obstacles supply required evidence on the default path; the recovery reasoner is optional and
+advisory. If ROS, Gazebo, or MoveIt are new to you, read [Fundamentals](/docs/fundamentals)
+first.
+
+| Page | What it covers |
+| --- | --- |
+| [Workcell and frames](./workcell-and-frames.mdx) | TF tree, surveyed YAML, frame rules |
+| [Simulation and control](./simulation.mdx) | Gazebo, ros2_control, telemetry, baseline composition |
+| [World state](./world-state.mdx) | Semantic authority, reservations, trust boundaries |
+| [Motion planning](./motion-planning.mdx) | MoveIt, OMPL, planning-scene projector |
+| [Task execution](./task-execution.mdx) | Control path, state machine, RestockProduct |
+| [Manipulation](./manipulation.mdx) | Grasp and placement candidates |
+| [Ports](./ports.mdx) | World / motion / gripper / attachment contracts |
+| [Perception and models](./perception-and-models.mdx) | Default camera evidence and optional advisory reasoner |
+| [Glossary](./glossary.mdx) | Terms used in this section |
+
+Package inventory lives under [Reference: Package map](/docs/reference/packages).

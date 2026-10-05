@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia (dev@kikijiki.com) -->
+<!-- SPDX-License-Identifier: MIT -->
+<package format="3">
+  <name>restocker_bringup</name>
+  <version>0.1.0</version>
+  <description>Complete launch compositions and runtime profile validation.</description>
+  <maintainer email="dev@kikijiki.com">Matteo Bernacchia</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>restocker_control</exec_depend>
+  <exec_depend>restocker_gazebo</exec_depend>
+  <exec_depend>restocker_moveit_config</exec_depend>
+  <exec_depend>restocker_perception</exec_depend>
+  <exec_depend>restocker_task_executor</exec_depend>
+  <exec_depend>restocker_world_state</exec_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>geometry_msgs</test_depend>
+  <test_depend>moveit_msgs</test_depend>
+  <test_depend>launch_testing_ament_cmake</test_depend>
+  <test_depend>rclpy</test_depend>
+  <test_depend>sensor_msgs</test_depend>
+  <test_depend>restocker_description</test_depend>
+  <test_depend>restocker_interfaces</test_depend>
+  <test_depend>ros_gz_sim</test_depend>
+  <test_depend>sensor_msgs</test_depend>
+  <test_depend>shape_msgs</test_depend>
+  <test_depend>std_srvs</test_depend>
+  <test_depend>tf2_ros</test_depend>
+  <test_depend>python3-yaml</test_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

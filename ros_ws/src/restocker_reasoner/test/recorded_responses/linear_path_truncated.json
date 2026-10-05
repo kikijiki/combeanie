@@ -1,0 +1,9 @@
+{
+  "schema_version": "restocker.reasoner.recovery.response.v1",
+  "request_id": "rec-linear-path-truncated",
+  "status": "ok",
+  "failure_class": "linear_path_truncated",
+  "recommended_primitive": "resume_at_recovery_state",
+  "confidence": 0.95,
+  "explanation": "The failure is explicitly a linear path truncation during the approach phase. The controller is authorized to perform a bounded replan from the current state. Since the failure occurred mid-path and the system is in a recoverable state (PlanApproach), resuming from the current recovery state allows the controller to re-evaluate the path from the last known good position. This is the standard and most efficient recovery for truncated linear approaches, avoiding the overhead of abandoning the task entirely."
+}

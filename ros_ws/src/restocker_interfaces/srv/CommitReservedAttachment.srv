@@ -1,0 +1,16 @@
+# Atomically commits selected-object attachment under the active reservation.
+string token
+string operation_id
+# Pose of the grasped product's body frame in the gripper's grasp_center frame, as verified by the
+# simulated attachment boundary before coupling. World state keeps it so a held product's pose can
+# be derived from the robot's kinematics instead of re-observed.
+geometry_msgs/Pose grasp_center_from_held_object
+---
+restocker_interfaces/WorldStateOperationStatus status
+# With OK these fields are the current commit/replay receipt. With CLOCK_AUTHORITY_INHIBITED,
+# has_reservation=true carries the ORIGINAL historical commit revision/reservation only; it is
+# reconciliation evidence and cannot authorize lease release or continuation. False means no
+# historical receipt is supplied. ATTACHMENT_CLOCK_NOT_READY never carries a success receipt.
+uint64 world_revision
+bool has_reservation
+restocker_interfaces/TaskReservation reservation

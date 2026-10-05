@@ -1,0 +1,284 @@
+/* ─── Pipeline diagram ─────────────────────────────────────────────── */
+
+.pipelineWrap {
+  margin: 2rem 0;
+  font-size: 0.875rem;
+}
+
+.pipelineTitle {
+  text-align: center;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ifm-color-emphasis-600);
+  margin-bottom: 1rem;
+}
+
+.pipeline {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.layerBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 340px;
+  max-width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  overflow-wrap: anywhere;
+  padding: 0.55rem 1rem;
+  border-radius: 6px;
+  border: 1.5px solid transparent;
+  text-decoration: none !important;
+  transition: filter 0.15s, transform 0.1s;
+  cursor: pointer;
+}
+
+.layerBox:hover,
+.layerBoxActive {
+  filter: brightness(1.12);
+
+}
+
+.layerModel  { background: color-mix(in srgb, var(--ifm-color-primary) 14%, transparent); border-color: color-mix(in srgb, var(--ifm-color-primary) 40%, transparent); }
+.layerIr     { background: color-mix(in srgb, #6c8ebf 14%, transparent);                  border-color: color-mix(in srgb, #6c8ebf 40%, transparent); }
+.layerCompile{ background: color-mix(in srgb, #c47a2c 14%, transparent);                  border-color: color-mix(in srgb, #c47a2c 40%, transparent); }
+.layerRuntime{ background: color-mix(in srgb, #27ae60 14%, transparent);                  border-color: color-mix(in srgb, #27ae60 40%, transparent); }
+
+.layerLabel {
+  font-weight: 600;
+  color: var(--ifm-font-color-base);
+}
+
+.layerSublabel {
+  font-size: 0.75rem;
+  color: var(--ifm-color-emphasis-600);
+  margin-top: 1px;
+}
+
+.arrow {
+  width: 2px;
+  height: 18px;
+  background: var(--ifm-color-emphasis-300);
+  position: relative;
+}
+
+.arrow::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--ifm-color-emphasis-300);
+}
+
+.forkRow {
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+  display: flex;
+  gap: 1.5rem;
+}
+
+.forkBranch {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.legend {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  margin-top: 1.25rem;
+  font-size: 0.75rem;
+  color: var(--ifm-color-emphasis-700);
+  flex-wrap: wrap;
+}
+
+.legendDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* ─── Glossary ──────────────────────────────────────────────────────── */
+
+.glossaryWrap {
+  margin: 1rem 0;
+}
+
+.glossarySearch {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
+  background: var(--ifm-background-color);
+  color: var(--ifm-font-color-base);
+}
+
+.glossarySearch:focus {
+  outline: none;
+  border-color: var(--ifm-color-primary);
+}
+
+.glossaryJumps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.glossaryJump {
+  padding: 2px 7px;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  background: transparent;
+  color: var(--ifm-color-emphasis-700);
+  transition: background 0.12s;
+}
+
+.glossaryJump:hover {
+  background: var(--ifm-color-emphasis-100);
+}
+
+.glossaryJumpDisabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.glossaryGroup {
+  margin-bottom: 1.5rem;
+}
+
+.glossaryGroupLetter {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ifm-color-primary);
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+  padding-bottom: 0.2rem;
+  margin-bottom: 0.6rem;
+}
+
+.glossaryEntry {
+  padding: 0.4rem 0;
+}
+
+.glossaryTerm {
+  font-weight: 700;
+  margin-right: 0.5rem;
+}
+
+.glossaryDef {
+  color: var(--ifm-color-emphasis-800);
+  font-size: 0.875rem;
+}
+
+.glossaryLink {
+  font-size: 0.78rem;
+  margin-left: 0.4rem;
+}
+
+/* ─── Stack dependency SVG ──────────────────────────────────────────── */
+
+.stackSvgWrap {
+  width: 100%;
+  overflow-x: auto;
+  --stack-fill-task: color-mix(in srgb, var(--ifm-color-primary) 16%, transparent);
+  --stack-fill-sem: color-mix(in srgb, #6c8ebf 16%, transparent);
+  --stack-fill-advise: color-mix(in srgb, #6c8ebf 10%, transparent);
+  --stack-fill-plan: color-mix(in srgb, #c47a2c 16%, transparent);
+  --stack-fill-act: color-mix(in srgb, #27ae60 16%, transparent);
+  --stack-fill-tf: color-mix(in srgb, var(--ifm-color-emphasis-500) 12%, transparent);
+}
+
+.stackSvg {
+  display: block;
+  width: min(100%, 640px);
+  height: auto;
+  margin: 0 auto;
+}
+
+.stackBox {
+  stroke: var(--ifm-color-emphasis-300);
+  stroke-width: 1.5;
+}
+
+.stackBoxLink {
+  cursor: pointer;
+}
+
+.stackBoxLink:hover .stackBox {
+  filter: brightness(1.08);
+  stroke: var(--ifm-color-primary);
+}
+
+.stackBoxLabel {
+  fill: var(--ifm-font-color-base);
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.stackBoxSub {
+  fill: var(--ifm-color-emphasis-600);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.stackEdge {
+  fill: none;
+  stroke: var(--ifm-color-emphasis-400);
+  stroke-width: 1.75;
+}
+
+.stackEdgeDashed {
+  fill: none;
+  stroke: var(--ifm-color-emphasis-500);
+  stroke-width: 1.75;
+  stroke-dasharray: 5 4;
+}
+
+.stackArrowHead {
+  fill: var(--ifm-color-emphasis-400);
+}
+
+.stackEdgeLabel {
+  fill: var(--ifm-color-emphasis-600);
+  font-size: 10px;
+  pointer-events: none;
+}
+
+.legendNote {
+  font-size: 0.75rem;
+  color: var(--ifm-color-emphasis-600);
+  margin-left: 0.5rem;
+}
+
+@media (max-width: 600px) {
+  .forkRow { flex-direction: column; align-items: center; }
+  .forkRow > * { width: 100%; flex: auto !important; }
+}
+
+.layerBox:focus-visible, .glossaryJump:focus-visible, .glossarySearch:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 3px;
+}

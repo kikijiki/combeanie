@@ -1,0 +1,59 @@
+# Simulator motor limits. Position and velocity bounds are the released UR10e values. Effort
+# values size Gazebo's ideal velocity motors and do not model hardware torque. They are 8x the
+# hardware limits so joints keep tracking while the rail accelerates with a product attached
+# (4x lost wrist_1 tracking during a cross-cell carry).
+joint_limits:
+  shoulder_pan_joint:
+    has_acceleration_limits: false
+    has_effort_limits: true
+    has_position_limits: true
+    has_velocity_limits: true
+    max_effort: 2640.0
+    max_position: !degrees 360.0
+    max_velocity: !degrees 120.0
+    min_position: !degrees -360.0
+  shoulder_lift_joint:
+    has_acceleration_limits: false
+    has_effort_limits: true
+    has_position_limits: true
+    has_velocity_limits: true
+    max_effort: 2640.0
+    max_position: !degrees 360.0
+    max_velocity: !degrees 120.0
+    min_position: !degrees -360.0
+  elbow_joint:
+    has_acceleration_limits: false
+    has_effort_limits: true
+    has_position_limits: true
+    has_velocity_limits: true
+    max_effort: 1200.0
+    max_position: !degrees 180.0
+    max_velocity: !degrees 180.0
+    min_position: !degrees -180.0
+  wrist_1_joint:
+    has_acceleration_limits: false
+    has_effort_limits: true
+    has_position_limits: true
+    has_velocity_limits: true
+    max_effort: 432.0
+    max_position: !degrees 360.0
+    max_velocity: !degrees 180.0
+    min_position: !degrees -360.0
+  wrist_2_joint:
+    has_acceleration_limits: false
+    has_effort_limits: true
+    has_position_limits: true
+    has_velocity_limits: true
+    max_effort: 432.0
+    max_position: !degrees 360.0
+    max_velocity: !degrees 180.0
+    min_position: !degrees -360.0
+  wrist_3_joint:
+    has_acceleration_limits: false
+    has_effort_limits: true
+    has_position_limits: true
+    has_velocity_limits: true
+    max_effort: 432.0
+    max_position: !degrees 360.0
+    max_velocity: !degrees 180.0
+    min_position: !degrees -360.0

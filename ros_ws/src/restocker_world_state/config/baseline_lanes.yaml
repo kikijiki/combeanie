@@ -1,0 +1,37 @@
+schema_version: 1
+
+# Two lanes per product class. Classes repeat across the shelf instead of sitting in adjacent
+# pairs, so a class's two lanes are 1.2 m apart on the rail, not 0.4 m. Task selection then has a
+# destination choice with a real cost difference, and an occupied or obstructed lane sends the
+# product to its sibling on the other half of the shelf.
+# Lanes 01-03 keep their original classes so recorded baselines that name them stay valid.
+#
+# target_count is the owner's declared want, not a capacity: each lane's depth admits roughly
+# 9-12 of its product (usable depth over the catalogued pitch), and six leaves headroom above
+# the want. Runtime changes go through /world_state/set_lane_policy and are persisted beside
+# this file's schema, not written back here.
+lanes:
+  lane_01:
+    expected_product_class: can
+    expected_sku: SIM-CAN-STD
+    target_count: 6
+  lane_02:
+    expected_product_class: small_bottle
+    expected_sku: SIM-BOTTLE-SMALL
+    target_count: 6
+  lane_03:
+    expected_product_class: large_bottle
+    expected_sku: SIM-BOTTLE-LARGE
+    target_count: 6
+  lane_04:
+    expected_product_class: can
+    expected_sku: SIM-CAN-STD
+    target_count: 6
+  lane_05:
+    expected_product_class: small_bottle
+    expected_sku: SIM-BOTTLE-SMALL
+    target_count: 6
+  lane_06:
+    expected_product_class: large_bottle
+    expected_sku: SIM-BOTTLE-LARGE
+    target_count: 6

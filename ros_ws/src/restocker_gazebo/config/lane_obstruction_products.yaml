@@ -1,0 +1,66 @@
+schema_version: 1
+pose_topic: /world/restocking/pose/info
+frame_id: world
+backend:
+  name: gazebo_ground_truth
+  version: harmonic_pose_v1
+pose_covariance_diagonal: [1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8]
+workcell_pose: [0.0, 0.55, 0.75, 0.0, 0.0, 0.0]
+# One small bottle to move, and one small bottle jammed in the mouth of lane_02.
+#
+# This is the only scenario that makes `obstructed` true. Occupancy (a lane holding a product) is
+# exercised by lane_routing_products.yaml, and the two conditions differ:
+# restocker_gazebo/lane_evidence.cpp records a product as lane *contents* only when its envelope
+# is fully contained in the lane's usable volume, and marks the lane *obstructed* when the
+# envelope overlaps that volume without being contained. No other shipped configuration produced
+# the second case, so the flag task selection reads at task_selection.cpp was only ever false in
+# a running system.
+#
+# The obstruction has to be one the lane cannot clear by itself, which is what `static: true` is
+# for. The lanes are gravity-feed roller beds (restocker_description/config/workcell_geometry.yaml,
+# shelf.lane_incline_deg): a free product set down anywhere in a lane runs to the front rail and
+# settles inside the usable volume, which reads as an occupied lane, not an obstructed one. The
+# only obstructions a gravity lane still has are ones physics will not resolve (jammed, wedged or
+# stuck), and this bottle is held where it is put.
+#
+# It is jammed in the lane mouth, sticking out of the back of the shelf, as a shelf loaded from
+# behind can end up. The geometry, in lane frame:
+#
+#   lane_02 usable volume     y in [0.01, 0.86]      (rear_clearance + usable_depth)
+#   shelf rear edge           y = 0.0
+#   roller surface at y=0.03  z = 0.0566             ((0.84 - 0.03) * tan(4 deg))
+#   jammed bottle             y in [-0.004, 0.064]   (centre 0.03, radius 0.034)
+#
+# so the bottle overlaps the usable volume, protrudes 0.014 m past its rear face and 0.004 m past
+# the back of the shelf, and cannot be contained. Vertically and laterally it is well inside the
+# lane (it stands on the roller surface, 0.20 m tall in a 0.40 m volume, on the lane centre line
+# between dividers 0.375 m apart), so the one axis that fails containment is the intended one,
+# and it fails by 0.014 m rather than by a tolerance. In world coordinates the lane centre is
+# x = -0.6 and the shelf datum adds (0, 0.55, 0.75).
+#
+# The bottle to move sits at the surveyed tray pose lane_routing_products.yaml uses for a small
+# bottle, so this scenario inherits a measured grasp. That pose also makes the routing claim a
+# strict preference rather than a tie-break: selection scores rail travel, and from x = -0.42 the
+# delivery leg to lane_02 is 0.18 m against 1.02 m to lane_05. lane_02 is cheaper by 0.84 m and
+# is chosen whenever available; the sibling is reached here only because the obstruction takes
+# lane_02 out of the running.
+products:
+  - model_name: stock_small_bottle_01
+    source_object_id: sim:stock_small_bottle_01
+    geometry_key: bottle.small.standard
+    product_class: small_bottle
+    sku: SIM-BOTTLE-SMALL
+    mass_kg: 0.500
+    rgba: [0.10, 0.42, 0.82, 0.82]
+    friction: 0.72
+    spawn_pose: [-0.42, -0.80, 0.670, 0.0, 0.0, 0.0]
+  - model_name: shelf_small_bottle_01
+    source_object_id: sim:shelf_small_bottle_01
+    geometry_key: bottle.small.standard
+    product_class: small_bottle
+    sku: SIM-BOTTLE-SMALL
+    mass_kg: 0.500
+    rgba: [0.10, 0.42, 0.82, 0.82]
+    friction: 0.72
+    static: true
+    spawn_pose: [-0.6, 0.58, 0.9066, 0.0, 0.0, 0.0]

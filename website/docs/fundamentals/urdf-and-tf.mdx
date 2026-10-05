@@ -1,0 +1,57 @@
+---
+id: urdf-and-tf
+title: URDF, Xacro, and TF2
+sidebar_position: 4
+---
+
+import FrameTreeDiagram from '@site/src/components/architecture/FrameTreeDiagram';
+
+# URDF, Xacro, and TF2
+
+**URDF** is an XML description of links (rigid bodies) and joints (how links move). **Xacro**
+is a macro preprocessor so you do not duplicate the same finger twice and can inject surveyed
+numbers from YAML.
+
+**TF2** is the live transform tree: given joint angles + fixed mounts, `robot_state_publisher`
+broadcasts where every named frame is *right now* on `/tf` and `/tf_static`. Perception,
+MoveIt, and placement code query TF instead of hard-coding poses.
+
+**Optical frames** differ from body frames for cameras (REP-103). Image math uses
+`*_optical_frame`; mechanical mounts use `*_camera_link`.
+
+## Why it matters here
+
+Lane frames are **generated from the same YAML** that sizes the shelf
+(`workcell_geometry.yaml`), so semantic lane IDs and TF names cannot drift. Grasp candidates
+are computed at `grasp_center` then converted to `tool0`. Camera topics stamp optical frames.
+
+## This project
+
+| Piece | Path |
+| --- | --- |
+| Xacro tree | `restocker_description/urdf/*.xacro` |
+| Sim overlay | `restocker_gazebo/urdf/restocker_sim.urdf.xacro` |
+| Sensors | `sensors.xacro` (wrist RGB-D + optical frame) |
+| Contract tests | `restocker_description/test/` |
+
+```text
+/joint_states ─┐
+robot_description ─┴─► robot_state_publisher ─► /tf · /tf_static
+                                              ├─► perception
+                                              ├─► MoveIt
+                                              └─► placement candidates
+```
+
+Static mounts (`world→shelf`) rarely change. Arm frames update every joint tick. Never invent
+an identity transform to “fix” a missing frame. That hides configuration bugs.
+
+<FrameTreeDiagram />
+
+## References
+
+- **Official docs:** [Building a visual robot model (Jazzy)](https://docs.ros.org/en/jazzy/Tutorials/Intermediate/URDF/Building-a-Visual-Robot-Model-with-URDF-from-Scratch.html)
+- **Official docs:** [Using xacro (Jazzy)](https://docs.ros.org/en/jazzy/Tutorials/Intermediate/URDF/Using-Xacro-to-Clean-Up-a-URDF-File.html)
+- **Official docs:** [TF2 introduction (Jazzy)](https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Tf2/Introduction-To-Tf2.html)
+- **Literature:** [REP-103](https://www.ros.org/reps/rep-0103.html) · [REP-105](https://www.ros.org/reps/rep-0105.html)
+- **Reference implementation:** `robot_state_publisher` (URDF + `/joint_states` → TF)
+- **This project:** [Workcell and frames](/docs/architecture/workcell-and-frames) · [Manipulators and frames](./manipulators-and-frames)

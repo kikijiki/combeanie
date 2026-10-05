@@ -1,0 +1,13 @@
+build:
+  event-handlers:
+    - console_cohesion+
+  symlink-install: true
+  cmake-args:
+    - -G
+    - Ninja
+    - -DCMAKE_BUILD_TYPE=RelWithDebInfo
+test:
+  event-handlers:
+    - console_cohesion+
+test-result:
+  verbose: true

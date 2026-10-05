@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="560" viewBox="0 0 980 560" role="img" aria-labelledby="title">
+  <title id="title">Robot orthographic schematic</title>
+  <rect width="100%" height="100%" fill="#fbfcfd"/>
+  <text x="24.00" y="22.00" fill="#1a1f24" font-size="16" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">Rail-mounted Universal Robots UR10e</text>
+  <text x="24.00" y="42.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">UR10e dimensions from ur_description 3.5.1; rail and gripper dimensions remain project-owned.</text>
+  <text x="50.00" y="72.00" fill="#5a6570" font-size="14" font-weight="600" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">Side (YZ)</text>
+  <rect x="49.60" y="462.80" width="40.80" height="27.20" rx="0.00" fill="#e8eaed" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <rect x="30.90" y="442.40" width="78.20" height="20.40" rx="0.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="1.6" opacity="1.0"/>
+  <rect x="53.85" y="411.68" width="32.30" height="30.72" rx="8.00" fill="#f4f6f8" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <line x1="70.00" y1="411.68" x2="165.20" y2="369.18" stroke="#f4f6f8" stroke-width="34"/>
+  <line x1="165.20" y1="369.18" x2="199.20" y2="278.23" stroke="#f4f6f8" stroke-width="29"/>
+  <line x1="199.20" y1="278.23" x2="219.60" y2="273.13" stroke="#f4f6f8" stroke-width="22"/>
+  <circle cx="70.00" cy="411.68" r="12.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="2"/>
+  <circle cx="165.20" cy="369.18" r="12.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="2"/>
+  <circle cx="199.20" cy="278.23" r="12.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="2"/>
+  <rect x="219.60" y="263.78" width="11.90" height="18.70" rx="0.00" fill="#e8eaed" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <line x1="231.50" y1="267.18" x2="243.40" y2="267.18" stroke="#1f6b5c" stroke-width="5"/>
+  <line x1="231.50" y1="279.08" x2="243.40" y2="279.08" stroke="#1f6b5c" stroke-width="5"/>
+  <circle cx="70.00" cy="490.00" r="3.50" fill="#1f6b5c" stroke="#1f6b5c" stroke-width="1"/>
+  <line x1="70.00" y1="490.00" x2="88.00" y2="504.00" stroke="#1f6b5c" stroke-width="1.2"/>
+  <text x="92.00" y="508.00" fill="#1f6b5c" font-size="12" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">rail_base</text>
+  <circle cx="219.60" cy="273.13" r="3.50" fill="#1f6b5c" stroke="#1f6b5c" stroke-width="1"/>
+  <line x1="219.60" y1="273.13" x2="237.60" y2="265.13" stroke="#1f6b5c" stroke-width="1.2"/>
+  <text x="241.60" y="269.13" fill="#1f6b5c" font-size="12" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">tool0</text>
+  <circle cx="243.40" cy="273.13" r="3.50" fill="#1f6b5c" stroke="#1f6b5c" stroke-width="1"/>
+  <line x1="243.40" y1="273.13" x2="253.40" y2="255.13" stroke="#1f6b5c" stroke-width="1.2"/>
+  <text x="257.40" y="259.13" fill="#1f6b5c" font-size="12" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">grasp_center</text>
+  <text x="70.00" y="518.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">rail 4.0 m long (into page)</text>
+  <text x="70.00" y="534.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">UR10e upper arm 0.6127 m · forearm 0.57155 m</text>
+  <line x1="10.50" y1="490.00" x2="146.50" y2="490.00" stroke="#5a6570" stroke-width="1" stroke-dasharray="4 3"/>
+  <line x1="70.00" y1="490.00" x2="70.00" y2="243.50" stroke="#5a6570" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="148.20" y="494.00" fill="#5a6570" font-size="11" font-weight="600" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">+Y</text>
+  <text x="52.00" y="238.40" fill="#5a6570" font-size="11" font-weight="600" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">+Z</text>
+  <text x="500.00" y="72.00" fill="#5a6570" font-size="14" font-weight="600" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">Front (XZ)</text>
+  <rect x="353.00" y="472.80" width="374.00" height="27.20" rx="0.00" fill="#e8eaed" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <rect x="516.62" y="452.40" width="46.75" height="20.40" rx="0.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="1.6" opacity="1.0"/>
+  <rect x="531.12" y="421.68" width="17.77" height="30.72" rx="6.00" fill="#f4f6f8" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <line x1="540.00" y1="421.68" x2="568.05" y2="331.58" stroke="#f4f6f8" stroke-width="34"/>
+  <line x1="568.05" y1="331.58" x2="530.65" y2="263.58" stroke="#f4f6f8" stroke-width="29"/>
+  <circle cx="540.00" cy="421.68" r="12.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="2"/>
+  <circle cx="568.05" cy="331.58" r="12.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="2"/>
+  <circle cx="530.65" cy="263.58" r="12.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="2"/>
+  <rect x="523.17" y="224.48" width="14.96" height="11.90" rx="0.00" fill="#e8eaed" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <rect x="526.21" y="200.68" width="3.27" height="23.80" rx="0.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="1.6" opacity="1.0"/>
+  <rect x="531.82" y="200.68" width="3.27" height="23.80" rx="0.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="1.6" opacity="1.0"/>
+  <circle cx="540.00" cy="500.00" r="3.50" fill="#1f6b5c" stroke="#1f6b5c" stroke-width="1"/>
+  <line x1="540.00" y1="500.00" x2="554.00" y2="516.00" stroke="#1f6b5c" stroke-width="1.2"/>
+  <text x="558.00" y="520.00" fill="#1f6b5c" font-size="12" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">rail_base</text>
+  <circle cx="530.65" cy="236.38" r="3.50" fill="#1f6b5c" stroke="#1f6b5c" stroke-width="1"/>
+  <line x1="530.65" y1="236.38" x2="546.65" y2="232.38" stroke="#1f6b5c" stroke-width="1.2"/>
+  <text x="550.65" y="236.38" fill="#1f6b5c" font-size="12" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">tool0</text>
+  <circle cx="530.65" cy="212.58" r="3.50" fill="#1f6b5c" stroke="#1f6b5c" stroke-width="1"/>
+  <line x1="530.65" y1="212.58" x2="548.65" y2="196.58" stroke="#1f6b5c" stroke-width="1.2"/>
+  <text x="552.65" y="200.58" fill="#1f6b5c" font-size="12" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">grasp_center</text>
+  <text x="500.00" y="528.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">rail span 4.0 m · carriage 0.50 m</text>
+  <text x="500.00" y="544.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">grasp_center at tool0 + (0.00, 0.00, 0.14) m</text>
+</svg>

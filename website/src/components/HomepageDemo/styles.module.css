@@ -1,0 +1,24 @@
+.demo {
+  padding: 2rem 0 0;
+}
+
+.figure {
+  margin: 0 auto;
+  max-width: 860px;
+  text-align: center;
+}
+
+.video {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--ifm-global-radius, 0.4rem);
+  box-shadow: var(--ifm-global-shadow-md);
+  background: var(--ifm-color-emphasis-200);
+}
+
+.caption {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--ifm-color-emphasis-700);
+}

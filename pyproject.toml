@@ -1,0 +1,19 @@
+[tool.ruff]
+# Match ament_flake8 so repository formatting cannot produce ROS lint failures.
+line-length = 99
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# The forensic recorder holds its output files open for the lifetime of the ROS node and
+# closes them on shutdown; a context manager would close them before the first callback.
+"tools/diagnostics/record_state.py" = ["SIM115"]
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

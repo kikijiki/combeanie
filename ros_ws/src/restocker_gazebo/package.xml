@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia (dev@kikijiki.com) -->
+<!-- SPDX-License-Identifier: MIT -->
+<package format="3">
+  <name>restocker_gazebo</name>
+  <version>0.1.0</version>
+  <description>Gazebo worlds, product models, sensors, scenarios, and ground-truth adapters.</description>
+  <maintainer email="dev@kikijiki.com">Matteo Bernacchia</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <depend>ament_index_cpp</depend>
+  <depend>eigen3_cmake_module</depend>
+  <depend>gz-msgs10</depend>
+  <depend>gz-sim8</depend>
+  <depend>gz-transport13</depend>
+  <depend>protobuf</depend>
+  <depend>rclcpp</depend>
+  <depend>restocker_interfaces</depend>
+  <depend>yaml-cpp</depend>
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>gz_ros2_control</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>restocker_control</exec_depend>
+  <exec_depend>restocker_description</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>launch_testing_ament_cmake</test_depend>
+  <test_depend>python3-yaml</test_depend>
+  <test_depend>rclpy</test_depend>
+  <test_depend>urdfdom_py</test_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

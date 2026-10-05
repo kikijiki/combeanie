@@ -1,0 +1,9 @@
+{
+  "request_id": "rec-free-space-planning-failed",
+  "failure_class": "free_space_planning_failed",
+  "recommended_primitive": "resume_at_recovery_state",
+  "status": "ok",
+  "confidence": 0.9,
+  "explanation": "The failure occurred during pre-insert motion planning, indicating a free space planning issue where MoveIt could not find a valid trajectory. The controller is authorized to perform a bounded replan from the current state. Since this is the first recovery attempt (1 of 2), resuming at the recovery state to trigger a fresh plan is the appropriate deterministic action. This aligns with the controller's default behavior and the available authorization.",
+  "schema_version": "restocker.reasoner.recovery.response.v1"
+}

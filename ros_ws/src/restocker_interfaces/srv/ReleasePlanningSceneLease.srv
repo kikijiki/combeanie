@@ -1,0 +1,8 @@
+# Accepts release and starts reconciliation through the required semantic revision.
+string operation_id
+string token
+uint64 required_semantic_revision
+---
+restocker_interfaces/PlanningSceneLeaseOperationStatus status
+bool has_lease
+restocker_interfaces/PlanningSceneLease lease

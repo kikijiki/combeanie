@@ -1,0 +1,97 @@
+# Configuration of the overhead RGB-D perception pipeline.
+#
+# The reference colours are the colours each product renders as in this workcell's lighting,
+# measured off a captured frame, not the albedo its material declares in the scenario file. Ambient
+# light lifts every channel, and the two bottles are translucent, so the sensor sees the product
+# blended with whatever is behind it. The declared albedo would put every reference several times
+# the acceptance tolerance away from the pixels it has to match.
+#
+# The SKU and nominal dimensions restate restocker_description/config/product_collision_catalog.yaml.
+# test_signature_catalog_agreement asserts the two stay equal, so a catalogued product that is
+# resized or renumbered cannot leave this file describing the old one. Lane policy admits a
+# product by class and SKU together, and an observation without a SKU is refused at the destination
+# lane.
+
+perception:
+  ros__parameters:
+    use_sim_time: true
+    planning_frame: world
+    colour_topic: /overhead_camera/image
+    depth_topic: /overhead_camera/depth_image
+    camera_info_topic: /overhead_camera/camera_info
+    observation_topic: /perception/object_observations
+    detection_topic: /perception/detections
+    # tf2 must have delivered the acquisition stamp before the transform can be read at it. The
+    # overhead chain is static so this only absorbs listener start-up; waiting is still correct,
+    # since the alternative is reading the transform at another instant.
+    transform_timeout_ms: 60.0
+    # See perception_node.cpp: every acquisition is a pose the executor may act on, so the image
+    # streams are subscribed reliably. Set false only if a bridge publishes them best-effort, which
+    # a reliable subscription cannot receive.
+    reliable_sensor_qos: true
+
+    backend_name: overhead_rgbd_colour_depth
+    backend_version: 1.0.0
+
+    # Chromaticity is colour divided by intensity. 0.055 is roughly a third of the distance from
+    # the small bottle's blue to the robot's own blue (the nearest confusable colour in the cell),
+    # and contains the spread the translucent bottles show as the tray behind them changes their
+    # blend.
+    chromaticity_tolerance: 0.055
+    minimum_intensity: 60.0
+    minimum_depth_m: 0.20
+    maximum_depth_m: 8.0
+    # The smallest product renders about 16 x 30 px at the tray's 2.06 m range, so 40 px is a
+    # partially occluded product and 39 px is noise.
+    minimum_component_pixels: 40
+
+    top_face_band_m: 0.02
+    top_face_percentile: 0.92
+    minimum_top_face_points: 15
+    # A downward-looking camera sees a full disc of an upright cylinder's top face; sampled that
+    # way its mean radius is about 0.68 R and its extreme about 1.05 R. Measured on this cell the
+    # three products give 0.67-0.70 and 1.02-1.08. The bands hold that and reject the robot's blue
+    # links, which reach 4.1 R.
+    minimum_mean_radius_ratio: 0.45
+    maximum_mean_radius_ratio: 0.95
+    minimum_extreme_radius_ratio: 0.70
+    maximum_extreme_radius_ratio: 1.35
+    height_tolerance_m: 0.03
+
+    translation_sigma_floor_m: 0.003
+
+    # The volume this cell works in, in the planning frame: the stock tray at the near end, the six
+    # lanes at the far end, and the space between them. A detection outside it is not one of this
+    # cell's products, whatever its colour.
+    workspace_minimum_xyz_m: [-1.25, -1.10, 0.55]
+    workspace_maximum_xyz_m: [1.25, 1.45, 1.70]
+
+    product_classes: [can, small_bottle, large_bottle]
+    can.sku: SIM-CAN-STD
+    can.reference_rgb: [200.0, 80.0, 70.0]
+    can.nominal_radius_m: 0.033
+    can.nominal_height_m: 0.122
+    small_bottle.sku: SIM-BOTTLE-SMALL
+    small_bottle.reference_rgb: [70.0, 130.0, 190.0]
+    small_bottle.nominal_radius_m: 0.034
+    small_bottle.nominal_height_m: 0.200
+    large_bottle.sku: SIM-BOTTLE-LARGE
+    large_bottle.reference_rgb: [70.0, 140.0, 105.0]
+    large_bottle.nominal_radius_m: 0.045
+    large_bottle.nominal_height_m: 0.290
+
+pose_error_evaluator:
+  ros__parameters:
+    use_sim_time: true
+    estimate_topic: /perception/object_observations
+    ground_truth_topic: /perception/ground_truth/object_observations
+    attachment_state_topic: /simulation_attachment/state
+    sample_topic: /perception/pose_error
+    # Wide enough that any error worth reporting is measured rather than dropped, and far inside
+    # the 0.40 m spacing between two stocked products, so association cannot cross over.
+    association_radius_m: 0.15
+    # The camera runs at 6 Hz and ground truth at 10 Hz, so the two streams sit up to about 180 ms
+    # apart.
+    maximum_pairing_skew_ms: 200.0
+    held_settle_ms: 1000.0
+    report_period_s: 20.0

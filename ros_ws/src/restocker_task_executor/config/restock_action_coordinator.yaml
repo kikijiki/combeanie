@@ -1,0 +1,187 @@
+restock_action_coordinator:
+  ros__parameters:
+    use_sim_time: true
+    action_name: /restock_product
+    status_topic: ~/status
+    planning_frame: world
+    workcell_root_frame: shelf
+    product_catalog_path: ""
+    workcell_geometry_path: ""
+    gripper_geometry_path: ""
+    world_state.get_snapshot_service: /world_state/get_snapshot
+    world_state.reserve_task_service: /world_state/reserve_task
+    world_state.validate_reservation_service: /world_state/validate_reservation
+    world_state.release_reservation_service: /world_state/release_reservation
+    world_state.validate_execution_authority_service: /world_state/validate_execution_authority
+    pump_period_ms: 20
+    startup.snapshot_timeout_ms: 1000
+    startup.retry_period_ms: 250
+    inbox_capacity: 128
+    executor_threads: 3
+    generation_deposit_capacity: 64
+    shutdown_timeout_ms: 20000
+    selection.maximum_object_age_ms: 500
+    selection.lane_evidence_validity_ms: 60000
+    selection.maximum_robot_age_ms: 500
+    selection.perception_liveness_max_age_ms: 500
+    selection.maximum_future_skew_ms: 50
+    selection.stock_containment_margin_m: 0.0
+    selection.stock_boundary_tolerance_m: 0.002
+    selection.destination_entry_depth_tolerance_m: 0.010
+    selection.maximum_upright_tilt_rad: 0.05
+    # Wrist depth liveness must match the camera bridge (reliable). Best-effort drops most of
+    # these multi-megabyte frames and trips the 500 ms liveness horizon on a healthy sensor.
+    perception.reliable_sensor_qos: true
+    # Bounded, observable reacquire when the wrist stream is unlive at a motion-segment
+    # request or at task selection. The 500 ms horizon is unchanged: work proceeds only when
+    # the same liveness check passes again inside this steady-clock budget, and expiry keeps
+    # the terminal refusal (segment refusal, or the original selection failure). Covers
+    # transient stamp gaps from host load on a healthy sensor; never hot-loops: the pump
+    # period paces every re-check. Zero skips the hold and refuses immediately.
+    perception.reacquire_timeout_ms: 5000
+    grasp.tool_frame: tool0
+    grasp.center_frame: grasp_center
+    grasp.approach_yaws_rad: [1.5707963267948966, -1.5707963267948966, 0.0]
+    # How high the grasp centre must sit above the base of whatever it is grasping. The wrist_3,
+    # flange and gripper bodies are cylinders and boxes up to 0.09 m in radius about the approach
+    # axis, so a grasp taken level with a product's centre buries them in the surface it stands on
+    # whenever that centre is lower than they are tall. The constraint is therefore on height above
+    # the support, not on displacement from the centre, and the per-product axial offset is derived
+    # from this value and the product's own catalogued height: mid-height where that already
+    # clears, raised by exactly the shortfall where it does not.
+    # Measured against /compute_ik on the baseline scene, sweeping the grasp height of the 0.122 m
+    # can whose centre stands 0.061 m above the tray: no collision-free solution for the grasp pose
+    # at 0.081 m above the tray or below, every pose solves from 0.091 m upward. The three
+    # catalogued products then grasp at 0.111 m (can, offset 0.050), 0.111 m (small bottle, offset
+    # 0.011) and 0.145 m (large bottle, its own mid-height, offset 0.000), each solving 8 of 8 IK
+    # seeds with a full Cartesian approach and retract.
+    # 0.111 rather than the 0.091 cliff because the straight-line approach re-solves IK at every
+    # 5 mm step and a redundant rail-plus-six-axis arm drifts through its null space while doing
+    # so: at 0.101, the height this was originally set to, that drift repeatedly dipped the wrist
+    # into the stock tray and left the straight line blocked between 39% and 79% of the way in.
+    # 0.111 still grips the shortest catalogued product over 0.0285 m of finger, far above the
+    # attachment plugin's 0.005 m contact-overlap floor.
+    grasp.minimum_center_height_above_base_m: 0.111
+    # Select only pre-grasp IK branches whose approach remains collision-free with the grasp
+    # target probed 5 mm lower. The executed target is unchanged; this margin covers controller
+    # endpoint tolerance at the stock-tray rim in the dense fixture.
+    motion.pregrasp_continuation_vertical_margin_m: 0.005
+    # The other side of the same derivation: how far a product may stand up past the grasp centre
+    # before it grows into the wrist camera. The camera is a 0.05 x 0.09 x 0.04 m body bolted
+    # 0.11 m above tool0 and 0.07 m along the approach, so in the grasp-centre frame it occupies
+    # 0.090 to 0.130 m above the jaws and reaches back to within 0.045 m of the grasp centre,
+    # which is the large bottle's radius. Grasping that bottle at its own mid-height therefore laid
+    # its upper half against the camera face with nothing between them, and /check_state_validity
+    # reported the contact intermittently along the retract, which is what made the linear retract
+    # stop 25% of the way out on the live run. Measured by walking the retract with the product
+    # attached: the contact is present at an axial offset of 0.000 and 0.045, and gone at 0.065.
+    # 0.080 leaves 0.010 m under the camera's lower face and puts the three catalogued products at
+    # axial offsets of 0.050 (can, unchanged), 0.020 (small bottle) and 0.065 (large bottle), each
+    # solving 10 of 10 IK seeds with full Cartesian approach, retract, insert and retreat.
+    grasp.maximum_top_above_center_m: 0.080
+    # Stand off far enough that the closed gripper does not have to be threaded into the stock
+    # tray to reach the pre-grasp. The binding dimension is the product's radius, because the
+    # fingers reach 0.07 m past the grasp centre and close to a 0.042 m inner gap, narrower than
+    # any catalogued product. Measured with /plan_kinematic_path: for the 0.033 m can, 0.10 m
+    # leaves only 0.067 m of free space in front of the product and every one of 15 plans was
+    # rejected for sweeping a finger through it, 0.14 m recovered 11 of 15, and 0.18 m and beyond
+    # planned cleanly 15 of 15; for the widest catalogued product, the 0.045 m large bottle, the
+    # pre-grasp pose itself has no collision-free solution at 0.10 m, plans 0 of 3 at 0.12 m, and
+    # plans 3 of 3 from 0.14 m upward. One workcell-wide value covers both because 0.18 m clears
+    # the widest product's own cliff by 0.04 m, exactly the margin it already carried for the can.
+    grasp.pregrasp_distance_m: 0.18
+    grasp.retract_distance_m: 0.12
+    grasp.score.rail_travel_weight: 1.0
+    grasp.score.rear_access_weight: 1.0
+    grasp.score.wrist_clearance_weight: 1.0
+    grasp.transform_translation_tolerance_m: 0.000001
+    grasp.transform_rotation_tolerance_rad: 0.000001
+    task.max_operation_retries: 1
+    task.max_recovery_attempts: 2
+    task.validation_timeout_ms: 3000
+    # Joint-space rejection sampling avoids the projected-box-face invalid paths produced by
+    # constrained state space. Give that fail-closed sampler room to find the cross-workcell carry;
+    # the whole-task deadline remains the immutable upper bound.
+    #
+    # 60 s, not 20 s: the budget is divided across the pre-insert's four continuation-endpoint
+    # candidates (Milestone 10 §6, Card 074: every candidate keeps a first-pass slice — 10 s of
+    # 60 s at four candidates — and the remainder goes to the first endpoint that timed out, so
+    # the preferred endpoint holds half the floor; at 20 s the old even split gave 5 s each), and
+    # under full-suite parallel load every 5 s slice timed out with OMPL PLANNING_FAILED / MoveIt
+    # FAILURE 99999 even though a retry planned the same pose moments later — measured loaded
+    # solves reach 4.9 s against sub-second typical plans. A successful plan returns as soon as it
+    # solves, so the larger cap costs nothing on the green path; task.total_timeout_ms stays the
+    # immutable bound on the goal. Card 066's dense dev run 3 spent 300 s of that bound in five
+    # even-split refusals (21 x 15 s timeouts, then the endpoint planned in 11.1 s).
+    task.planning_timeout_ms: 60000
+    # A motion command plans and executes one segment in a single call, so its budget is
+    # planning_timeout + execution_timeout. The size is measured, not assumed (Card 049): every
+    # `motion segment exceeded its command deadline` receipt expired exactly on the armed
+    # instant while the port was still completing controller goals — busy and progressing, so
+    # the budget was the defect, not the verdict. Measured needs from those receipts: ~146 s
+    # (SC-003 run 3, op 59: 50.6 s of planning then 13 controller goals against the 120 s
+    # default budget), ~199 s (SC-003 retry 2, op 158, at the old 180 s composition pin), ~215 s
+    # (Card 066 dense dev 2, op 60, same pin: 27.9 s planning with two OMPL slice timeouts,
+    # then 8 of 10 controller goals before the cancel) — against loaded execution measured at
+    # 1.6–3.3x the planned trajectory (146–158 s wall for a ~48 s pre-insert at load1 31–35,
+    # Card 044; 131.7 s for 44.769 s in Card 066 dev 3). 180000 ms arms a 240000 ms segment
+    # budget: the largest value the retry invariant 2 * (planning + execution) <=
+    # task.total_timeout_ms permits at 480000, covering the ~215 s worst receipt with margin,
+    # while a segment that stops producing controller goals is still cancelled fail-closed at
+    # its armed deadline (driver test BusyPreInsertWithoutProgress...).
+    task.execution_timeout_ms: 180000
+    task.transaction_timeout_ms: 30000
+    task.recovery_timeout_ms: 15000
+    # Recovery replans from the current state only after a fresh snapshot shows the robot at rest
+    # on telemetry no older than selection.maximum_robot_age_ms. When it does not, the driver
+    # re-requests a snapshot every stop_settle_poll_ms for at most stop_settle_timeout_ms (steady
+    # clock, inside task.recovery_timeout_ms) before failing the recovery; expiry is UNSAFE exactly
+    # as an immediate refusal was. The rest speed and age bound are unchanged. Zero skips the hold.
+    recovery.stop_settle_timeout_ms: 2000
+    recovery.stop_settle_poll_ms: 100
+    # Six planned segments, two gripper moves and two transactions. A complete transfer measured
+    # about 35 s on the baseline scene when 240000 was derived from it as 2 × (planning +
+    # execution) plus one retry of the longest segment; measured goals have outgrown that twice
+    # over and Card 044 re-sized the bound (Milestone 10 §6): green-day goals run 48.7–208.8 s,
+    # loaded cuts landed at 241–272+ s still mid-retreat (pre-insert alone 146–158 s against 48 s
+    # planned), and with Card 049's execution at 180000 (the shipped compositions pin the same
+    # value) the 2 × (planning + execution) floor is now exactly 480000 — the bound sits on its
+    # own retry floor with nothing to spare while staying hard fail-closed: a stuck goal still
+    # times out, at 8 minutes instead of 4.
+    task.total_timeout_ms: 480000
+    # The product is carried and released this far above the roller bed, and falls onto it when
+    # the jaws open. Planned flush against the bed instead, it is in contact with it for the whole
+    # 0.12 m insertion, and whether the collision checker calls that contact a collision comes
+    # down to rounding: walking the insertion with the product attached and asking
+    # /check_state_validity at every 5 mm, 20 of 25 states were rejected for touching the lane
+    # floor at zero clearance, and the live linear insert stopped at 17% on one run and 50% on
+    # another while completing on others. At 0.002 all 25 states are valid for every catalogued
+    # product.
+    #
+    # It is measured from the bed's rear lip, not from the bed under the release point, because
+    # the insert is a straight horizontal push and the product passes over every part of the bed
+    # shallower than where it is set down (manipulation_geometry.hpp,
+    # lane_insertion_floor_height_m). The real drop on release is therefore this plus the bed's
+    # own fall across the insert depth, about 9 mm; a product lands, absorbs it and runs on down
+    # the lane without tipping, which is the case the incline was chosen against.
+    placement.insertion_floor_clearance_m: 0.002
+    # The advisory reasoner. Off by default; every acceptance result in this repository was
+    # measured with it off. Enabling it composes an optional client that may decline a recovery
+    # the deterministic authorisation had already permitted and can do nothing else. An absent,
+    # slow, wrong or hostile backend leaves the deterministic path unchanged. Measured latencies
+    # against a local llama.cpp backend were 5 to 34 s, hence the short deadline and the usually
+    # missing answer.
+    reasoner.enabled: false
+    reasoner.host: 127.0.0.1
+    reasoner.port: 8080
+    reasoner.path: /v1/chat/completions
+    reasoner.model: ""
+    reasoner.timeout_ms: 4000
+    reasoner.minimum_confidence: 0.5
+    # Empty writes no audit file. Any path here receives one JSON object per line recording what
+    # was asked, what came back verbatim, whether it validated, whether it was used, and what
+    # happened next.
+    reasoner.audit_path: ""
+    reconciliation.window_ms: 5000
+    reconciliation.attempt_timeout_ms: 1000
+    reconciliation.max_attempts: 3

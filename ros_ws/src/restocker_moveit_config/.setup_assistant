@@ -1,0 +1,10 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: restocker_description
+    relative_path: urdf/restocker_planning.urdf.xacro
+  srdf:
+    relative_path: config/restocker.srdf
+  package_settings:
+    author_name: Beverage Restocking Contributors
+    author_email: maintainers@invalid.example
+    generated_timestamp: 2026-08-30T00:00:00Z

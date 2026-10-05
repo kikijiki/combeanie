@@ -1,0 +1,110 @@
+# Lane survey: measuring how far back a lane's product column reaches, from the wrist camera, and
+# comparing that measurement against the simulator's own.
+#
+# Every number below is derived from the shipped workcell, sensor and station table, with the
+# derivation beside it.
+
+lane_observation:
+  ros__parameters:
+    # The wrist camera: a lane is measured from a viewpoint the arm was moved to.
+    depth_topic: /wrist_camera/depth_image
+    camera_info_topic: /wrist_camera/camera_info
+    lane_observation_topic: /perception/lane_observations
+    acquire_service: /perception/acquire_lane_observation
+    backend_name: wrist_depth_lane_survey
+    backend_version: 1.0.0
+
+    # The lane <- camera transform is resolved at the depth frame's own stamp, so this is only how
+    # long to wait for TF to catch up with that stamp. The wrist chain comes from
+    # robot_state_publisher off joint_states, which runs far ahead of the 5 Hz renderer.
+    transform_timeout_sec: 0.20
+
+    # How long to wait for a frame stamped after the arm stopped. Measured wrist renderer latency
+    # is 0.040 s of simulated time to the first frame after a stop and 0.640 s to the third; 2.0 s
+    # is a liveness bound over that. Exceeding it publishes nothing, which distinguishes a dead
+    # sensor from a blind one.
+    acquisition_timeout_sec: 2.0
+
+    # The coverage a measurement must reach to be offered as an answer rather than a refusal.
+    #
+    # Coverage is the fraction of the lane's depth, from the rear entrance to the nearest measured
+    # surface, that this acquisition accounted for. It exists because available_depth_m fails in
+    # the dangerous direction: a lane nothing returns from reports the emptiest possible lane, and
+    # empty opens the capacity gate on a lane with no room.
+    #
+    # 0.90 is set between two measured groups, on a rendered shipped station:
+    #   * Every honest measurement scores 1.000. Thirty-four columns (empty through full, all three
+    #     catalogued products) covered every bin, because the bed behind the column is in plain
+    #     view and everything in front of it is excused by the column itself.
+    #   * Failures score far below: nothing returned is 0.000, a camera aimed at the neighbouring
+    #     lane is 0.000, and half a blinded frame on an empty lane is 0.463.
+    # Nothing was measured between 0.463 and 1.000, so the floor is the round number nearest the
+    # honest side of that gap. It is not a posterior and must not be compared with the object
+    # pipeline's 0.60, which is one.
+    #
+    # Limitation: it cannot catch a product the depth stream passes through, because a ray through
+    # a transparent product and a ray through empty space are the same ray. See
+    # lane_depth_measurement.hpp.
+    minimum_coverage: 0.90
+
+    # How far above the roller bed a return has to be before it can be a product rather than the
+    # bed. The bed is a modelled plane, so this covers the arm's pose error entering through
+    # forward kinematics (achieved camera pose within 6.1 mm of commanded at worst) plus the
+    # grazing incidence at which the bed is seen near the retainer. 10 mm is well below the 122 mm
+    # can.
+    floor_margin_m: 0.010
+
+    # How far short of the front retainer's face the product window stops. Without it the 0.09 m
+    # tall retainer, in view at exactly the lane depth where the window ends, reads as the nearest
+    # product and every empty lane measures 0.830 m free against a true 0.850. The narrowest
+    # catalogued product puts its rear face 0.066 m behind that face, so nothing real is lost.
+    front_inset_m: 0.010
+
+    # How far behind the lane's rear entrance plane to look for something protruding out of the
+    # mouth (what `obstructed` means here). The shipped obstruction scenario protrudes 0.014 m;
+    # 0.060 m catches that and stops short of the manipulation corridor, where the arm would be
+    # seen.
+    obstruction_reach_m: 0.060
+
+    # The wrist sensor clips at 0.05 and 2.5 m. The lane spans 0.75 to 1.50 m from its station, so
+    # these bounds discard the sensor's own clip planes and nothing else.
+    minimum_depth_m: 0.10
+    maximum_depth_m: 2.40
+
+    # Every second pixel in each axis: 640 x 360 = 230400 samples of a 1280 x 720 frame, in
+    # single-digit milliseconds, still hundreds of returns in the narrowest histogram bin.
+    pixel_stride: 2
+
+    # The depth histogram's bin. Its floor is how far apart consecutive sampled image rows land on
+    # the bed at the far end of the lane: 1.49 m away at 21.6 degrees of grazing is 5.8 mm per
+    # row, 11.6 mm at stride 2. At a 10 mm bin an empty lane covered 80 of 83 bins (the three at
+    # the far end, as that arithmetic predicts). 0.020 is that gap with most of a bin of margin.
+    # It does not quantise the reported depth, which is the least lane depth of the returns inside
+    # the bin.
+    bin_width_m: 0.020
+
+    # Product returns a bin needs before it is a surface rather than speckle. A can's rear face at
+    # 1.1 m is about 40 px across and 75 px tall, so thousands of returns; 12 is far below any real
+    # surface and far above a stray sample.
+    minimum_surface_bin_returns: 12
+    minimum_accepted_returns: 200
+    minimum_obstruction_returns: 40
+
+lane_depth_error_evaluator:
+  ros__parameters:
+    measurement_topic: /perception/lane_observations
+    ground_truth_topic: /perception/ground_truth/lane_observations
+    sample_topic: /perception/lane_depth_error
+
+    # The ground-truth producer publishes at up to 10 Hz and the camera measures once per survey,
+    # so the two stamps are never the same instant. 500 ms is two ground-truth periods plus the
+    # renderer's 200 ms frame interval; the products a survey scenario pins do not move in that
+    # time.
+    maximum_pairing_skew_ms: 500.0
+    report_period_s: 20.0
+
+    # The distribution is reported by how full the lane was, since measurement difficulty depends
+    # on it and a mean over the whole range would hide an estimator that only works on an empty
+    # lane.
+    fill_buckets: 10
+    lane_depth_m: 0.85

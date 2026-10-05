@@ -1,0 +1,8 @@
+std_msgs/Header header
+uint64 revision
+restocker_interfaces/TrackedObject[] objects
+restocker_interfaces/ShelfLane[] lanes
+restocker_interfaces/RobotExecutionState robot
+bool has_active_reservation
+restocker_interfaces/TaskReservation active_reservation
+restocker_interfaces/WorldStateEvent[] events

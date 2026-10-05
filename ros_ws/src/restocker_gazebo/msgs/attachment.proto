@@ -1,0 +1,150 @@
+// Copyright 2026 Matteo Bernacchia <dev@kikijiki.com>
+// SPDX-License-Identifier: MIT
+
+syntax = "proto3";
+
+package restocker_gazebo.msgs;
+
+enum AttachmentCommandValue {
+  ATTACHMENT_COMMAND_UNSET = 0;
+  ATTACHMENT_COMMAND_ATTACH = 1;
+  ATTACHMENT_COMMAND_DETACH = 2;
+}
+
+enum AttachmentStatusCodeValue {
+  ATTACHMENT_STATUS_UNSET = 0;
+  ATTACHMENT_STATUS_PENDING = 1;
+  ATTACHMENT_STATUS_ATTACHED = 2;
+  ATTACHMENT_STATUS_DETACHED = 3;
+  ATTACHMENT_STATUS_INVALID_ARGUMENT = 4;
+  ATTACHMENT_STATUS_AUTHORIZATION_FAILED = 5;
+  ATTACHMENT_STATUS_EXTERNAL_INCONSISTENCY = 6;
+  ATTACHMENT_STATUS_CONFLICT = 7;
+  ATTACHMENT_STATUS_TOKEN_MISMATCH = 8;
+  ATTACHMENT_STATUS_IDEMPOTENCY_CONFLICT = 9;
+  ATTACHMENT_STATUS_RESOURCE_EXHAUSTED = 10;
+  ATTACHMENT_STATUS_OBJECT_NOT_FOUND = 11;
+  ATTACHMENT_STATUS_ENTITY_AMBIGUOUS = 12;
+  ATTACHMENT_STATUS_GRIPPER_NOT_READY = 13;
+  ATTACHMENT_STATUS_OUT_OF_TOLERANCE = 14;
+  ATTACHMENT_STATUS_STATE_MISMATCH = 15;
+  ATTACHMENT_STATUS_SIMULATOR_EPOCH_CHANGED = 16;
+  ATTACHMENT_STATUS_OUTCOME_UNKNOWN = 17;
+  ATTACHMENT_STATUS_OPERATION_NOT_FOUND = 18;
+  ATTACHMENT_STATUS_INTERNAL_ERROR = 255;
+}
+
+enum AttachmentPhaseValue {
+  ATTACHMENT_PHASE_UNKNOWN = 0;
+  ATTACHMENT_PHASE_DETACHED = 1;
+  ATTACHMENT_PHASE_VALIDATING_ATTACH = 2;
+  ATTACHMENT_PHASE_APPLYING_ATTACH = 3;
+  ATTACHMENT_PHASE_VERIFYING_ATTACH = 4;
+  ATTACHMENT_PHASE_ATTACHED = 5;
+  ATTACHMENT_PHASE_VALIDATING_DETACH = 6;
+  ATTACHMENT_PHASE_APPLYING_DETACH = 7;
+  ATTACHMENT_PHASE_VERIFYING_DETACH = 8;
+  ATTACHMENT_PHASE_INCONSISTENT = 9;
+}
+
+enum AttachmentMotionGateValue {
+  ATTACHMENT_MOTION_GATE_UNKNOWN = 0;
+  ATTACHMENT_MOTION_GATE_INHIBITED = 1;
+  ATTACHMENT_MOTION_GATE_VALID = 2;
+}
+
+message AttachmentPose {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+  double qx = 4;
+  double qy = 5;
+  double qz = 6;
+  double qw = 7;
+}
+
+message AttachmentIdentityValue {
+  uint64 object_id = 1;
+  string object_source_id = 2;
+  string parent_model = 3;
+  string parent_link = 4;
+  string child_model = 5;
+  string child_link = 6;
+}
+
+message AttachmentRequestValue {
+  AttachmentCommandValue command = 1;
+  uint64 reservation_id = 2;
+  AttachmentIdentityValue identity = 3;
+  AttachmentPose expected_grasp_center_to_child = 4;
+  // 36 entries, row major, in geometry_msgs/PoseWithCovariance order. Empty or all zero means
+  // the caller stated no uncertainty for the observation the expected grasp came from.
+  repeated double expected_pose_covariance = 5;
+}
+
+// Measured disagreement between the authorized grasp and the observed one, and the bound it was
+// held to. Present whenever the fidelity assertion was evaluated, on rejection as well as on
+// acceptance.
+message AttachmentFidelityValue {
+  double translation_residual_m = 1;
+  double rotation_residual_rad = 2;
+  double translation_budget_m = 3;
+  double claimed_translation_sigma_m = 4;
+  double translation_ceiling_m = 5;
+}
+
+message AttachmentEvidenceValue {
+  bool joint_observed = 1;
+  AttachmentPose parent_to_child = 2;
+  AttachmentPose child_pose_in_world = 3;
+  repeated double relative_twist_in_parent = 4;
+  uint64 simulator_iteration = 5;
+  int64 simulation_time_ns = 6;
+}
+
+message AttachmentStatusValue {
+  AttachmentStatusCodeValue code = 1;
+  string detail = 2;
+}
+
+message AttachmentOperationValue {
+  string simulator_epoch = 1;
+  uint64 sequence = 2;
+  string operation_id = 3;
+  AttachmentRequestValue request = 4;
+  AttachmentPhaseValue phase = 5;
+  AttachmentStatusValue status = 6;
+  bool mutation_started = 7;
+  bool started_from_inconsistent = 8;
+  AttachmentEvidenceValue evidence = 9;
+  AttachmentFidelityValue fidelity = 10;
+}
+
+message AttachmentStateValue {
+  string simulator_epoch = 1;
+  uint64 sequence = 2;
+  AttachmentPhaseValue phase = 3;
+  AttachmentMotionGateValue motion_gate = 4;
+  AttachmentStatusValue status = 5;
+  AttachmentIdentityValue attached_identity = 6;
+  AttachmentEvidenceValue evidence = 7;
+  AttachmentFidelityValue fidelity = 8;
+}
+
+message SetAttachmentRequest {
+  string expected_simulator_epoch = 1;
+  string operation_id = 2;
+  AttachmentRequestValue request = 3;
+}
+
+message QueryAttachmentRequest {
+  string expected_simulator_epoch = 1;
+  string operation_id = 2;
+}
+
+message AttachmentReply {
+  AttachmentStatusValue status = 1;
+  bool replayed = 2;
+  AttachmentOperationValue operation = 3;
+  AttachmentStateValue state = 4;
+}

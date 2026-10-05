@@ -1,0 +1,8 @@
+# Starts or polls acquisition of the exclusive managed-geometry transaction lease.
+string operation_id
+uint64 minimum_applied_revision
+---
+restocker_interfaces/PlanningSceneLeaseOperationStatus status
+bool has_lease
+string token
+restocker_interfaces/PlanningSceneLease lease

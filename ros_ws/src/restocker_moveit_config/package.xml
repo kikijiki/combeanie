@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia (dev@kikijiki.com) -->
+<!-- SPDX-License-Identifier: MIT -->
+<package format="3">
+  <name>restocker_moveit_config</name>
+  <version>0.1.0</version>
+  <description>MoveIt planning groups, kinematics, planners, limits, and controller mapping.</description>
+  <maintainer email="dev@kikijiki.com">Matteo Bernacchia</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>moveit_configs_utils</exec_depend>
+  <exec_depend>moveit_kinematics</exec_depend>
+  <exec_depend>moveit_planners_ompl</exec_depend>
+  <exec_depend>moveit_ros_move_group</exec_depend>
+  <exec_depend>moveit_ros_visualization</exec_depend>
+  <exec_depend>moveit_simple_controller_manager</exec_depend>
+  <exec_depend>restocker_description</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>restocker_control</test_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

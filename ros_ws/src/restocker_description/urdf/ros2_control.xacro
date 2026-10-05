@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: MIT -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!-- Both command interfaces are exported for every joint; each controller claims one, decided
+       in controllers.yaml. The arm and rail use velocity feedforward, the gripper uses position.
+       The controller-manager post-limiter that rewrote velocity commands is disabled there. -->
+  <xacro:macro name="restocker_controlled_joint" params="name lower upper initial_position:=0.0">
+    <joint name="${name}">
+      <command_interface name="position">
+        <param name="min">${lower}</param>
+        <param name="max">${upper}</param>
+      </command_interface>
+      <command_interface name="velocity"/>
+      <state_interface name="position">
+        <param name="initial_value">${initial_position}</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="restocker_ros2_control" params="prefix controller_config">
+    <ros2_control name="${prefix}GazeboSimSystem" type="system">
+      <hardware>
+        <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+      </hardware>
+      <xacro:restocker_controlled_joint name="${prefix}rail_joint" lower="${restocker_rail_lower}" upper="${restocker_rail_upper}"/>
+      <!-- Match ur_description's released UR10e limits and its documented mock-hardware home. -->
+      <xacro:restocker_controlled_joint name="${prefix}shoulder_pan_joint" lower="${-2.0 * pi}" upper="${2.0 * pi}" initial_position="0.0"/>
+      <xacro:restocker_controlled_joint name="${prefix}shoulder_lift_joint" lower="${-2.0 * pi}" upper="${2.0 * pi}" initial_position="-1.57"/>
+      <xacro:restocker_controlled_joint name="${prefix}elbow_joint" lower="${-pi}" upper="${pi}" initial_position="0.0"/>
+      <xacro:restocker_controlled_joint name="${prefix}wrist_1_joint" lower="${-2.0 * pi}" upper="${2.0 * pi}" initial_position="-1.57"/>
+      <xacro:restocker_controlled_joint name="${prefix}wrist_2_joint" lower="${-2.0 * pi}" upper="${2.0 * pi}" initial_position="0.0"/>
+      <xacro:restocker_controlled_joint name="${prefix}wrist_3_joint" lower="${-2.0 * pi}" upper="${2.0 * pi}" initial_position="0.0"/>
+      <xacro:restocker_controlled_joint name="${prefix}left_finger_joint" lower="${restocker_gripper_lower}" upper="${restocker_gripper_upper}" initial_position="0.005"/>
+      <xacro:restocker_controlled_joint name="${prefix}right_finger_joint" lower="${restocker_gripper_lower}" upper="${restocker_gripper_upper}" initial_position="0.005"/>
+    </ros2_control>
+
+    <gazebo>
+      <plugin filename="libgz_ros2_control-system.so" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+        <parameters>${controller_config}</parameters>
+        <hold_joints>true</hold_joints>
+        <!-- Position-commanded gripper only. At gain 1.0, post-release traverses repeatedly drove the
+             parked-open fingers past their hard bounds, and the impulses coincided with arm wrist
+             velocity-limit excursions. Gain 0.5 keeps short-stroke attachment accuracy without
+             hammering those stops. -->
+        <position_proportional_gain>0.5</position_proportional_gain>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+</robot>

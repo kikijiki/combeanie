@@ -1,0 +1,45 @@
+trajectory_execution:
+  allowed_execution_duration_scaling: 1.2
+  # The joint trajectory controllers may take goal_time: 1.0 s past the end of a trajectory to
+  # settle inside their goal tolerances (see restocker_control/config/controllers.yaml). MoveIt's
+  # duration monitor must outlast that window, or it cancels controllers still inside their
+  # contract and reports TIMED_OUT for a segment they were about to answer. The margin is that
+  # window plus room for the result to travel back.
+  allowed_goal_duration_margin: 1.2
+  allowed_start_tolerance: 0.01
+  execution_duration_monitoring: true
+
+moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
+
+moveit_simple_controller_manager:
+  controller_names:
+    - arm_controller
+    - rail_controller
+    - gripper_controller
+
+  arm_controller:
+    action_ns: follow_joint_trajectory
+    type: FollowJointTrajectory
+    default: true
+    joints:
+      - shoulder_pan_joint
+      - shoulder_lift_joint
+      - elbow_joint
+      - wrist_1_joint
+      - wrist_2_joint
+      - wrist_3_joint
+
+  rail_controller:
+    action_ns: follow_joint_trajectory
+    type: FollowJointTrajectory
+    default: true
+    joints:
+      - rail_joint
+
+  gripper_controller:
+    action_ns: follow_joint_trajectory
+    type: FollowJointTrajectory
+    default: true
+    joints:
+      - left_finger_joint
+      - right_finger_joint

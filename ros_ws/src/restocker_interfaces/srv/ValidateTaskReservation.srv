@@ -1,0 +1,7 @@
+# Read-only validation of the current stage predicates for one capability token.
+string token
+---
+restocker_interfaces/WorldStateOperationStatus status
+uint64 world_revision
+bool has_reservation
+restocker_interfaces/TaskReservation reservation

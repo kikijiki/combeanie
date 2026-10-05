@@ -1,0 +1,6 @@
+{
+  "schema_version": "restocker.reasoner.recovery.response.v1",
+  "request_id": "rec-free-space-planning-failed",
+  "status": "ok",
+ "failure_class": "free_space_planning_failed",
+

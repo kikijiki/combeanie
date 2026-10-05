@@ -1,0 +1,50 @@
+schema_version: 1
+
+# Lane policy for the dense restock scenario (restocker_gazebo/config/dense_restock_products.yaml).
+#
+# The mode loop idles when the section 4 deficit -- target_count minus the held count at the
+# catalogued pitch -- reaches zero on every lane, so the demo declares targets the dense
+# fixture can actually reach from its measured starting columns: can 10, small bottle 9,
+# large bottle 6 per lane (front 15/13/9 of 20/18/12). The deficits that produces -- 5/5/3,
+# thirteen transfers -- are covered by the scenario's back tray (9/9/7) with surplus, and the
+# loop ends at PHASE_FRONT_FULL with back stock left over.
+#
+# The targets stop short of surveyed capacity (12/11/8) on purpose. Filling to capacity drives
+# the last placements into the packed column, where the adaptive release inserts into existing
+# stock instead of the rear mouth: the first dense run under this loop measured one such
+# placement growing the rear gap by only 9.7 mm against a 67.8 mm pitch, so the depth-derived
+# held count under-counted and a phantom deficit stranded with no back stock to fill it (the
+# loop then correctly surveyed the tray and idled, which is not FRONT_FULL). Stopping short of
+# the packed regime keeps every placement a clean mouth insertion whose column growth the
+# depth deficit can see, without touching placement_require_column_growth.
+#
+# baseline_lanes.yaml's owner want of six per lane is deliberately lower than these targets:
+# the shipped front already holds more than six cans in each can lane, so under the default
+# policy those lanes are at target and the demo would idle immediately. Pair this file with
+# the dense scenario only; the demo disables lane_policy_state persistence so a stale
+# SetLanePolicy document cannot overlay these targets.
+lanes:
+  lane_01:
+    expected_product_class: can
+    expected_sku: SIM-CAN-STD
+    target_count: 10
+  lane_02:
+    expected_product_class: small_bottle
+    expected_sku: SIM-BOTTLE-SMALL
+    target_count: 9
+  lane_03:
+    expected_product_class: large_bottle
+    expected_sku: SIM-BOTTLE-LARGE
+    target_count: 6
+  lane_04:
+    expected_product_class: can
+    expected_sku: SIM-CAN-STD
+    target_count: 10
+  lane_05:
+    expected_product_class: small_bottle
+    expected_sku: SIM-BOTTLE-SMALL
+    target_count: 9
+  lane_06:
+    expected_product_class: large_bottle
+    expected_sku: SIM-BOTTLE-LARGE
+    target_count: 6

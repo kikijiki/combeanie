@@ -99,18 +99,18 @@ TEST(AttachmentPose, CanonicalizesQuaternionSignAndRejectsInvalidInput)
 
 TEST(AttachmentJournal, ConstructorRequiresEpochAndBoundedDetachCapacity)
 {
-  EXPECT_THROW(AttachmentJournal("", 8), std::invalid_argument);
-  EXPECT_THROW(AttachmentJournal("epoch-a", 2), std::invalid_argument);
-  EXPECT_THROW(AttachmentJournal("epoch-a", 4, std::nullopt, 0), std::invalid_argument);
+  EXPECT_THROW(AttachmentJournal("", 8, std::nullopt, 2, "weld"), std::invalid_argument);
+  EXPECT_THROW(AttachmentJournal("epoch-a", 2, std::nullopt, 2, "weld"), std::invalid_argument);
+  EXPECT_THROW(AttachmentJournal("epoch-a", 4, std::nullopt, 0, "weld"), std::invalid_argument);
 
   auto invalid_identity = can_identity();
   invalid_identity.child_link.clear();
-  EXPECT_THROW(AttachmentJournal("epoch-a", 8, invalid_identity), std::invalid_argument);
+  EXPECT_THROW(AttachmentJournal("epoch-a", 8, invalid_identity, 2, "weld"), std::invalid_argument);
 }
 
 TEST(AttachmentJournal, StartsDetachedWithAValidDefaultDenyingNoEvidence)
 {
-  const AttachmentJournal journal("epoch-a", 8);
+  const AttachmentJournal journal("epoch-a", 8, std::nullopt, 2, "weld");
   EXPECT_EQ(journal.capacity(), 8U);
   EXPECT_EQ(journal.size(), 0U);
   EXPECT_EQ(journal.reserved_detach_slots(), 0U);
@@ -123,7 +123,7 @@ TEST(AttachmentJournal, StartsDetachedWithAValidDefaultDenyingNoEvidence)
 
 TEST(AttachmentJournal, RejectsMalformedRequestsWithoutConsumingCapacity)
 {
-  AttachmentJournal journal("epoch-a", 8);
+  AttachmentJournal journal("epoch-a", 8, std::nullopt, 2, "weld");
   auto request = attach_request();
   EXPECT_EQ(journal.submit("", request).status.code, AttachmentStatusCode::kInvalidArgument);
   request.reservation_id = 0;
@@ -139,7 +139,7 @@ TEST(AttachmentJournal, RejectsMalformedRequestsWithoutConsumingCapacity)
 
 TEST(AttachmentJournal, CanonicalReplayIsIdempotentAndChangedPayloadConflicts)
 {
-  AttachmentJournal journal("epoch-a", 8);
+  AttachmentJournal journal("epoch-a", 8, std::nullopt, 2, "weld");
   auto request = attach_request();
   const auto accepted = journal.submit("attach-1", request);
   ASSERT_TRUE(accepted.operation);
@@ -161,7 +161,7 @@ TEST(AttachmentJournal, CanonicalReplayIsIdempotentAndChangedPayloadConflicts)
 
 TEST(AttachmentJournal, SerializesMutationsAndRetainsTerminalAttachmentEvidence)
 {
-  AttachmentJournal journal("epoch-a", 8);
+  AttachmentJournal journal("epoch-a", 8, std::nullopt, 2, "weld");
   EXPECT_EQ(
     journal.submit("attach-1", attach_request()).status.code,
     AttachmentStatusCode::kPending);
@@ -192,7 +192,7 @@ TEST(AttachmentJournal, SerializesMutationsAndRetainsTerminalAttachmentEvidence)
 
 TEST(AttachmentJournal, SafeAttachRejectionReleasesEveryReservedDetachAttempt)
 {
-  AttachmentJournal journal("epoch-a", 3);
+  AttachmentJournal journal("epoch-a", 3, std::nullopt, 2, "weld");
   ASSERT_EQ(
     journal.submit("attach-1", attach_request()).status.code,
     AttachmentStatusCode::kPending);
@@ -212,7 +212,7 @@ TEST(AttachmentJournal, SafeAttachRejectionReleasesEveryReservedDetachAttempt)
 
 TEST(AttachmentJournal, DetachConsumesReservedAttemptsAndVerifiesAbsence)
 {
-  AttachmentJournal journal("epoch-a", 4);
+  AttachmentJournal journal("epoch-a", 4, std::nullopt, 2, "weld");
   ASSERT_EQ(
     journal.submit("attach-1", attach_request()).status.code,
     AttachmentStatusCode::kPending);
@@ -236,7 +236,7 @@ TEST(AttachmentJournal, DetachConsumesReservedAttemptsAndVerifiesAbsence)
 
 TEST(AttachmentJournal, SafeDetachRejectionLeavesRemainingRecoveryCapacity)
 {
-  AttachmentJournal journal("epoch-a", 4);
+  AttachmentJournal journal("epoch-a", 4, std::nullopt, 2, "weld");
   ASSERT_EQ(
     journal.submit("attach-1", attach_request()).status.code,
     AttachmentStatusCode::kPending);
@@ -259,7 +259,7 @@ TEST(AttachmentJournal, SafeDetachRejectionLeavesRemainingRecoveryCapacity)
 
 TEST(AttachmentJournal, DetachReplayIgnoresTheUnusedExpectedGraspStorage)
 {
-  AttachmentJournal journal("epoch-a", 8);
+  AttachmentJournal journal("epoch-a", 8, std::nullopt, 2, "weld");
   ASSERT_EQ(
     journal.submit("attach-1", attach_request()).status.code,
     AttachmentStatusCode::kPending);
@@ -277,7 +277,7 @@ TEST(AttachmentJournal, DetachReplayIgnoresTheUnusedExpectedGraspStorage)
 
 TEST(AttachmentJournal, PostMutationContradictionFailsClosedAndBlocksNewCommands)
 {
-  AttachmentJournal journal("epoch-a", 8);
+  AttachmentJournal journal("epoch-a", 8, std::nullopt, 2, "weld");
   ASSERT_EQ(
     journal.submit("attach-1", attach_request()).status.code,
     AttachmentStatusCode::kPending);
@@ -302,7 +302,7 @@ TEST(AttachmentJournal, PostMutationContradictionFailsClosedAndBlocksNewCommands
 
 TEST(AttachmentJournal, NegativeSimulationTimeMakesPostMutationOutcomeUnknown)
 {
-  AttachmentJournal journal("epoch-a", 8);
+  AttachmentJournal journal("epoch-a", 8, std::nullopt, 2, "weld");
   ASSERT_EQ(
     journal.submit("attach-1", attach_request()).status.code,
     AttachmentStatusCode::kPending);
@@ -321,7 +321,7 @@ TEST(AttachmentJournal, NegativeSimulationTimeMakesPostMutationOutcomeUnknown)
 
 TEST(AttachmentJournal, QueryDistinguishesCurrentStateMissingAndJournaledOperation)
 {
-  AttachmentJournal journal("epoch-a", 8);
+  AttachmentJournal journal("epoch-a", 8, std::nullopt, 2, "weld");
   EXPECT_EQ(journal.query().status.code, AttachmentStatusCode::kDetached);
   EXPECT_FALSE(journal.query().operation);
   EXPECT_EQ(journal.query("missing").status.code, AttachmentStatusCode::kOperationNotFound);
@@ -336,14 +336,14 @@ TEST(AttachmentJournal, QueryDistinguishesCurrentStateMissingAndJournaledOperati
 
 TEST(AttachmentJournal, EpochRotationIsCleanOnlyFromAnIdleDetachedState)
 {
-  AttachmentJournal clean("epoch-a", 8);
+  AttachmentJournal clean("epoch-a", 8, std::nullopt, 2, "weld");
   clean.rotate_epoch("epoch-b");
   EXPECT_EQ(clean.state().simulator_epoch, "epoch-b");
   EXPECT_EQ(clean.state().phase, AttachmentPhase::kDetached);
   EXPECT_EQ(clean.state().motion_gate, AttachmentMotionGate::kValid);
   EXPECT_THROW(clean.rotate_epoch("epoch-b"), std::invalid_argument);
 
-  AttachmentJournal pending("epoch-a", 8);
+  AttachmentJournal pending("epoch-a", 8, std::nullopt, 2, "weld");
   ASSERT_EQ(
     pending.submit("attach-1", attach_request()).status.code,
     AttachmentStatusCode::kPending);
@@ -356,7 +356,7 @@ TEST(AttachmentJournal, EpochRotationIsCleanOnlyFromAnIdleDetachedState)
 
 TEST(AttachmentJournal, RecoveredAttachmentStartsInhibitedWithDetachCapacity)
 {
-  AttachmentJournal recovered("epoch-b", 8, can_identity());
+  AttachmentJournal recovered("epoch-b", 8, can_identity(), 2, "weld");
   EXPECT_EQ(recovered.state().phase, AttachmentPhase::kInconsistent);
   EXPECT_EQ(recovered.state().motion_gate, AttachmentMotionGate::kInhibited);
   EXPECT_EQ(recovered.state().status.code, AttachmentStatusCode::kExternalInconsistency);
@@ -376,7 +376,7 @@ TEST(AttachmentJournal, RecoveredAttachmentStartsInhibitedWithDetachCapacity)
 
 TEST(AttachmentJournal, HeldObjectWatchdogFaultInhibitsMotionAndRetainsIdentity)
 {
-  AttachmentJournal journal("epoch-a", 8);
+  AttachmentJournal journal("epoch-a", 8, std::nullopt, 2, "weld");
   ASSERT_EQ(
     journal.submit("attach-1", attach_request()).status.code,
     AttachmentStatusCode::kPending);
@@ -395,7 +395,7 @@ TEST(AttachmentJournal, HeldObjectWatchdogFaultInhibitsMotionAndRetainsIdentity)
 
 TEST(AttachmentJournal, WatchdogFaultTransitionRejectsInvalidLifecycleAndEvidence)
 {
-  AttachmentJournal journal("epoch-a", 8);
+  AttachmentJournal journal("epoch-a", 8, std::nullopt, 2, "weld");
   EXPECT_EQ(
     journal.mark_external_inconsistency("not attached").status.code,
     AttachmentStatusCode::kStateMismatch);
@@ -418,10 +418,32 @@ TEST(AttachmentJournal, WatchdogFaultTransitionRejectsInvalidLifecycleAndEvidenc
     AttachmentStatusCode::kStateMismatch);
 }
 
+TEST(AttachmentJournal, PhysicalHoldFaultEvidenceCarriesNoJoint)
+{
+  // A physical grip has no joint to observe, so the watchdog's fault evidence must say so; a
+  // weld's fault evidence must still show its joint.
+  AttachmentJournal physical("epoch-a", 8, std::nullopt, 2, "physical");
+  ASSERT_EQ(
+    physical.submit("attach-1", attach_request()).status.code, AttachmentStatusCode::kPending);
+  ASSERT_EQ(physical.mark_validation_succeeded("attach-1").status.code,
+    AttachmentStatusCode::kPending);
+  ASSERT_EQ(physical.mark_mutation_started("attach-1").status.code, AttachmentStatusCode::kPending);
+  ASSERT_EQ(
+    physical.mark_verification_succeeded("attach-1", evidence(false)).status.code,
+    AttachmentStatusCode::kAttached);
+  EXPECT_EQ(
+    physical.mark_external_inconsistency("pad slip", evidence(true)).status.code,
+    AttachmentStatusCode::kInvalidArgument);
+  EXPECT_NE(
+    physical.mark_external_inconsistency("pad slip", evidence(false)).status.code,
+    AttachmentStatusCode::kInvalidArgument);
+  EXPECT_EQ(physical.state().phase, AttachmentPhase::kInconsistent);
+}
+
 // CMB-SPEC-10 Stage 1: retention bounds are named and observable.
 TEST(AttachmentJournalRetention, ReportsEpochCapacityAndClassifiesLifecycle)
 {
-  AttachmentJournal journal("epoch-a", 8);
+  AttachmentJournal journal("epoch-a", 8, std::nullopt, 2, "weld");
   auto snapshot = journal.retention_snapshot();
   EXPECT_EQ(snapshot.journal, "simulator.attachment");
   EXPECT_EQ(snapshot.epoch_id, "epoch-a");
@@ -465,7 +487,7 @@ TEST(AttachmentJournalRetention, ReportsEpochCapacityAndClassifiesLifecycle)
 
 TEST(AttachmentJournalRetention, UnknownOutcomeIsAnOpenObligationAndRotationClearsRecords)
 {
-  AttachmentJournal journal("epoch-a", 8);
+  AttachmentJournal journal("epoch-a", 8, std::nullopt, 2, "weld");
   ASSERT_EQ(
     journal.submit("attach-1", attach_request()).status.code, AttachmentStatusCode::kPending);
   ASSERT_EQ(
@@ -489,7 +511,7 @@ TEST(AttachmentJournalRetention, UnknownOutcomeIsAnOpenObligationAndRotationClea
 
 TEST(AttachmentJournalRetention, RecoveredAttachmentReportsReservedCreditsWithoutRecords)
 {
-  AttachmentJournal recovered("epoch-b", 8, can_identity());
+  AttachmentJournal recovered("epoch-b", 8, can_identity(), 2, "weld");
   const auto snapshot = recovered.retention_snapshot();
   EXPECT_EQ(snapshot.size, 0U);
   EXPECT_EQ(snapshot.open_obligations, 0U);
@@ -497,8 +519,31 @@ TEST(AttachmentJournalRetention, RecoveredAttachmentReportsReservedCreditsWithou
   EXPECT_TRUE(snapshot.held_attachment) << "a held joint is state, not a record";
   EXPECT_TRUE(snapshot.inhibited);
 
-  AttachmentJournal clean("epoch-a", 8);
+  AttachmentJournal clean("epoch-a", 8, std::nullopt, 2, "weld");
   EXPECT_FALSE(clean.retention_snapshot().held_attachment);
+}
+
+TEST(AttachmentJournal, CarriesTheConfiguredHoldModeOnRepliesAndAcrossEpochs)
+{
+  // The mode is part of every receipt (spec 11.3 D1), so it must survive the epoch reset that
+  // rebuilds the state from scratch, and an unrecognised spelling must never be publishable.
+  AttachmentJournal journal("epoch-a", 8, std::nullopt, 2, "physical");
+  EXPECT_EQ(journal.state().hold_mode, "physical");
+  EXPECT_EQ(journal.query().state.hold_mode, "physical");
+
+  journal.rotate_epoch("epoch-b");
+  EXPECT_EQ(journal.state().hold_mode, "physical");
+  EXPECT_EQ(journal.query().state.hold_mode, "physical");
+
+  EXPECT_THROW(
+    AttachmentJournal("epoch-c", 8, std::nullopt, 2, "glued"), std::invalid_argument);
+  EXPECT_THROW(
+    AttachmentJournal("epoch-c", 8, std::nullopt, 2, ""), std::invalid_argument);
+
+  // Callers that are not about the mode get the shipped default, not a silent empty string.
+  const AttachmentJournal defaulted("epoch-d", 8);
+  EXPECT_EQ(defaulted.state().hold_mode, "physical");
+  EXPECT_TRUE(known_hold_mode(defaulted.state().hold_mode));
 }
 
 }  // namespace

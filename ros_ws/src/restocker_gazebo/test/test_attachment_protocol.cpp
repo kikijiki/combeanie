@@ -88,7 +88,7 @@ TEST(AttachmentProtocol, CarriesTheAuthorizingCovarianceToTheBoundary)
 
 TEST(AttachmentProtocol, CarriesTheFidelityResidualBackOnRefusal)
 {
-  AttachmentJournal journal("sim-epoch-a", 8);
+  AttachmentJournal journal("sim-epoch-a", 8, std::nullopt, 2, "weld");
   AttachmentStatus error;
   const auto decoded = decode_command(attach_message(), error);
   ASSERT_TRUE(decoded);
@@ -157,7 +157,7 @@ TEST(AttachmentProtocol, QueryRequiresAnExpectedSimulatorEpoch)
 
 TEST(AttachmentProtocol, EncodesPresenceAndEveryPieceOfPhysicalEvidence)
 {
-  AttachmentJournal journal("sim-epoch-a", 8);
+  AttachmentJournal journal("sim-epoch-a", 8, std::nullopt, 2, "weld");
   AttachmentStatus error;
   const auto decoded = decode_command(attach_message(), error);
   ASSERT_TRUE(decoded);
@@ -189,12 +189,44 @@ TEST(AttachmentProtocol, EncodesPresenceAndEveryPieceOfPhysicalEvidence)
   EXPECT_EQ(encoded.operation().evidence().simulator_iteration(), 123U);
   ASSERT_TRUE(encoded.has_state());
   EXPECT_EQ(encoded.state().motion_gate(), msgs::ATTACHMENT_MOTION_GATE_VALID);
+  EXPECT_EQ(encoded.state().hold_mode(), "weld");
   ASSERT_TRUE(encoded.state().has_attached_identity());
   EXPECT_EQ(encoded.state().attached_identity().child_model(), "stock_can_01");
 
   const auto round_trip = decode_reply(encoded, error);
   ASSERT_TRUE(round_trip);
   EXPECT_EQ(*round_trip, terminal);
+}
+
+TEST(AttachmentProtocol, CarriesThePhysicalHoldModeAcrossTheWire)
+{
+  AttachmentJournal journal("sim-epoch-a", 8, std::nullopt, 2, "physical");
+  AttachmentStatus error;
+  const auto encoded = encode_reply(journal.query());
+  ASSERT_TRUE(encoded.has_state());
+  EXPECT_EQ(encoded.state().hold_mode(), "physical");
+
+  const auto round_trip = decode_reply(encoded, error);
+  ASSERT_TRUE(round_trip);
+  EXPECT_EQ(round_trip->state.hold_mode, "physical");
+}
+
+TEST(AttachmentProtocol, RejectsAReplyWhoseHoldModeIsNotARecognisedSpelling)
+{
+  // The mode decides which physics a result may be cited for, so a reply that states none — or
+  // one nobody defined — is uninterpretable and must be refused rather than defaulted (spec
+  // 11.3 D1).
+  AttachmentStatus error;
+  AttachmentJournal journal("sim-epoch-a", 8, std::nullopt, 2, "weld");
+  auto encoded = encode_reply(journal.query());
+  encoded.mutable_state()->clear_hold_mode();
+  EXPECT_FALSE(decode_reply(encoded, error));
+  EXPECT_EQ(error.code, AttachmentStatusCode::kInvalidArgument);
+
+  encoded = encode_reply(journal.query());
+  encoded.mutable_state()->set_hold_mode("welded-on");
+  EXPECT_FALSE(decode_reply(encoded, error));
+  EXPECT_EQ(error.code, AttachmentStatusCode::kInvalidArgument);
 }
 
 TEST(AttachmentProtocol, RejectsMalformedRepliesAtTheAdapterBoundary)
@@ -204,7 +236,7 @@ TEST(AttachmentProtocol, RejectsMalformedRepliesAtTheAdapterBoundary)
   EXPECT_FALSE(decode_reply(missing, error));
   EXPECT_EQ(error.code, AttachmentStatusCode::kInvalidArgument);
 
-  AttachmentJournal journal("sim-epoch-a", 8);
+  AttachmentJournal journal("sim-epoch-a", 8, std::nullopt, 2, "weld");
   auto encoded = encode_reply(journal.query());
   encoded.mutable_status()->set_code(
     static_cast<msgs::AttachmentStatusCodeValue>(99));

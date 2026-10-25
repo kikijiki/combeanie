@@ -13,10 +13,61 @@ finger:
   size_xyz_m: [0.035, 0.018, 0.14]
   center_xyz_m: [0.0, 0.0, 0.07]
   mass_kg: 0.18
+  # Spec M10 §11 D9: the collision is size_xyz_m tiled into this many equal rows along x (the pad
+  # height, the product axis in a side grasp). DART has no torsional friction (§11.2 F13), so one
+  # box is one clustered contact and a hinge about the jaw axis; separated rows resist the spin.
+  # Derived, not tuned: the fewest rows for which every catalogued product at its production grasp
+  # height covers at least three whole rows (0.122 m cans cover -17.5..+11 mm of the 35 mm pad).
+  pad_rows: 4
+  # Spec M10 §11 D10: the pad is a 3.3 mm 60 Shore A silicone layer on the finger's inner face,
+  # modelled in the simulation description as one small link per row on a prismatic spring-damper
+  # joint along the pad normal (the MoveIt planning description keeps D9's plain tiled collisions).
+  # Every number below is physical data or derived from it; see §11 D10 for the sources.
+  pad:
+    thickness_m: 0.0033
+    # Thin bonded layer indented by the product's cylinder at the design load (Gent & Lindley
+    # shape factor, Koblar et al. SV-JME 2014); loss factor tan delta 0.1 at the product-on-pads
+    # mode. Row period 1.32 ms against the 1 ms step: the spring is applied explicitly each step
+    # (the engine ignores the joint spring), which is stable only if the engine's own implicit
+    # joint damping is about critical for the row (omega*dt = 4.76 > 2 otherwise; measured as pad
+    # forces chattering between 13 and 84 N under a 40 N clamp, 2026-10-18).
+    row_stiffness_n_per_m: 111000.0
+    # c = 1.2 * 2*sqrt(k * row_mass) = 1.2 * 46.6 = 56 N*s/m, applied by the engine implicitly
+    # (the joint's <dynamics damping>; the plugin applies the spring only). It is not an extreme
+    # pad: against the product's own mass on this stiffness (0.36 kg) it is a damping ratio of
+    # 56 / (2*sqrt(111000 * 0.36)) = 0.14, i.e. a loss factor of ~0.28, inside silicone's range.
+    row_damping_n_s_per_m: 56.0
+    # Silicone density 1.22 g/cm3 x the row volume 8.75 x 3.3 x 140 mm.
+    row_mass_kg: 0.0049
+    # Spec M10 §11 D10 item 3: the pad joints' force limit, which DART clips a FORCE command to
+    # (§11.2 F14). The spring is commanded by restocker_pad_spring_system, and its own bound is
+    # k * travel + c * velocity = 111000 * 0.002 + 11.5 * 0.12 = 223.4 N, so the limit sits above
+    # that with margin and never clips. These joints are passive: the limit is otherwise inert,
+    # and the finger drive keeps finger.joint.effort_n unchanged.
+    effort_n: 500.0
+    # Pair-specific pad-to-product friction (§11 D10 item 2): DART combines the two bodies with
+    # min(), so the attachment system overrides the contact pair itself and only for pad-to-product
+    # contacts; product-to-shelf and product-to-tray keep the catalogued values. The PET figure is
+    # a stated proxy (silicone on acrylic at the 25 N our pads carry), not a PET measurement.
+    friction_by_material:
+      aluminium: 0.8
+      pet: 0.3
+      # Stated proxy (CMB-119 stage 1), unmeasured: coated carton board against silicone. Boxes
+      # are not attachable yet, so nothing reads this; it keeps the table total over classes.
+      cardboard: 0.35
+    material_by_product_class:
+      can: aluminium
+      small_bottle: pet
+      large_bottle: pet
+      contour_bottle: pet
+      box: cardboard
   joint:
     lower_m: 0.0
     upper_m: 0.035
-    effort_n: 100.0
+    # Spec M10 §11 D10: a force-controlled parallel gripper's grip force, from the sizing rule
+    # 2*mu*F >= 2*m*(g + a) on the heaviest product (margin 2.1 at 1.1 kg and mu 0.3). This is also
+    # the joint's force limit, which DART clips a FORCE-actuator command to (§11.2 F14).
+    effort_n: 40.0
     velocity_mps: 0.12
     damping_n_s_per_m: 2.0
     friction_n: 0.5
@@ -28,8 +79,45 @@ finger:
     axis: [0.0, -1.0, 0.0]
 
 attachment:
-  # Physical holding is supplied by the fixed joint. The finger faces remain
-  # outside the product collision geometry to avoid competing constraints.
+  # How a verified grasp is held (Milestone 10 spec 11.3). `weld` commands the jaws to stop one
+  # hold clearance short of the product and lets the restocker_attachment_joint DetachableJoint
+  # carry it: the finger faces stay outside the product collision geometry, which is what
+  # `minimum_inner_clearance_m` below demands of them. `physical` commands the jaws *narrower*
+  # than the product by hold_interference_m, so they stop against it and the servo keeps
+  # pressing; friction at that contact is what carries the product through carry, insert and
+  # release, and no joint is created. This file is the single source of the mode: the simulator
+  # boundary and the task executor both read it, so the aperture a run commands and the aperture
+  # it verifies can never disagree. `weld` ships: the physical hold passes the end-to-end
+  # acceptance run only about 40 % of the time (Card 057 evidence, 2026-10-18), see the README.
+  hold_mode: weld
+  # Per-side interference in physical mode, i.e. how far past the catalogued surface the jaws
+  # are commanded. It buys the grip force: the stall settles where the servo's push balances the
+  # three compliances in series, the servo (1/p = 16 um/N), the silicone pad (1/111 kN/m =
+  # 9 um/N) and the engine's soft contact (measured 34 um/N: a 1 mm interference delivered only
+  # 15-19 N per pad, 0.3 mm of command-to-stall error at a 62.5 kN/m gain, a PET bottle
+  # slipping out of a lift with 9 N of friction against 10.8 N of weight). Reaching the 40 N
+  # clamp needs interference >= 40 N * 59 um/N = 2.4 mm; 2.7 mm leaves 0.2 mm of stall error
+  # beyond the 0.64 mm the clamp needs (effort_n / p), i.e. the loop saturates. The stall then
+  # sits 2.03 mm inside the catalogued surface at the 40 N the pads actually deliver (measured
+  # 40.5 / 41.4 N: the pad takes 0.36 mm of that, the soft contact 1.67 mm), inside
+  # maximum_penetration_m below, and 0.7 mm short of the command, well inside
+  # gripper_controller's 3 mm goal.
+  hold_interference_m: 0.0027
+  # Physical mode's contact band, per side, on the inner clearance between a finger face and the
+  # catalogued product surface: negative means pressed in, positive means a gap. DART bleeds
+  # penetration off at no more than 1 mm/s (ERP 0.01, MAX_ERV 1e-3, neither tunable through SDF),
+  # so a settled grip sits at or just inside the surface. The positive side is deliberately
+  # tighter than the weld mode's whole 0.5 mm daylight rule: a gap of that size is daylight, not
+  # contact, and a predicate that admitted it would certify a jaw standing next to the product.
+  # How deep a settled grip reads with the flat-box pad rows: 2.0-2.9 mm per side on the cans and
+  # the small bottle, and up to 3.15 mm on one side of the 90 mm large bottle, which sits 0.4 mm
+  # off the squeeze axis (2.4 / 3.15 mm on its two sides); 3.3 mm admits that and stays under the
+  # 3 mm gripper_controller goal with the command-to-stall residual (3.3 - 2.7 = 0.6 mm).
+  maximum_penetration_m: 0.0033
+  contact_tolerance_m: 0.0001
+  # Weld mode only: the gap every finger face must keep from the product so the joint, not the
+  # contact, carries the load. Ignored for the predicate in physical mode, still used to derive
+  # the palm envelope check and the weld-mode fidelity ceiling.
   minimum_inner_clearance_m: 0.0005
   minimum_contact_overlap_m: 0.005
   # The motion planner pads every robot link by 1.5 mm. Keep another 1.0 mm of planned clearance

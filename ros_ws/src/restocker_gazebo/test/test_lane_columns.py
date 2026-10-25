@@ -281,3 +281,27 @@ def test_shipped_sensor_acceptance_products_matches_the_builder():
     assert loaded["products"] == expected["products"]
     assert sum(1 for product in loaded["products"] if product.get("static")) == 0
     assert sum(1 for product in loaded["products"] if not product.get("static")) == 3
+
+
+def test_box_base_geometries_restate_the_generated_catalogue():
+    from restocker_gazebo.lane_columns import BOX_CATALOGUE
+
+    by_sku = {g["sku"]: g for g in _catalogue()["geometries"] if g["product_class"] == "box"}
+    assert len(by_sku) == 4
+    sizes = {tuple(g["shape"]["size_xyz_m"]) for g in by_sku.values()}
+    assert sizes == {tuple(entry["size_xyz_m"]) for entry in BOX_CATALOGUE.values()}
+
+
+def test_a_box_column_packs_by_its_depth_and_the_producer_agrees():
+    from restocker_gazebo.lane_columns import BOX_CATALOGUE
+
+    key = "box.carton_1000"
+    sx, sy, sz = BOX_CATALOGUE[key]["size_xyz_m"]
+    first, second = (column_pose_in_lane(key, i)[0] for i in (0, 1))
+    assert first - second == pytest.approx(sy * math.cos(LANE_INCLINE_RAD))
+    scenario = lane_column_scenario([LaneColumn("lane_01", key, 3)])
+    assert {p["product_class"] for p in scenario["products"]} == {"box"}
+    # A box's depth-axis extent under the incline is sy/2 cos + sz/2 sin, as the producer's AABB.
+    extent = sy / 2 * math.cos(LANE_INCLINE_RAD) + sz / 2 * math.sin(LANE_INCLINE_RAD)
+    centre = column_pose_in_lane(key, 2)[0]
+    assert ground_truth_available_depth_m(key, 3) == pytest.approx(centre - extent - 0.01)

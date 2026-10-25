@@ -1,0 +1,36 @@
+{
+  "escalation": {
+    "backend": "florence2",
+    "crops": 2,
+    "enabled": true,
+    "max_new_tokens": 96,
+    "reader": {
+      "max_line_words": 3,
+      "min_line_score": 0.5,
+      "unrolled": false,
+      "upscale": 2
+    },
+    "revision": "00921df66db728a9ceb750f5eca43e5c203a2051",
+    "threads": 4
+  },
+  "facing_confidence": 0.5,
+  "max_relooks": 3,
+  "max_views": 5,
+  "min_turn_deg": 22.5,
+  "ocr_crops": 3,
+  "reader": {
+    "max_line_words": 3,
+    "min_line_score": 0.5,
+    "unrolled": true,
+    "upscale": 2
+  },
+  "scoring": "max",
+  "shortlist_rank": 3,
+  "text": {
+    "max_contradictions": 0,
+    "min_margin": 0.25,
+    "min_matched": 2,
+    "min_score": 0.5
+  },
+  "whiten": true
+}

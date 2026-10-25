@@ -222,6 +222,45 @@ class Svg:
         self.line(x, y, x + dx, y + dy, stroke=ACCENT, sw=1.2)
         self.text(x + dx + 4, y + dy + 4, name, size=size, fill=TEAL, weight="700")
 
+    def arrow(
+        self,
+        x1: float,
+        y1: float,
+        x2: float,
+        y2: float,
+        *,
+        stroke: str = LINE,
+        sw: float = 1.6,
+        dash: str | None = None,
+    ) -> None:
+        """A line with an arrow head at (x2, y2)."""
+        self.line(x1, y1, x2, y2, stroke=stroke, sw=sw, dash=dash)
+        angle = math.atan2(y2 - y1, x2 - x1)
+        head = 8.0
+        left = (x2 - head * math.cos(angle - 0.4), y2 - head * math.sin(angle - 0.4))
+        right = (x2 - head * math.cos(angle + 0.4), y2 - head * math.sin(angle + 0.4))
+        self.poly([(x2, y2), left, right], fill=stroke, stroke=stroke, sw=1)
+
+    def box(
+        self,
+        x: float,
+        y: float,
+        w: float,
+        h: float,
+        lines: list[str],
+        *,
+        fill: str = FILL_ARM,
+        stroke: str = LINE,
+        dash: str | None = None,
+    ) -> None:
+        """A rounded box with a bold first line and plain lines under it."""
+        self.rect(x, y, w, h, fill=fill, stroke=stroke, sw=1.6, rx=6, dash=dash)
+        self.text(x + w / 2, y + 20, lines[0], size=12.5, anchor="middle")
+        for index, line in enumerate(lines[1:]):
+            self.text(
+                x + w / 2, y + 38 + 15 * index, line, size=11, fill=MUTED, weight="500", anchor="middle"
+            )
+
     def caption(self, text: str, y: float = 22) -> None:
         self.text(24, y, text, size=16, fill=INK, weight="700")
 
@@ -875,6 +914,113 @@ def lane_cross_section(geom: dict, catalog: dict, out: Path) -> None:
     write_svg(out / "lane-cross-section.svg", svg)
 
 
+def perception_data_flow(out: Path) -> None:
+    """Which perception producer publishes what, and who reads it."""
+    svg = Svg(1000, 600, "Perception data flow schematic")
+    svg.caption("Perception data flow")
+    svg.note(
+        "Solid boxes run on the default launch; dashed boxes start with a launch argument "
+        "(lane_stock, inventory).",
+        24,
+        42,
+    )
+    src_x, src_w = 24, 150
+    prod_x, prod_w = 215, 215
+    topic_x, topic_w = 470, 250
+    cons_x, cons_w = 770, 206
+    rows = {"over": 66, "conf": 126, "lane": 186, "stock": 256, "inv": 326, "obs": 406, "gt": 486}
+    h = 50
+    svg.box(src_x, 96, src_w, 62, ["Wrist camera", "RGB-D"], fill=FILL_SHELF)
+    svg.box(src_x, rows["obs"] - 6, src_w, 62, ["Overhead camera", "depth"], fill=FILL_SHELF)
+    svg.box(src_x, rows["gt"] - 6, src_w, 62, ["Gazebo", "ground_truth_adapter"], fill=FILL_TRAY)
+    svg.box(prod_x, rows["over"], prod_w, h, ["Tray overview duty", "tray_overview_perception"], fill=FILL_PRODUCT)
+    svg.box(prod_x, rows["conf"], prod_w, h, ["Tray confirm duty", "tray_confirm_perception"], fill=FILL_PRODUCT)
+    svg.box(prod_x, rows["lane"], prod_w, h, ["Lane survey", "lane_survey"], fill=FILL_PRODUCT)
+    svg.box(prod_x, rows["stock"], prod_w, h, ["Lane stock estimator", "lane_stock_node"], fill=FILL_ARM, dash="5 4")
+    svg.box(prod_x, rows["obs"], prod_w, h, ["Depth obstacles", "depth_obstacle_node"], fill=FILL_PRODUCT)
+    svg.box(prod_x, rows["gt"], prod_w, h, ["Error evaluators", "read ground truth only"], fill=FILL_TRAY)
+    svg.box(topic_x, rows["over"], topic_w, h, ["/perception/tray_candidates", "hypotheses, never ingested"], fill="#ffffff")
+    svg.box(topic_x, rows["conf"], topic_w, h, ["/perception/object_observations", "admitted evidence"], fill="#ffffff")
+    svg.box(topic_x, rows["lane"], topic_w, h, ["/perception/lane_observations", "free depth, coverage"], fill="#ffffff")
+    svg.box(topic_x, rows["stock"], topic_w, h, ["/perception/lane_stock", "count, composition"], fill="#ffffff", dash="5 4")
+    svg.box(topic_x, rows["obs"], topic_w, h, ["/perception/obstacle_observations", "boxes"], fill="#ffffff")
+    svg.box(topic_x, rows["gt"], topic_w, h, ["/perception/ground_truth/*", "evaluation only"], fill="#ffffff")
+    svg.box(cons_x, rows["conf"] - 10, cons_w, 130, ["World state", "validates observations,", "owns SKU and lane contents"], fill=TEAL_SOFT, stroke=TEAL)
+    svg.box(cons_x, rows["inv"] - 6, cons_w, 62, ["Inventory", "inventory_node"], fill=FILL_ARM, dash="5 4")
+    svg.box(topic_x, rows["inv"], topic_w, h, ["/perception/inventory", "/query_inventory service"], fill="#ffffff", dash="5 4")
+    svg.box(cons_x, rows["obs"], cons_w, h, ["Planning scene", "projector"], fill=TEAL_SOFT, stroke=TEAL)
+    svg.arrow(src_x + src_w, 120, prod_x, rows["over"] + 25)
+    svg.arrow(src_x + src_w, 127, prod_x, rows["conf"] + 25)
+    svg.arrow(src_x + src_w, 134, prod_x, rows["lane"] + 25)
+    svg.arrow(src_x + src_w, rows["obs"] + 25, prod_x, rows["obs"] + 25)
+    svg.arrow(src_x + src_w, rows["gt"] + 25, prod_x, rows["gt"] + 25)
+    for key in ("over", "conf", "lane", "obs"):
+        svg.arrow(prod_x + prod_w, rows[key] + 25, topic_x, rows[key] + 25)
+    svg.arrow(prod_x + prod_w, rows["gt"] + 25, topic_x, rows["gt"] + 25, dash="2 3")
+    svg.arrow(prod_x + prod_w, rows["stock"] + 25, topic_x, rows["stock"] + 25, dash="5 4")
+    svg.arrow(prod_x + prod_w / 2, rows["lane"] + h, prod_x + prod_w / 2, rows["stock"], dash="5 4")
+    svg.arrow(topic_x + topic_w, rows["conf"] + 25, cons_x, rows["conf"] + 25)
+    svg.arrow(topic_x + topic_w, rows["lane"] + 25, cons_x, rows["lane"] + 25)
+    svg.arrow(topic_x + topic_w, rows["obs"] + 25, cons_x, rows["obs"] + 25)
+    svg.arrow(topic_x + topic_w, rows["stock"] + 25, cons_x + 60, rows["inv"] - 6, dash="5 4")
+    svg.arrow(cons_x, rows["inv"] + 25, topic_x + topic_w, rows["inv"] + 25, dash="5 4")
+    svg.note(
+        "The estimator and the inventory read the lane policy and ledger from the world state. "
+        "Nothing consumes /perception/lane_stock or the inventory.",
+        24,
+        585,
+    )
+    write_svg(out / "perception-data-flow.svg", svg)
+
+
+def identity_ladder(out: Path) -> None:
+    """The identity escalation ladder of /identify_object."""
+    svg = Svg(1000, 520, "Identity ladder schematic")
+    svg.caption("Identity ladder: cheapest evidence first, never a guess")
+    svg.note("Per object: the first look plus up to max_relooks more (default 3).", 24, 42)
+    svg.rect(14, 62, 226, 290, fill="none", stroke=MUTED, sw=1, rx=8, dash="4 3")
+    svg.note("evidence from the looks so far", 24, 80)
+    svg.box(24, 92, 206, 70, ["Barcode close-ups", "decoded to a GTIN", "check digit verified"], fill=FILL_ARM)
+    svg.box(24, 172, 206, 70, ["Label text", "read from the object's", "own columns"], fill=FILL_ARM)
+    svg.box(24, 252, 206, 70, ["Embedding", "ranks registered products,", "a shortlist only"], fill=FILL_ARM)
+    rx, rw = 330, 270
+    ys = [92, 182, 272, 362]
+    rungs = [
+        ("1  Barcode", "a registered GTIN: exact match", TEAL_SOFT, TEAL),
+        ("2  Label text, second reader if open", "one product, clear margin over", TEAL_SOFT, TEAL),
+        ("3  Not yet", "facing estimate, suggested turn", FILL_PRODUCT, TEAL),
+        ("4  Needs human", "the look budget is spent", FILL_TRAY, LINE),
+    ]
+    second = ["", "the runner-up; in the embedding's top 3", "or a new view; look again", "nothing is named"]
+    for index, (title, line, fill, stroke) in enumerate(rungs):
+        lines = [title, line] + ([second[index]] if second[index] else [])
+        svg.box(rx, ys[index], rw, 70, lines, fill=fill, stroke=stroke)
+        if index:
+            svg.arrow(rx + rw / 2, ys[index - 1] + 70, rx + rw / 2, ys[index], dash="5 4")
+            svg.note(
+                "budget spent" if index == 3 else "not decided", rx + rw / 2 + 8, ys[index] - 6
+            )
+    svg.arrow(230, 127, rx, 127)
+    svg.arrow(230, 207, rx, 217)
+    svg.arrow(230, 287, rx, 237, dash="5 4")
+    ox, ow = 700, 270
+    svg.box(ox, 92, ow, 70, ["IDENTIFIED", "SKU and GTIN", "rung: barcode or text"], fill=TEAL_SOFT, stroke=TEAL)
+    svg.box(ox, 272, ow, 70, ["NOT_YET", "guidance: turn by suggested_turn_deg", "or look from another side"], fill=FILL_PRODUCT, stroke=TEAL)
+    svg.box(ox, 362, ow, 70, ["NEEDS_HUMAN", "unregistered look-alikes", "end here"], fill=FILL_TRAY)
+    svg.arrow(rx + rw, 127, ox, 127)
+    svg.arrow(rx + rw, 217, ox, 150)
+    svg.arrow(rx + rw, 307, ox, 307)
+    svg.arrow(rx + rw, 397, ox, 397)
+    svg.box(ox, 452, ow, 56, ["UNKNOWN", "valid GTIN nobody registered, or no sidecar"], fill=FILL_TRAY, dash="5 4")
+    svg.note(
+        "After NOT_YET the caller turns the product (a rotation oracle in simulation) and calls "
+        "again with the same object_key.",
+        24,
+        500,
+    )
+    write_svg(out / "identity-ladder.svg", svg)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -910,6 +1056,8 @@ def main() -> int:
     workcell_top_and_side(workcell, catalog, workcell_xacro, sensors_xacro, workcell_pose, out)
     combined_layout(workcell, workcell_xacro, workcell_pose, urdf_dir, out)
     lane_cross_section(workcell, catalog, out)
+    perception_data_flow(out)
+    identity_ladder(out)
     return 0
 
 

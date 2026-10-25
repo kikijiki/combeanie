@@ -4,6 +4,7 @@
 
 """Launch Gazebo Harmonic, the robot model, and its ros2_control controllers."""
 
+from functools import cache
 import os
 from pathlib import Path
 import tempfile
@@ -37,6 +38,7 @@ from launch.substitutions import (
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackagePrefix, FindPackageShare
+from restocker_gazebo.label_textures import install_texture, load_texture_rotations
 from restocker_gazebo.scenario_config import (
     load_product_catalog,
     load_scenario,
@@ -48,6 +50,7 @@ from restocker_gazebo.scenario_random import (
     parse_seed,
     write_generated_scenario,
 )
+from restocker_gazebo.world_bundle import BundledModel, bundle_models, load_materials
 
 
 def generated_scenario_directory() -> Path:
@@ -94,6 +97,103 @@ def _pose_parameters(pose: list[float]) -> dict[str, float]:
     return dict(zip(("x", "y", "z", "R", "P", "Y"), pose, strict=True))
 
 
+@cache
+def _texture_rotations(manifest: str) -> dict[str, int]:
+    """The label manifest's rotations, read once however many products ask."""
+    return load_texture_rotations(manifest)
+
+
+def _product_xacro_arguments(product, catalog) -> dict[str, str]:
+    """The product.urdf.xacro arguments of one scenario product, as the text xacro receives."""
+    geometry = resolve_product_geometry(product, catalog)
+    shape = geometry["shape"]
+    box = shape["type"] == "box"
+    package_share = Path(get_package_share_directory("restocker_gazebo"))
+    # A scenario names a label by filename only. Resolving it here keeps the scenario free of
+    # absolute paths and the URDF free of package layout; Gazebo would otherwise resolve an albedo
+    # map relative to its own working directory.
+    texture_root = package_share / "materials" / "textures"
+    mesh_root = package_share / "meshes"
+    # Strips are stored upright; the half-turn a cylinder primitive's UVs need is applied by
+    # install_texture, driven by the manifest (see label_textures.py).
+    texture_rotations = _texture_rotations(
+        str(package_share / "config" / "generated_product_labels.yaml")
+    )
+    label = product.get("label_texture", "")
+    label_texture = ""
+    if label:
+        # Gazebo does not complain about an albedo map it cannot open: it draws the flat base
+        # colour, which looks like a product never given a label and which a vision
+        # measurement would silently absorb.
+        if not (texture_root / label).is_file():
+            raise RuntimeError(f"label texture is not installed: {label}")
+        label_texture = str(install_texture(texture_root / label, texture_rotations.get(label, 0)))
+    mesh = product.get("visual_mesh", "")
+    visual_mesh = ""
+    if mesh:
+        if not (mesh_root / mesh).is_file():
+            raise RuntimeError(f"visual mesh is not installed: {mesh}")
+        visual_mesh = str(mesh_root / mesh)
+    return {
+        "radius": str(shape.get("radius_m", 0.033)),
+        "height": str(shape.get("height_m", shape["size_xyz_m"][2] if box else 0.122)),
+        "box_size": " ".join(str(v) for v in shape["size_xyz_m"]) if box else "",
+        "mass": str(product["mass_kg"]),
+        "friction": str(product["friction"]),
+        "static": "true" if product.get("static", False) else "false",
+        "rgba": " ".join(str(value) for value in product["rgba"]),
+        "label_texture": label_texture,
+        "visual_mesh": visual_mesh,
+    }
+
+
+def _bundle_world(context):
+    """Replace the world with a copy that already holds the workcell and every product."""
+    # Runs after _resolve_scenario (the scenario path is final) and before the Gazebo include
+    # reads `world`. The workcell and products are then not spawned by create processes.
+    if LaunchConfiguration("bundle_scenario").perform(context).lower() != "true":
+        return []
+    if LaunchConfiguration("spawn_scenario").perform(context).lower() != "true":
+        return []
+    scenario = load_scenario(LaunchConfiguration("scenario_config").perform(context))
+    catalog = load_product_catalog(LaunchConfiguration("product_catalog").perform(context))
+    workcell_geometry = LaunchConfiguration("workcell_geometry").perform(context)
+    world_path = Path(LaunchConfiguration("world").perform(context))
+    description_share = Path(get_package_share_directory("restocker_description"))
+    gazebo_share = Path(get_package_share_directory("restocker_gazebo"))
+    models = [
+        BundledModel(
+            str(description_share / "urdf" / "workcell.urdf.xacro"),
+            {"geometry_config": workcell_geometry},
+            "workcell",
+            [float(value) for value in scenario["workcell_pose"]],
+        )
+    ]
+    product_xacro = str(gazebo_share / "urdf" / "product.urdf.xacro")
+    for product in scenario["products"]:
+        models.append(
+            BundledModel(
+                product_xacro,
+                _product_xacro_arguments(product, catalog),
+                product["model_name"],
+                [float(value) for value in product["spawn_pose"]],
+            )
+        )
+    materials_path = LaunchConfiguration("scene_materials").perform(context)
+    bundled = bundle_models(
+        world_path.read_text(encoding="utf-8").replace("@GAZEBO_SHARE@", str(gazebo_share)),
+        models,
+        materials=load_materials(materials_path) if materials_path else None,
+    )
+    target = generated_scenario_directory() / f"bundled_{os.getpid()}_{world_path.name}"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(bundled, encoding="utf-8")
+    return [
+        LogInfo(msg=f"bundled {len(models)} models into {target}"),
+        SetLaunchConfiguration("world", str(target)),
+    ]
+
+
 def _scenario_actions(context):
     """Expand one validated workcell and the configured parameterized products."""
     scenario_config = LaunchConfiguration("scenario_config").perform(context)
@@ -102,6 +202,7 @@ def _scenario_actions(context):
     scenario = load_scenario(scenario_config)
     catalog = load_product_catalog(product_catalog)
     enabled = IfCondition(LaunchConfiguration("spawn_scenario"))
+    bundled = LaunchConfiguration("bundle_scenario").perform(context).lower() == "true"
     xacro_executable = FindExecutable(name="xacro")
     workcell_xacro = str(
         Path(get_package_share_directory("restocker_description")) / "urdf" / "workcell.urdf.xacro"
@@ -109,10 +210,6 @@ def _scenario_actions(context):
     product_xacro = str(
         Path(get_package_share_directory("restocker_gazebo")) / "urdf" / "product.urdf.xacro"
     )
-    # A scenario names a label by filename only. Resolving it here keeps the scenario free of
-    # absolute paths and the URDF free of package layout; Gazebo would otherwise resolve an albedo
-    # map relative to its own working directory.
-    texture_root = Path(get_package_share_directory("restocker_gazebo")) / "materials" / "textures"
     workcell_description = ParameterValue(
         Command(
             [
@@ -189,18 +286,7 @@ def _scenario_actions(context):
     ]
 
     for product in scenario["products"]:
-        geometry = resolve_product_geometry(product, catalog)
-        shape = geometry["shape"]
-        rgba = " ".join(str(value) for value in product["rgba"])
-        label = product.get("label_texture", "")
-        label_texture = ""
-        if label:
-            # Gazebo does not complain about an albedo map it cannot open: it draws the flat base
-            # colour, which looks like a product never given a label and which a vision
-            # measurement would silently absorb.
-            if not (texture_root / label).is_file():
-                raise RuntimeError(f"label texture is not installed: {label}")
-            label_texture = str(texture_root / label)
+        arguments = _product_xacro_arguments(product, catalog)
         product_description = ParameterValue(
             Command(
                 [
@@ -208,20 +294,26 @@ def _scenario_actions(context):
                     " ",
                     product_xacro,
                     " radius:=",
-                    str(shape["radius_m"]),
+                    arguments["radius"],
                     " height:=",
-                    str(shape["height_m"]),
+                    arguments["height"],
+                    ' box_size:="',
+                    arguments["box_size"],
+                    '"',
                     " mass:=",
-                    str(product["mass_kg"]),
+                    arguments["mass"],
                     " friction:=",
-                    str(product["friction"]),
+                    arguments["friction"],
                     " static:=",
-                    "true" if product.get("static", False) else "false",
+                    arguments["static"],
                     ' rgba:="',
-                    rgba,
+                    arguments["rgba"],
                     '"',
                     ' label_texture:="',
-                    label_texture,
+                    arguments["label_texture"],
+                    '"',
+                    ' visual_mesh:="',
+                    arguments["visual_mesh"],
                     '"',
                 ]
             ),
@@ -246,6 +338,9 @@ def _scenario_actions(context):
             )
         )
 
+    # A bundled world already holds the workcell and every product (see _bundle_world).
+    if bundled:
+        creates = []
     for index, create in enumerate(creates):
         actions.append(TimerAction(period=0.25 * (index + 1), actions=[create]))
 
@@ -566,9 +661,28 @@ def generate_launch_description() -> LaunchDescription:
                     "time in runs that never look through this camera"
                 ),
             ),
+            DeclareLaunchArgument(
+                "bundle_scenario",
+                default_value="false",
+                description=(
+                    "Place the workcell and every product in the world file Gazebo loads, so "
+                    "they stand there from the first frame, instead of spawning them one create "
+                    "process at a time over the first half minute"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "scene_materials",
+                default_value="",
+                description=(
+                    "With bundle_scenario: a YAML file restyling the visuals of bundled models "
+                    "(see restocker_gazebo.world_bundle), so a dressed scene need not change the "
+                    "description every test shares"
+                ),
+            ),
             # Must precede every action that reads `scenario_config`: a seeded run rewrites it to
             # the generated document.
             OpaqueFunction(function=_resolve_scenario),
+            OpaqueFunction(function=_bundle_world),
             SetEnvironmentVariable(
                 "GZ_SIM_SYSTEM_PLUGIN_PATH",
                 [

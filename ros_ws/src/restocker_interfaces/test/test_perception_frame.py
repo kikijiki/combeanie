@@ -23,6 +23,7 @@ def test_detection_product_classes_match_the_observation_boundary() -> None:
     assert (
         ObjectDetection.PRODUCT_CLASS_LARGE_BOTTLE == ObjectObservation.PRODUCT_CLASS_LARGE_BOTTLE
     )
+    assert ObjectDetection.PRODUCT_CLASS_BOX == ObjectObservation.PRODUCT_CLASS_BOX
 
 
 def test_a_detection_carries_no_stamp_or_frame_of_its_own() -> None:

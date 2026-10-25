@@ -1,0 +1,38 @@
+{
+ "card": "CMB-120",
+ "config": {
+  "blob_reach_m": 0.028,
+  "catalogue_height_tol_m": 0.03,
+  "catalogue_radius_tol_m": 0.009,
+  "disc_min_cells": 12,
+  "disc_radius_m": [
+   0.024,
+   0.052
+  ],
+  "disc_rms_m": 0.006,
+  "flat_below_m": 0.01,
+  "flat_relief_m": 0.002,
+  "floor_seen_tolerance_m": 0.015,
+  "footprint_margin_m": 0.006,
+  "max_neck_splits": 3,
+  "max_products_per_blob": 30,
+  "min_area_m2": 0.0006,
+  "min_height_m": 0.02,
+  "neck_max_m": 0.1,
+  "neck_min_depth_m": 0.006,
+  "peel_min_radius_ratio": 1.0,
+  "plateau_band_m": 0.004,
+  "rect_cliff_drop_m": 0.01,
+  "rect_max_concavity_m": 0.01,
+  "rect_max_side_m": 0.3,
+  "rect_min_cliff_share": 0.7,
+  "rect_min_edge_cells": 8,
+  "rect_min_overlap": 0.86,
+  "rect_min_side_m": 0.018,
+  "rect_over_disc_margin": 0.06
+ },
+ "config_sha256": "1d0fb965c32b5e90a5334bb2228236ca0b4ab071134c367acdacf2e4b4784c68",
+ "frozen_before_any_held_out_frame_was_read": true,
+ "frozen_on": "2026-10-20",
+ "tuned_on": "box development seeds 1101..1112 (rect/neck/flat-top logic and thresholds); 1113..1136 and cylinder dev 1001..1024 only evaluated afterwards, nothing re-tuned on them"
+}

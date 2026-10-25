@@ -307,6 +307,53 @@ TEST_F(LaneEvidenceTest, InvalidSamplesRejectEveryLaneConsistently)
   }
 }
 
+// A box (CMB-119) is bounded by the axis-aligned box of its rotated body: standing, its depth
+// extent is half its depth; rolled a quarter turn about the lane's x, half its height.
+TEST_F(LaneEvidenceTest, ABoxUsesTheAxisAlignedBoundOfItsRotatedBody)
+{
+  YAML::Node scenario = YAML::LoadFile(RESTOCKER_TEST_SCENARIO);
+  YAML::Node box;
+  box["model_name"] = "stock_box_01";
+  box["source_object_id"] = "sim:stock_box_01";
+  box["geometry_key"] = "box.gen019";
+  box["product_class"] = "box";
+  box["sku"] = "GEN-019";
+  box["mass_kg"] = 1.03;
+  box["rgba"].push_back(1.0);
+  box["rgba"].push_back(1.0);
+  box["rgba"].push_back(1.0);
+  box["rgba"].push_back(1.0);
+  box["friction"] = 0.55;
+  for (const double value : {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}) {
+    box["spawn_pose"].push_back(value);
+  }
+  scenario["products"] = YAML::Node(YAML::NodeType::Sequence);
+  scenario["products"].push_back(box);
+  const auto path = std::filesystem::path(::testing::TempDir()) / "box_scenario.yaml";
+  std::ofstream stream(path);
+  stream << scenario;
+  stream.close();
+  const auto box_truth = load_ground_truth_config(path);
+  const auto config = load_lane_evidence_config(
+    RESTOCKER_TEST_WORKCELL_GEOMETRY, RESTOCKER_TEST_PRODUCT_CATALOG, box_truth);
+  ASSERT_EQ(config.products.size(), 1U);
+  ASSERT_TRUE(config.products[0].box_size_m.has_value());
+  EXPECT_NEAR(config.products[0].box_size_m->y(), 0.06, 1.0e-12);
+
+  auto standing = timestamped_sample();
+  add_pose(standing, "stock_box_01", -1.0, 1.37, 0.85);
+  const auto upright = convert_lane_evidence_sample(standing, config);
+  ASSERT_EQ(upright[0].observed_source_object_ids.size(), 1U);
+  EXPECT_NEAR(upright[0].available_depth_m, 0.82 - 0.03 - 0.01, 1.0e-9);
+
+  auto lying = timestamped_sample();
+  auto * pose = add_pose(lying, "stock_box_01", -1.0, 1.37, 0.85);
+  pose->mutable_orientation()->set_x(std::sqrt(0.5));
+  pose->mutable_orientation()->set_w(std::sqrt(0.5));
+  const auto rolled = convert_lane_evidence_sample(lying, config);
+  EXPECT_NEAR(rolled[0].available_depth_m, 0.82 - 0.0825 - 0.01, 1.0e-9);
+}
+
 TEST_F(LaneEvidenceTest, RejectsScenarioCatalogSemanticDisagreement)
 {
   YAML::Node catalog = YAML::LoadFile(RESTOCKER_TEST_PRODUCT_CATALOG);

@@ -39,6 +39,9 @@ namespace
   if (value == "large_bottle") {
     return ProductClass::LargeBottle;
   }
+  if (value == "box") {
+    return ProductClass::Box;
+  }
   throw std::invalid_argument("unknown expected_product_class: " + value);
 }
 
@@ -51,6 +54,8 @@ namespace
       return "small_bottle";
     case ProductClass::LargeBottle:
       return "large_bottle";
+    case ProductClass::Box:
+      return "box";
     case ProductClass::Unknown:
       break;
   }
@@ -364,6 +369,15 @@ std::vector<ProductLaneProfile> load_product_lane_profiles(
   std::vector<ProductLaneProfile> profiles;
   profiles.reserve(geometries.size());
   for (const YAML::Node & entry : geometries) {
+    // Contoured bottles are perception-only (Card 110): no lane policy or placement admits them,
+    // so they get no lane profile instead of failing the whole catalogue.
+    // Boxes likewise (CMB-119 stage 1): no lane profile until placement is derived for them.
+    if (entry["product_class"] &&
+      (entry["product_class"].as<std::string>() == "contour_bottle" ||
+      entry["product_class"].as<std::string>() == "box"))
+    {
+      continue;
+    }
     const YAML::Node shape = entry["shape"];
     if (!shape || !shape["type"] || shape["type"].as<std::string>() != "cylinder") {
       throw std::invalid_argument("lane placement profiles support only cylindrical products");

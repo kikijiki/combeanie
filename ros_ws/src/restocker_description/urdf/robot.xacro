@@ -22,19 +22,21 @@
 
   <xacro:macro
     name="restocker_robot"
-    params="prefix joint_limits_parameters_file wrist_camera_sensor:=true">
+    params="prefix joint_limits_parameters_file wrist_camera_sensor:=true compliant_pads:=false">
     <xacro:restocker_rail prefix="${prefix}"/>
     <xacro:restocker_arm
       prefix="${prefix}"
       joint_limits_parameters_file="${joint_limits_parameters_file}"/>
-    <xacro:restocker_gripper prefix="${prefix}"/>
+    <!-- compliant_pads is the simulation description's D10 form of the finger pad; the planning
+         and visualization descriptions keep D9's plain tiled collisions. -->
+    <xacro:restocker_gripper prefix="${prefix}" compliant_pads="${compliant_pads}"/>
     <xacro:restocker_wrist_camera prefix="${prefix}" sensor="${wrist_camera_sensor}"/>
     <xacro:restocker_beanie prefix="${prefix}" parent="${prefix}shoulder_link"/>
   </xacro:macro>
 
   <xacro:macro
     name="restocker_robot_with_parent"
-    params="prefix parent joint_limits_parameters_file wrist_camera_sensor:=true *origin">
+    params="prefix parent joint_limits_parameters_file wrist_camera_sensor:=true compliant_pads:=false *origin">
     <joint name="${prefix}rail_base_mount_joint" type="fixed">
       <parent link="${parent}"/>
       <child link="${prefix}rail_base"/>
@@ -44,6 +46,7 @@
     <xacro:restocker_robot
       prefix="${prefix}"
       joint_limits_parameters_file="${joint_limits_parameters_file}"
-      wrist_camera_sensor="${wrist_camera_sensor}"/>
+      wrist_camera_sensor="${wrist_camera_sensor}"
+      compliant_pads="${compliant_pads}"/>
   </xacro:macro>
 </robot>

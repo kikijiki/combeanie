@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <cmath>
 #include <limits>
 #include <optional>
 #include <string>
@@ -114,6 +115,59 @@ TEST(GripperGoal, DefaultsToTheAttachmentBandRatherThanTheControllerConstraint)
   const GripperGoal goal;
   EXPECT_DOUBLE_EQ(goal.position_tolerance_m, kAttachmentJointToleranceM);
   EXPECT_LT(goal.position_tolerance_m, 0.003);
+}
+
+TEST(FingersStalledInBand, AcceptsFingersAtRestAgainstTheProductShortOfTheTarget)
+{
+  // Commanded 2.7 mm past the surface, the jaws stop 0.7 mm short of the target (measured).
+  const double target = 0.0093;
+  const double band = 0.0027 + kAttachmentJointToleranceM;
+  const GripperFingerState stalled{target + 0.0007, target + 0.0006};
+  EXPECT_TRUE(
+    fingers_stalled_in_band(stalled, stalled, target, kAttachmentJointToleranceM, band, 5.0e-5));
+}
+
+TEST(FingersStalledInBand, RefusesFingersStillMovingEvenInsideTheBand)
+{
+  const double target = 0.0093;
+  const double band = 0.0027 + kAttachmentJointToleranceM;
+  // Passing through the band at 0.12 m/s moves about a millimetre per 100 Hz sample.
+  EXPECT_FALSE(
+    fingers_stalled_in_band(
+      GripperFingerState{target + 0.0010, target + 0.0010},
+      GripperFingerState{target + 0.0022, target + 0.0022}, target, kAttachmentJointToleranceM,
+      band, 5.0e-5));
+}
+
+TEST(FingersStalledInBand, RefusesRestOutsideTheBandAndDegenerateInputs)
+{
+  const double target = 0.0093;
+  const double band = 0.0027 + kAttachmentJointToleranceM;
+  const GripperFingerState far{target + 0.004, target + 0.004};
+  EXPECT_FALSE(
+    fingers_stalled_in_band(far, far, target, kAttachmentJointToleranceM, band, 5.0e-5));
+  // Closed past the target (never stopped by anything) is the normal band's business only.
+  const GripperFingerState past{target - 0.002, target - 0.002};
+  EXPECT_FALSE(
+    fingers_stalled_in_band(past, past, target, kAttachmentJointToleranceM, band, 5.0e-5));
+  const GripperFingerState ok{target + 0.0005, target + 0.0005};
+  EXPECT_FALSE(
+    fingers_stalled_in_band(ok, ok, target, kAttachmentJointToleranceM, 0.0, 5.0e-5));
+  EXPECT_FALSE(
+    fingers_stalled_in_band(
+      GripperFingerState{std::nan(""), target}, ok, target, kAttachmentJointToleranceM, band,
+      5.0e-5));
+}
+
+TEST(GripperGoalValidation, RejectsANegativeOrNonFiniteStallBand)
+{
+  GripperGoal goal;
+  goal.target_position_m = 0.01;
+  EXPECT_TRUE(valid_gripper_goal(goal));
+  goal.stall_band_m = -0.001;
+  EXPECT_FALSE(valid_gripper_goal(goal));
+  goal.stall_band_m = std::nan("");
+  EXPECT_FALSE(valid_gripper_goal(goal));
 }
 
 TEST(FingersAtTarget, AcceptsBothFingersInsideTheBand)

@@ -1,0 +1,82 @@
+---
+id: catalogue-and-assets
+title: Catalogue and assets
+sidebar_position: 5
+---
+
+# Catalogue and assets
+
+Everything perception is measured on is fictional. `tools/label_factory.py` generates the product
+catalogue deterministically from a seed: names and brands are invented, labels are original artwork,
+and every barcode is a valid EAN-13 with a `2000000...` prefix (GS1's restricted-circulation range),
+so no real product is ever matched.
+
+![One front-panel view of each of the 20 catalogue products, GEN-001 to GEN-020](/img/perception/catalogue.png)
+
+## Products
+
+| SKUs | Shape | Notes |
+| --- | --- | --- |
+| `GEN-001` to `GEN-004` | can (radius 0.033 m, height 0.122 m) | two look-alike pairs |
+| `GEN-005` to `GEN-008` | small bottle | two look-alike pairs |
+| `GEN-009` to `GEN-012` | large bottle | two look-alike pairs |
+| `GEN-013` to `GEN-016` | contoured bottle | two look-alike pairs; waisted, ribbed visual, perception-only |
+| `GEN-017`, `GEN-018` | 200 mL carton, 65 x 40 x 105 mm | a look-alike pair |
+| `GEN-019` | 1 L carton, 95 x 60 x 165 mm | |
+| `GEN-020` | slim 330 mL box, 55 x 25 x 150 mm | **no barcode**: its back panel carries none and its manifest row has no `gtin` |
+
+A look-alike pair shares brand and kind and differs in the flavour word, with the same layout and
+colours. That is the case an embedding cannot resolve and label text can. The same idea is a
+scenario of its own: `same_shape_products.yaml` stocks two cans of identical dimensions whose labels
+differ in one word, and `same_shape_lanes.yaml` makes `lane_04` expect the citrus can, so reading the
+word right fills both lanes and reading it wrong leaves selection with no eligible pair.
+
+## Label textures
+
+Every label is a full unwrapped strip with a front panel (brand, flavour, a logo of random shapes)
+and a back panel (ingredients, nutrition table, disclaimers, a valid EAN-13).
+
+![Unwrapped label strip of a can: front panel left, back panel with barcode right](/img/perception/label-can.webp)
+
+- **Round products** use one strip. Gazebo maps it once around the circumference and along the axis.
+- **Boxes** use a **face atlas**: the unfolded net at 8000 px/m with front, right, back and left in one
+  row and top and bottom below. The manifest row carries the face table (pixel rectangle, outward
+  normal and the product-frame directions of the image's right and up edges, always right-handed so no
+  face is mirrored), plus `box_variant`, `visual_mesh`, `size_xyz_m`, `mass_kg` and `atlas_px`.
+  `tools/generate_box_meshes.py` writes one OBJ per variant with hard edges and per-face UVs from the
+  same layout function the atlas uses.
+
+![Face atlas of the 1 L carton: front, right, back and left in a row, top and bottom below](/img/perception/label-box.webp)
+
+**Textures are stored upright.** Every `gen-NNN.png` reads correctly as stored. Gazebo unwraps a
+cylinder primitive with the strip rotated by half a turn, while the contoured bottle's own UVs show it
+upright. Each manifest row therefore carries `texture_rotation_deg`: 180 for `can`, `small_bottle` and
+`large_bottle`, 0 for `contour_bottle` and for boxes. The launch file installs the texture through
+`restocker_gazebo/label_textures.py`, the only place the half-turn is applied: a rotation of 180 loads a
+pixel-exact rotated copy cached under the system temporary directory, anything else loads unchanged. The
+registry's reference-view renderer maps the strip as stored and applies no rotation.
+
+## Geometry and physics
+
+- The contoured bottle has a waisted, ribbed visual (`meshes/contour_bottle.obj`) while its collision is
+  the plain cylinder of radius 0.036 m. Perception sees a bottle shape; grasping, friction and lane
+  geometry are those of a cylinder.
+- A box has no class fallback. Its collision and inertia come from `box_size`, and a box lies on its back
+  (front face up) in a lane column, packed by its depth.
+- The visual is named `product_body_visual` and the collision `product_body_collision`; sdformat merges
+  a material or friction extension only into elements whose generated name contains the merging
+  pattern, and drops it silently otherwise.
+
+![Gazebo renders of the carton products: upright, from the side, lying on a face, and the back panel](/img/perception/gazebo-boxes.webp)
+
+## What is simulator-only
+
+- The catalogue, its labels and its registry views exist only in the simulator. Registry views of the
+  simulated products are rendered offline from the same textures the simulator shows, so they measure
+  that the renderer and the simulator agree, not that real cartons are identified.
+- `generated_catalogue_products.yaml` lays all 20 SKUs on a tray. It is a scene for looking at
+  labels, not a restocking scenario.
+- The simulator's depth camera is ideal. Noise in the benchmarks is a synthetic model applied to the
+  render; see [Benchmarks](./benchmarks).
+- The simulated attachment, gripper and lane physics apply to cylinders. Boxes are observed, not
+  manipulated; see [Known boundaries](/docs/perception/#known-boundaries).

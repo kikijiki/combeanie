@@ -22,6 +22,7 @@
 #include <iostream>
 #include <limits>
 #include <optional>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -338,6 +339,78 @@ TEST(LaneDepthMeasurement, SeesAnEmptyLaneAlongItsWholeLength) {
   EXPECT_GT(measured.value().coverage, 0.99);
   EXPECT_EQ(measured.value().product_returns, 0U);
   EXPECT_GT(measured.value().bed_returns, 1000U);
+}
+
+// Range noise, as a fraction of range, on every returned pixel (deterministic generator).
+[[nodiscard]] std::vector<float> with_range_noise(
+  std::vector<float> depth, double sigma_fraction, std::uint32_t seed)
+{
+  std::mt19937 generator(seed);
+  std::normal_distribution<double> noise(0.0, sigma_fraction);
+  for (float & sample : depth) {
+    if (sample > 0.0F) {
+      sample = static_cast<float>(static_cast<double>(sample) * (1.0 + noise(generator)));
+    }
+  }
+  return depth;
+}
+
+TEST(LaneDepthMeasurement, RangeNoiseReadsTheBedAsProductUnlessTheMarginFollowsTheNoise) {
+  const auto fixture = shipped_lane("lane_03");
+  ASSERT_TRUE(fixture.has_value()) << "RESTOCKER_TEST_WORKCELL_GEOMETRY is not set";
+  const DepthCameraIntrinsics intrinsics = wrist_intrinsics();
+  LaneDepthConfig adaptive;
+  adaptive.floor_noise_sigma_factor = 4.0;
+  adaptive.edge_bias_sigma_factor = 4.0;
+
+  // An empty lane: with the fixed margin 1 % noise makes the bed a product; with the adaptive one
+  // it is still an empty lane seen along its whole length.
+  const LaneScene empty(fixture->window, fixture->lane_half_span_m, fixture->divider_height_m);
+  const std::vector<float> noisy_empty = with_range_noise(
+    render(empty, intrinsics, fixture->lane_from_optical), 0.01, 7U);
+  const auto fixed = measure_lane_depth(
+    noisy_empty, intrinsics.width, intrinsics, fixture->lane_from_optical, fixture->window,
+    LaneDepthConfig{});
+  ASSERT_TRUE(fixed.has_value());
+  EXPECT_TRUE(fixed.value().nearest_surface_found) << "the fixed margin was expected to fail here";
+  const auto widened = measure_lane_depth(
+    noisy_empty, intrinsics.width, intrinsics, fixture->lane_from_optical, fixture->window,
+    adaptive);
+  ASSERT_TRUE(widened.has_value());
+  EXPECT_FALSE(widened.value().nearest_surface_found);
+  EXPECT_DOUBLE_EQ(widened.value().available_depth_m, fixture->window.usable_depth_m);
+  EXPECT_GT(widened.value().floor_margin_m, fixture->window.floor_margin_m);
+  EXPECT_GT(widened.value().bed_sigma_m, 0.0);
+
+  // A column of four cans measures within half a pitch of the truth at 1 % noise.
+  const std::vector<Product> products = settled_column(fixture->window, 4U, 0.033, 0.122);
+  LaneScene scene(fixture->window, fixture->lane_half_span_m, fixture->divider_height_m);
+  for (const Product & product : products) {
+    scene.add(product);
+  }
+  const std::vector<float> noisy_column = with_range_noise(
+    render(scene, intrinsics, fixture->lane_from_optical), 0.01, 11U);
+  const auto column = measure_lane_depth(
+    noisy_column, intrinsics.width, intrinsics, fixture->lane_from_optical, fixture->window,
+    adaptive);
+  ASSERT_TRUE(column.has_value());
+  EXPECT_NEAR(
+    column.value().available_depth_m, ground_truth_available_depth(fixture->window, products),
+    0.033);
+}
+
+TEST(LaneDepthMeasurement, AnIdealFrameKeepsTheFixedMargin) {
+  const auto fixture = shipped_lane("lane_03");
+  ASSERT_TRUE(fixture.has_value()) << "RESTOCKER_TEST_WORKCELL_GEOMETRY is not set";
+  const DepthCameraIntrinsics intrinsics = wrist_intrinsics();
+  LaneDepthConfig adaptive;
+  adaptive.floor_noise_sigma_factor = 4.0;
+  const LaneScene scene(fixture->window, fixture->lane_half_span_m, fixture->divider_height_m);
+  const auto measured = measure_lane_depth(
+    render(scene, intrinsics, fixture->lane_from_optical), intrinsics.width, intrinsics,
+    fixture->lane_from_optical, fixture->window, adaptive);
+  ASSERT_TRUE(measured.has_value());
+  EXPECT_NEAR(measured.value().floor_margin_m, fixture->window.floor_margin_m, 0.003);
 }
 
 TEST(LaneDepthMeasurement, AgreesWithGroundTruthOverTheWholeColumnRange) {

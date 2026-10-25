@@ -63,7 +63,7 @@ AttachmentEvidence evidence()
 
 TEST(AttachmentMailbox, RejectsMalformedAndStaleEpochCommandsWithoutQueueing)
 {
-  AttachmentMailbox mailbox("sim-epoch-a", 8);
+  AttachmentMailbox mailbox("sim-epoch-a", 8, std::nullopt, 2, "weld");
   auto malformed = attach_message();
   malformed.clear_operation_id();
   EXPECT_EQ(
@@ -80,7 +80,7 @@ TEST(AttachmentMailbox, RejectsMalformedAndStaleEpochCommandsWithoutQueueing)
 
 TEST(AttachmentMailbox, ExactReplayQueuesOneImmutableUpdateThreadCommand)
 {
-  AttachmentMailbox mailbox("sim-epoch-a", 8);
+  AttachmentMailbox mailbox("sim-epoch-a", 8, std::nullopt, 2, "weld");
   const auto accepted = decode(mailbox.handle_set(attach_message()));
   EXPECT_EQ(accepted.status.code, AttachmentStatusCode::kPending);
   EXPECT_FALSE(accepted.replayed);
@@ -98,7 +98,7 @@ TEST(AttachmentMailbox, ExactReplayQueuesOneImmutableUpdateThreadCommand)
 
 TEST(AttachmentMailbox, UpdateThreadTransitionsArePollableThroughTransportQuery)
 {
-  AttachmentMailbox mailbox("sim-epoch-a", 8);
+  AttachmentMailbox mailbox("sim-epoch-a", 8, std::nullopt, 2, "weld");
   ASSERT_EQ(
     decode(mailbox.handle_set(attach_message())).status.code,
     AttachmentStatusCode::kPending);
@@ -124,7 +124,7 @@ TEST(AttachmentMailbox, UpdateThreadTransitionsArePollableThroughTransportQuery)
 
 TEST(AttachmentMailbox, ConcurrentReplaysStillProduceOnePhysicalWorkItem)
 {
-  AttachmentMailbox mailbox("sim-epoch-a", 8);
+  AttachmentMailbox mailbox("sim-epoch-a", 8, std::nullopt, 2, "weld");
   constexpr std::size_t kThreadCount = 16;
   std::atomic<std::size_t> accepted{0};
   std::vector<std::thread> threads;
@@ -149,7 +149,7 @@ TEST(AttachmentMailbox, ConcurrentReplaysStillProduceOnePhysicalWorkItem)
 
 TEST(AttachmentMailbox, SerializesDifferentOperationIdsBehindTheActiveMutation)
 {
-  AttachmentMailbox mailbox("sim-epoch-a", 8);
+  AttachmentMailbox mailbox("sim-epoch-a", 8, std::nullopt, 2, "weld");
   EXPECT_EQ(
     decode(mailbox.handle_set(attach_message("attach-first"))).status.code,
     AttachmentStatusCode::kPending);
@@ -165,7 +165,7 @@ TEST(AttachmentMailbox, SerializesDifferentOperationIdsBehindTheActiveMutation)
 
 TEST(AttachmentMailbox, EpochRotationDropsQueuedWorkAndRejectsOldQueries)
 {
-  AttachmentMailbox mailbox("sim-epoch-a", 8);
+  AttachmentMailbox mailbox("sim-epoch-a", 8, std::nullopt, 2, "weld");
   ASSERT_EQ(
     decode(mailbox.handle_set(attach_message())).status.code,
     AttachmentStatusCode::kPending);
@@ -181,7 +181,7 @@ TEST(AttachmentMailbox, EpochRotationDropsQueuedWorkAndRejectsOldQueries)
 
 TEST(AttachmentMailbox, WatchdogFaultIsImmediatelyVisibleToTransportQueries)
 {
-  AttachmentMailbox mailbox("sim-epoch-a", 8);
+  AttachmentMailbox mailbox("sim-epoch-a", 8, std::nullopt, 2, "weld");
   ASSERT_EQ(
     decode(mailbox.handle_set(attach_message())).status.code,
     AttachmentStatusCode::kPending);

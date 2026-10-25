@@ -1,0 +1,87 @@
+{
+  "card": "CMB-114",
+  "declared_on": "2026-10-19",
+  "declared_before_any_held_out_lane_frame_was_recorded_or_read": true,
+  "decision_unit": "one lane survey frame, scored on the lane it was taken for (the recorder's --lane-views frames: wrist RGB-D at the lane's survey station)",
+  "held_out_population": {
+    "rule": "held_out_generations.fresh of config/perception_splits.json (splits file sha256 72b40600...), sorted ascending, every second seed starting with the first (75 of 150 seeds); the burned version-1 held-out seeds are never used",
+    "why_a_subset": "one simulator at a time at about one minute per seed; 75 seeds give about 450 lanes, enough for every sample size below",
+    "calibration_and_development_data": "train and validation seeds only (78 seeds); the estimator's tolerances were chosen on them and are frozen in the commit that holds this file"
+  },
+  "arms": {
+    "abstain": "no identity channel (sidecar absent): count and geometry only; the primary arm for the count bound",
+    "channel": "the real /identify_product logic (CMB-112 round 2 registry, calibration and whitening, unchanged) on the framed rear-product crop, safe naming policy (name only what OCR or the barcode confirms)",
+    "oracle": "ablation, not a result: a perfect identity channel for whatever face is framed; shows the ceiling visibility alone puts on misplaced detection",
+    "abstain+degrade": "the same as abstain with the seeded depth blinding of stock/benchmark.py degrade_mask (half of the frames lose a band of 30-70 % of the image rows): the refusal protocol",
+    "probes_reported_only": "depth noise 0.5 %, 1 %, 2 % of range with 2 % pixel dropout (synthetic perturbation of the recorded frames, not a sensor model); channel with the embedding-alone naming policy (what the safe policy costs and prevents)"
+  },
+  "bounds": [
+    {
+      "id": "count_within_one",
+      "arms": ["abstain", "channel"],
+      "metric": "within_one_on_sufficient",
+      "direction": "min",
+      "value": 0.90,
+      "required_n": 150,
+      "meaning": "lanes whose measured coverage is at or above the producer's 0.90 floor: the share answered with a count within one product of the truth; a cannot-tell on such a lane is a miss"
+    },
+    {
+      "id": "low_coverage_refused",
+      "arms": ["abstain+degrade"],
+      "metric": "low_coverage_refused",
+      "direction": "min",
+      "value": 0.90,
+      "required_n": 60,
+      "meaning": "lanes whose measured coverage is below 0.90: the share the estimator refuses (cannot-tell)"
+    },
+    {
+      "id": "low_coverage_answered_wrong",
+      "arms": ["abstain+degrade"],
+      "metric": "low_coverage_answered_wrong",
+      "direction": "max",
+      "value": 0.10,
+      "required_n": 10,
+      "meaning": "of the low-coverage lanes the estimator did answer, the share more than one product off"
+    },
+    {
+      "id": "misplaced_false_alarm",
+      "arms": ["abstain", "channel", "oracle"],
+      "metric": "misplaced_false_alarm",
+      "direction": "max",
+      "value": 0.05,
+      "required_n": 100,
+      "meaning": "answered lanes whose products are all the expected SKU: the share flagged misplaced"
+    },
+    {
+      "id": "misplaced_recall_rear_given_a_perfect_channel",
+      "arms": ["oracle"],
+      "metric": "misplaced_recall_rear",
+      "direction": "min",
+      "value": 0.85,
+      "required_n": 30,
+      "meaning": "lanes whose misplaced product is the one nearest the camera (the only one a survey frame can show): the share flagged when the channel names it correctly. This bounds the estimator's logic, not the identity channel"
+    }
+  ],
+  "pass_rule": "a 'min' bound passes only if the LOWER limit of the 95 % Wilson interval is at or above the value, a 'max' bound only if the UPPER limit is at or below it, and only if required_n is met; otherwise fail (point estimate on the wrong side), or inconclusive (point estimate on the right side, interval or sample size not enough). Report whatever comes out; no re-tuning, one run per arm.",
+  "reported_without_bound": [
+    "misplaced recall over all misplaced lanes, and over the rear-misplaced subset, for the abstain and channel arms (bounded above by what the camera can name; a lane the estimator did not flag is not a verified-clean lane)",
+    "conforming-but-misplaced lanes (a lane declared fully conforming that truly holds a misplaced product)",
+    "share of lanes with a named face, mean share of unverified products",
+    "empty-lane read-as-empty rate (the generator draws few empty lanes, so the sample is small)",
+    "cannot-tell reasons",
+    "count error distribution and bias",
+    "everything above per lighting condition, per lane fill bucket, per product class and per arm"
+  ],
+  "frozen_estimator_options": {
+    "minimum_coverage": 0.90,
+    "empty_margin_m": 0.02,
+    "max_pitch_residual": 0.35,
+    "exact_pitch_residual": 0.20,
+    "height_step_tolerance_m": 0.03,
+    "class_height_tolerance_m": 0.03,
+    "min_face_side_px": 48,
+    "naming_policy": "safe",
+    "note": "the values in stock/estimator.py and config/lane_stock.yaml at the commit that holds this file"
+  },
+  "training": "none; AGENT_BRIEF section 3.3 holds. The identity channel is consumed as CMB-112 round 2 left it."
+}

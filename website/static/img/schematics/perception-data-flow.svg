@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" viewBox="0 0 1000 600" role="img" aria-labelledby="title">
+  <title id="title">Perception data flow schematic</title>
+  <rect width="100%" height="100%" fill="#fbfcfd"/>
+  <text x="24.00" y="22.00" fill="#1a1f24" font-size="16" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">Perception data flow</text>
+  <text x="24.00" y="42.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">Solid boxes run on the default launch; dashed boxes start with a launch argument (lane_stock, inventory).</text>
+  <rect x="24.00" y="96.00" width="150.00" height="62.00" rx="6.00" fill="#eef2f4" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="99.00" y="116.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">Wrist camera</text>
+  <text x="99.00" y="134.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">RGB-D</text>
+  <rect x="24.00" y="400.00" width="150.00" height="62.00" rx="6.00" fill="#eef2f4" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="99.00" y="420.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">Overhead camera</text>
+  <text x="99.00" y="438.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">depth</text>
+  <rect x="24.00" y="480.00" width="150.00" height="62.00" rx="6.00" fill="#dfe5ea" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="99.00" y="500.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">Gazebo</text>
+  <text x="99.00" y="518.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">ground_truth_adapter</text>
+  <rect x="215.00" y="66.00" width="215.00" height="50.00" rx="6.00" fill="#c5ddd7" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="322.50" y="86.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">Tray overview duty</text>
+  <text x="322.50" y="104.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">tray_overview_perception</text>
+  <rect x="215.00" y="126.00" width="215.00" height="50.00" rx="6.00" fill="#c5ddd7" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="322.50" y="146.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">Tray confirm duty</text>
+  <text x="322.50" y="164.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">tray_confirm_perception</text>
+  <rect x="215.00" y="186.00" width="215.00" height="50.00" rx="6.00" fill="#c5ddd7" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="322.50" y="206.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">Lane survey</text>
+  <text x="322.50" y="224.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">lane_survey</text>
+  <rect x="215.00" y="256.00" width="215.00" height="50.00" rx="6.00" fill="#f4f6f8" stroke="#2c3640" stroke-width="1.6" opacity="1.0" stroke-dasharray="5 4"/>
+  <text x="322.50" y="276.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">Lane stock estimator</text>
+  <text x="322.50" y="294.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">lane_stock_node</text>
+  <rect x="215.00" y="406.00" width="215.00" height="50.00" rx="6.00" fill="#c5ddd7" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="322.50" y="426.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">Depth obstacles</text>
+  <text x="322.50" y="444.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">depth_obstacle_node</text>
+  <rect x="215.00" y="486.00" width="215.00" height="50.00" rx="6.00" fill="#dfe5ea" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="322.50" y="506.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">Error evaluators</text>
+  <text x="322.50" y="524.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">read ground truth only</text>
+  <rect x="470.00" y="66.00" width="250.00" height="50.00" rx="6.00" fill="#ffffff" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="595.00" y="86.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">/perception/tray_candidates</text>
+  <text x="595.00" y="104.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">hypotheses, never ingested</text>
+  <rect x="470.00" y="126.00" width="250.00" height="50.00" rx="6.00" fill="#ffffff" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="595.00" y="146.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">/perception/object_observations</text>
+  <text x="595.00" y="164.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">admitted evidence</text>
+  <rect x="470.00" y="186.00" width="250.00" height="50.00" rx="6.00" fill="#ffffff" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="595.00" y="206.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">/perception/lane_observations</text>
+  <text x="595.00" y="224.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">free depth, coverage</text>
+  <rect x="470.00" y="256.00" width="250.00" height="50.00" rx="6.00" fill="#ffffff" stroke="#2c3640" stroke-width="1.6" opacity="1.0" stroke-dasharray="5 4"/>
+  <text x="595.00" y="276.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">/perception/lane_stock</text>
+  <text x="595.00" y="294.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">count, composition</text>
+  <rect x="470.00" y="406.00" width="250.00" height="50.00" rx="6.00" fill="#ffffff" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="595.00" y="426.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">/perception/obstacle_observations</text>
+  <text x="595.00" y="444.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">boxes</text>
+  <rect x="470.00" y="486.00" width="250.00" height="50.00" rx="6.00" fill="#ffffff" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="595.00" y="506.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">/perception/ground_truth/*</text>
+  <text x="595.00" y="524.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">evaluation only</text>
+  <rect x="770.00" y="116.00" width="206.00" height="130.00" rx="6.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="1.6" opacity="1.0"/>
+  <text x="873.00" y="136.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">World state</text>
+  <text x="873.00" y="154.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">validates observations,</text>
+  <text x="873.00" y="169.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">owns SKU and lane contents</text>
+  <rect x="770.00" y="320.00" width="206.00" height="62.00" rx="6.00" fill="#f4f6f8" stroke="#2c3640" stroke-width="1.6" opacity="1.0" stroke-dasharray="5 4"/>
+  <text x="873.00" y="340.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">Inventory</text>
+  <text x="873.00" y="358.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">inventory_node</text>
+  <rect x="470.00" y="326.00" width="250.00" height="50.00" rx="6.00" fill="#ffffff" stroke="#2c3640" stroke-width="1.6" opacity="1.0" stroke-dasharray="5 4"/>
+  <text x="595.00" y="346.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">/perception/inventory</text>
+  <text x="595.00" y="364.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">/query_inventory service</text>
+  <rect x="770.00" y="406.00" width="206.00" height="50.00" rx="6.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="1.6" opacity="1.0"/>
+  <text x="873.00" y="426.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">Planning scene</text>
+  <text x="873.00" y="444.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">projector</text>
+  <line x1="174.00" y1="120.00" x2="215.00" y2="91.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="215.00,91.00 210.78,97.80 207.19,92.71" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="174.00" y1="127.00" x2="215.00" y2="151.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="215.00,151.00 207.07,149.97 210.21,144.59" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="174.00" y1="134.00" x2="215.00" y2="211.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="215.00,211.00 208.79,205.96 214.29,203.03" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="174.00" y1="431.00" x2="215.00" y2="431.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="215.00,431.00 207.63,434.12 207.63,427.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="174.00" y1="511.00" x2="215.00" y2="511.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="215.00,511.00 207.63,514.12 207.63,507.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="430.00" y1="91.00" x2="470.00" y2="91.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="470.00,91.00 462.63,94.12 462.63,87.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="430.00" y1="151.00" x2="470.00" y2="151.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="470.00,151.00 462.63,154.12 462.63,147.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="430.00" y1="211.00" x2="470.00" y2="211.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="470.00,211.00 462.63,214.12 462.63,207.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="430.00" y1="431.00" x2="470.00" y2="431.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="470.00,431.00 462.63,434.12 462.63,427.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="430.00" y1="511.00" x2="470.00" y2="511.00" stroke="#2c3640" stroke-width="1.6" stroke-dasharray="2 3"/>
+  <polygon points="470.00,511.00 462.63,514.12 462.63,507.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="430.00" y1="281.00" x2="470.00" y2="281.00" stroke="#2c3640" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <polygon points="470.00,281.00 462.63,284.12 462.63,277.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="322.50" y1="236.00" x2="322.50" y2="256.00" stroke="#2c3640" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <polygon points="322.50,256.00 319.38,248.63 325.62,248.63" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="720.00" y1="151.00" x2="770.00" y2="151.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="770.00,151.00 762.63,154.12 762.63,147.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="720.00" y1="211.00" x2="770.00" y2="211.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="770.00,211.00 762.63,214.12 762.63,207.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="720.00" y1="431.00" x2="770.00" y2="431.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="770.00,431.00 762.63,434.12 762.63,427.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="720.00" y1="281.00" x2="830.00" y2="320.00" stroke="#2c3640" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <polygon points="830.00,320.00 822.01,320.47 824.10,314.60" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="770.00" y1="351.00" x2="720.00" y2="351.00" stroke="#2c3640" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <polygon points="720.00,351.00 727.37,347.88 727.37,354.12" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <text x="24.00" y="585.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">The estimator and the inventory read the lane policy and ledger from the world state. Nothing consumes /perception/lane_stock or the inventory.</text>
+</svg>

@@ -53,6 +53,9 @@ void require_non_empty(const std::string & value, std::string_view field)
   if (value == "large_bottle") {
     return ObjectObservation::PRODUCT_CLASS_LARGE_BOTTLE;
   }
+  if (value == "box") {
+    return ObjectObservation::PRODUCT_CLASS_BOX;
+  }
   throw std::invalid_argument("unknown product_class: " + value);
 }
 
@@ -108,6 +111,15 @@ void require_non_empty(const std::string & value, std::string_view field)
 [[nodiscard]] Eigen::AlignedBox3d cylinder_bounds(
   const ProductEnvelope & product, const Eigen::Isometry3d & lane_from_product)
 {
+  if (product.box_size_m) {
+    // The axis-aligned bound of a rotated box: each lane axis extent is the sum of the box's
+    // half sizes weighted by the absolute rotation entries.
+    const Eigen::Vector3d extents =
+      lane_from_product.linear().cwiseAbs() * (0.5 * *product.box_size_m);
+    return Eigen::AlignedBox3d(
+      lane_from_product.translation() - extents,
+      lane_from_product.translation() + extents);
+  }
   const Eigen::Vector3d axis = lane_from_product.linear().col(2);
   Eigen::Vector3d extents;
   for (Eigen::Index index = 0; index < 3; ++index) {
@@ -179,8 +191,9 @@ LaneEvidenceConfig load_lane_evidence_config(
       throw std::invalid_argument("unknown product geometry_key: " + product.geometry_key);
     }
     const YAML::Node shape = geometry->second["shape"];
-    if (!shape || shape["type"].as<std::string>() != "cylinder") {
-      throw std::invalid_argument("lane evidence supports only cylindrical product geometry");
+    const std::string shape_type = shape ? shape["type"].as<std::string>("") : "";
+    if (shape_type != "cylinder" && shape_type != "box") {
+      throw std::invalid_argument("lane evidence supports only cylinder and box product geometry");
     }
     if (product_class_from_text(geometry->second["product_class"].as<std::string>()) !=
       product.product_class)
@@ -195,11 +208,25 @@ LaneEvidenceConfig load_lane_evidence_config(
                 "scenario product SKU disagrees with catalog geometry " + product.geometry_key);
       }
     }
+    if (shape_type == "box") {
+      const YAML::Node size = shape["size_xyz_m"];
+      if (!size.IsSequence() || size.size() != 3) {
+        throw std::invalid_argument("shape.size_xyz_m must hold three values");
+      }
+      const Eigen::Vector3d box_size(
+        positive_finite(size[0], "shape.size_xyz_m[0]"),
+        positive_finite(size[1], "shape.size_xyz_m[1]"),
+        positive_finite(size[2], "shape.size_xyz_m[2]"));
+      config.products.push_back(
+        ProductEnvelope{
+          product.model_name, product.source_object_id, 0.0, box_size.z(), box_size});
+      continue;
+    }
     config.products.push_back(
       ProductEnvelope{
         product.model_name, product.source_object_id,
         positive_finite(shape["radius_m"], "shape.radius_m"),
-        positive_finite(shape["height_m"], "shape.height_m")});
+        positive_finite(shape["height_m"], "shape.height_m"), std::nullopt});
   }
 
   const YAML::Node workcell = YAML::LoadFile(workcell_geometry_path.string());

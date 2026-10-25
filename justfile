@@ -186,15 +186,18 @@ launch-rviz *args: build
 # `nix develop path:. -c ...` while iterating. Sources, launch files and configs are read from
 # disk at runtime and are unaffected.
 # Optional campaign cycle limit: `just demo 3` runs at most three survey/restock cycles; zero (the
-# default) keeps looping until Ctrl-C. Each cycle drains all currently compatible transfers.
+# default) keeps looping until Ctrl-C. Each cycle submits at most one transfer goal.
 # Watch the robot autonomously sweep the shelf and tray, restock until idle, then repeat.
-# The default is the shipped sensor-driven path (no evidence pins: wrist lane survey + wrist tray
-# confirm own the world state's ingest topics, ground truth demoted to /perception/ground_truth/*,
-# overhead camera obstacles-only) on the sensor acceptance fixture. `just demo gt:=true` is the
-# labelled ground-truth opt-in: dense fixture, ground truth pinned back onto the ingest topics.
-# Rebuilds first: demo only sources ros_ws/install.
-demo max_cycles="0" gt="false": build
-  nix develop "{{repo_root}}#baseline" --command {{repo_root}}/scripts/demo.bash "{{max_cycles}}" "{{gt}}"
+# Three scenes, one option each (see scripts/demo.bash; its DEFAULT_MODE line picks the bare one):
+#   just demo                 the showcase: labelled cans and bottles, a stocked shelf and a packed
+#                             back room, on the ground-truth evidence path (the sensor-driven path
+#                             cannot name several SKUs of one class yet)
+#   just demo gt:=true        the dense plain-coloured fixture, also ground-truth
+#   just demo sensor:=true    the shipped sensor-driven path (no evidence pins; wrist lane survey
+#                             and tray confirm own the evidence) on the sensor acceptance fixture
+# Arguments combine: `just demo 3 sensor:=true`. Rebuilds first: demo only sources ros_ws/install.
+demo *args: build
+  nix develop "{{repo_root}}#baseline" --command {{repo_root}}/scripts/demo.bash {{args}}
 
 # Launch the Gazebo and ros2_control simulation.
 launch-sim *args: build

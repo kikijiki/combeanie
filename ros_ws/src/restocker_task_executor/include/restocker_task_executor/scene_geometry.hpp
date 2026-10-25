@@ -74,6 +74,8 @@ enum class CatalogProductClass : std::uint8_t
   Can = 1,
   SmallBottle = 2,
   LargeBottle = 3,
+  // A carton or pouch (CMB-119): a BOX primitive. Planning-scene only: no grasp, no placement.
+  Box = 4,
 };
 
 struct ProductCollisionGeometry

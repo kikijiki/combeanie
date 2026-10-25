@@ -17,6 +17,12 @@ uint8 MOTION_GATE_VALID=2
 
 string simulator_epoch
 uint64 sequence
+# How a verified grasp is held in the simulator that produced this state: "weld" (the
+# DetachableJoint that welds the product to the gripper) or "physical" (finger contact and
+# friction hold it; no joint is created). Always set, so a log, a launch test and a campaign can
+# tell which physics a result came from; a number measured under "weld" is not evidence for
+# "physical".
+string hold_mode
 string operation_id
 uint64 reservation_id
 uint64 object_id

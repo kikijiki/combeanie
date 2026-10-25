@@ -42,7 +42,7 @@ void add_healthy_controllers(ListControllers::Response & response)
     .set__claimed_interfaces({"rail_joint/velocity"}),
     ControllerState{}.set__name("gripper_controller")
     .set__type("joint_trajectory_controller/JointTrajectoryController").set__state("active")
-    .set__claimed_interfaces({"left_finger_joint/position", "right_finger_joint/position"}),
+    .set__claimed_interfaces({"left_finger_joint/effort", "right_finger_joint/effort"}),
   };
 }
 

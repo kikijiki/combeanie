@@ -12,10 +12,11 @@ namespace restocker_gazebo
 AttachmentMailbox::AttachmentMailbox(
   std::string simulator_epoch, std::size_t journal_capacity,
   std::optional<AttachmentIdentity> recovered_attachment,
-  std::size_t detach_attempt_reserve)
+  std::size_t detach_attempt_reserve,
+  std::string hold_mode)
 : journal_(
     std::move(simulator_epoch), journal_capacity, std::move(recovered_attachment),
-    detach_attempt_reserve)
+    detach_attempt_reserve, std::move(hold_mode))
 {
 }
 

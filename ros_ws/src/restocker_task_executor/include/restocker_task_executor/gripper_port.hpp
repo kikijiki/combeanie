@@ -36,6 +36,11 @@ struct GripperGoal
   // Defaults to the attachment band; a looser value would report a good grasp the plugin refuses
   // to attach.
   double position_tolerance_m{kAttachmentJointToleranceM};
+  // A finger stopped by the product rests short of a target that was commanded past its surface
+  // (the physical hold's interference), so it never reaches the tight band above. When positive,
+  // fingers at rest anywhere from position_tolerance_m below the target to this far above it are
+  // also accepted (spec M10 11 D8). The attach predicate still checks the contact itself.
+  double stall_band_m{0.0};
   // Time budget handed to the controller for the single trajectory point.
   std::chrono::milliseconds move_duration{std::chrono::milliseconds(800)};
   // Upper bound on the whole submission, including position verification, before kTimedOut.
@@ -57,6 +62,13 @@ struct GripperFingerState
 [[nodiscard]] bool fingers_at_target(
   const GripperFingerState & measured, double target_position_m,
   double position_tolerance_m) noexcept;
+
+// True when both fingers rest in [target - tolerance, target + stall_band] and neither moved more
+// than rest_m since the previous sample, i.e. they are stopped there rather than passing through.
+[[nodiscard]] bool fingers_stalled_in_band(
+  const GripperFingerState & measured, const GripperFingerState & previous,
+  double target_position_m, double position_tolerance_m, double stall_band_m,
+  double rest_m) noexcept;
 
 enum class GripperOutcome : std::uint8_t
 {

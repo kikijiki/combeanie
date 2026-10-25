@@ -406,40 +406,44 @@ def build_workcell_scene(geometry: dict) -> trimesh.Scene:
     return scene
 
 
-def load_product_shapes(path: Path) -> dict[str, tuple[float, float]]:
-    """Return catalog cylinder dimensions keyed by scenario geometry_key."""
+def load_product_shapes(path: Path) -> dict[str, tuple[float, ...]]:
+    """Return catalog dimensions keyed by scenario geometry_key.
+
+    A cylinder is ``(radius, height)``; a box is ``(x, y, z)`` extents.
+    """
     data = yaml.safe_load(path.read_text())
-    shapes: dict[str, tuple[float, float]] = {}
+    shapes: dict[str, tuple[float, ...]] = {}
     for entry in data["geometries"]:
         shape = entry["shape"]
-        if shape["type"] != "cylinder":
+        if shape["type"] == "cylinder":
+            shapes[entry["geometry_key"]] = (float(shape["radius_m"]), float(shape["height_m"]))
+        elif shape["type"] == "box":
+            shapes[entry["geometry_key"]] = tuple(float(v) for v in shape["size_xyz_m"])
+        else:
             raise RuntimeError(
-                f"website product rendering only supports cylinders, got {shape['type']!r} "
-                f"for {entry['geometry_key']}"
+                f"website product rendering supports cylinders and boxes, got "
+                f"{shape['type']!r} for {entry['geometry_key']}"
             )
-        shapes[entry["geometry_key"]] = (
-            float(shape["radius_m"]),
-            float(shape["height_m"]),
-        )
     return shapes
 
 
 def add_scenario_products(
     scene: trimesh.Scene,
     scenario: dict,
-    shapes: dict[str, tuple[float, float]],
+    shapes: dict[str, tuple[float, ...]],
 ) -> None:
     """Add products in shelf-local coordinates to a workcell scene."""
     workcell_pose = tuple(float(value) for value in scenario["workcell_pose"])
     world_from_workcell = _T(workcell_pose[:3], workcell_pose[3:])
     workcell_from_world = np.linalg.inv(world_from_workcell)
     for product in scenario["products"]:
-        radius, height = shapes[product["geometry_key"]]
+        dims = shapes[product["geometry_key"]]
         spawn_pose = tuple(float(value) for value in product["spawn_pose"])
-        mesh = _paint_rgba(
-            trimesh.creation.cylinder(radius=radius, height=height, sections=32),
-            product["rgba"],
-        )
+        if len(dims) == 3:
+            body = trimesh.creation.box(extents=dims)
+        else:
+            body = trimesh.creation.cylinder(radius=dims[0], height=dims[1], sections=32)
+        mesh = _paint_rgba(body, product["rgba"])
         _add(
             scene,
             f"product_{product['model_name']}",

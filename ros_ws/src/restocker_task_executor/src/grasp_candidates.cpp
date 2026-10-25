@@ -36,6 +36,7 @@ template<typename T>
   return std::isfinite(candidate.approach_yaw_rad) &&
          std::isfinite(candidate.open_joint_position_m) &&
          std::isfinite(candidate.hold_joint_position_m) &&
+         std::isfinite(candidate.planning_hold_joint_position_m) &&
          finite_rigid_transform(candidate.poses.world_from_pregrasp_center) &&
          finite_rigid_transform(candidate.poses.world_from_grasp_center) &&
          finite_rigid_transform(candidate.poses.world_from_retract_center) &&
@@ -59,7 +60,10 @@ template<typename T>
     case ProductClass::SmallBottle:
     case ProductClass::LargeBottle:
       return true;
+    case ProductClass::Box:
     case ProductClass::Unknown:
+      // A box is a rectangular body: neither the side grasp nor the lane placement is derived
+      // for one yet (CMB-119 stage 1), so it is refused rather than treated as a cylinder.
       return false;
   }
   return false;
@@ -115,6 +119,7 @@ template<typename T>
          left.maximum_top_above_center_m == right.maximum_top_above_center_m &&
          left.pregrasp_distance_m == right.pregrasp_distance_m &&
          left.retract_distance_m == right.retract_distance_m &&
+         left.retract_lift_m == right.retract_lift_m &&
          left.open_clearance_per_side_m == right.open_clearance_per_side_m &&
          left.hold_clearance_per_side_m == right.hold_clearance_per_side_m &&
          left.maximum_open_joint_position_m == right.maximum_open_joint_position_m &&
@@ -133,6 +138,7 @@ template<typename T>
          left.approach_yaw_rad == right.approach_yaw_rad &&
          left.open_joint_position_m == right.open_joint_position_m &&
          left.hold_joint_position_m == right.hold_joint_position_m &&
+         left.planning_hold_joint_position_m == right.planning_hold_joint_position_m &&
          left.poses.world_from_pregrasp_center.matrix().isApprox(
     right.poses.world_from_pregrasp_center.matrix(), kTolerance) &&
          left.poses.world_from_grasp_center.matrix().isApprox(
@@ -175,6 +181,7 @@ template<typename T>
          left.approach_yaw_rad == right.approach_yaw_rad &&
          left.open_joint_position_m == right.open_joint_position_m &&
          left.hold_joint_position_m == right.hold_joint_position_m &&
+         left.planning_hold_joint_position_m == right.planning_hold_joint_position_m &&
          same_transform_exact(
     left.poses.world_from_pregrasp_center, right.poses.world_from_pregrasp_center) &&
          same_transform_exact(
@@ -253,9 +260,14 @@ GraspCandidateResult<std::vector<GraspCandidate>> generate_upright_cylinder_gras
     config.maximum_top_above_center_m <= 0.0 ||
     !std::isfinite(config.pregrasp_distance_m) || config.pregrasp_distance_m <= 0.0 ||
     !std::isfinite(config.retract_distance_m) || config.retract_distance_m <= 0.0 ||
+    !finite_nonnegative(config.retract_lift_m) ||
     !finite_nonnegative(config.open_clearance_per_side_m) ||
     !finite_nonnegative(config.hold_clearance_per_side_m) ||
     config.open_clearance_per_side_m <= config.hold_clearance_per_side_m ||
+    !finite_nonnegative(config.hold_interference_per_side_m) ||
+    (config.physical_hold && config.hold_interference_per_side_m <= 0.0) ||
+    (config.physical_hold &&
+    config.hold_interference_per_side_m >= config.open_clearance_per_side_m) ||
     !std::isfinite(config.maximum_open_joint_position_m) ||
     config.maximum_open_joint_position_m < gripper.joint_lower_m ||
     config.maximum_open_joint_position_m > gripper.joint_upper_m ||
@@ -318,11 +330,20 @@ GraspCandidateResult<std::vector<GraspCandidate>> generate_upright_cylinder_gras
 
   const double diameter = 2.0 * selection.product_envelope.radius_m;
   const double open_gap = diameter + 2.0 * config.open_clearance_per_side_m;
-  const double hold_gap = diameter + 2.0 * config.hold_clearance_per_side_m;
+  const double hold_gap =
+    config.physical_hold ?
+    diameter - 2.0 * config.hold_interference_per_side_m :
+    diameter + 2.0 * config.hold_clearance_per_side_m;
   const double open_joint = 0.5 * (open_gap - gripper.inner_gap_at_zero_m);
   const double hold_joint = 0.5 * (hold_gap - gripper.inner_gap_at_zero_m);
+  // The planner pads every link, so it cannot represent a jaw pressed into the product: a
+  // continuation check that starts from the physical hold aperture is always in collision. Its
+  // stand-in for the held pose keeps the clearance-based aperture in both hold modes.
+  const double planning_hold_gap = diameter + 2.0 * config.hold_clearance_per_side_m;
+  const double planning_hold_joint = 0.5 * (planning_hold_gap - gripper.inner_gap_at_zero_m);
   if (!std::isfinite(diameter) || !std::isfinite(open_gap) || !std::isfinite(hold_gap) ||
-    !std::isfinite(open_joint) || !std::isfinite(hold_joint))
+    !std::isfinite(open_joint) || !std::isfinite(hold_joint) ||
+    !std::isfinite(planning_hold_joint))
   {
     return failure<std::vector<GraspCandidate>>(
       GraspCandidateErrorCode::InvalidConfiguration,
@@ -330,7 +351,8 @@ GraspCandidateResult<std::vector<GraspCandidate>> generate_upright_cylinder_gras
   }
   if (open_joint < gripper.joint_lower_m || open_joint > gripper.joint_upper_m ||
     open_joint > config.maximum_open_joint_position_m ||
-    hold_joint < gripper.joint_lower_m || hold_joint > gripper.joint_upper_m)
+    hold_joint < gripper.joint_lower_m || hold_joint > gripper.joint_upper_m ||
+    planning_hold_joint < gripper.joint_lower_m || planning_hold_joint > gripper.joint_upper_m)
   {
     return failure<std::vector<GraspCandidate>>(
       GraspCandidateErrorCode::NoValidJawTarget,
@@ -378,8 +400,9 @@ GraspCandidateResult<std::vector<GraspCandidate>> generate_upright_cylinder_gras
     const Eigen::Isometry3d grasp = grasp_pose(center, yaw);
     const Eigen::Isometry3d pregrasp = offset_along_approach(
       grasp, config.pregrasp_distance_m);
-    const Eigen::Isometry3d retract = offset_along_approach(
+    Eigen::Isometry3d retract = offset_along_approach(
       grasp, config.retract_distance_m);
+    retract.translation().z() += config.retract_lift_m;
     const Eigen::Vector3d approach = grasp_approach_axis(grasp);
     const Eigen::Vector3d closing = grasp_closing_axis(grasp);
     GraspScore score;
@@ -400,6 +423,7 @@ GraspCandidateResult<std::vector<GraspCandidate>> generate_upright_cylinder_gras
         pregrasp, grasp, retract, pregrasp * grasp_center_from_tool0,
         grasp * grasp_center_from_tool0, retract * grasp_center_from_tool0},
       score, selection};
+    candidate.planning_hold_joint_position_m = planning_hold_joint;
     if (!finite_candidate(candidate)) {
       return failure<std::vector<GraspCandidate>>(
         GraspCandidateErrorCode::InvalidConfiguration,

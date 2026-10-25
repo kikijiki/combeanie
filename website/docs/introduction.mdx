@@ -34,7 +34,7 @@ be verified, the task refuses instead of guessing.
 A restock succeeds only when world state shows the product in the intended lane. Collisions, lost reservations, stale
 geometry, and ambiguous perception stop the task.
 
-Out of scope for now: physical store hardware, learned policies that command joints directly,
+Out of scope: physical store hardware, learned policies that command joints directly,
 and a single launch that turns every optional subsystem on without saying so.
 
 ## The scenario
@@ -48,8 +48,10 @@ The default simulated cell is a rear-access refrigerated display:
 | Rail-mounted arm | Travels along a rail behind the shelf so one arm covers every lane |
 | Cameras | Overhead RGB-D mast (obstacle detection only) plus wrist camera (the sensor-driven default's product and lane evidence) |
 
-Products in the catalog are cans and bottles of a few sizes. Lanes are paired by class so the
-task has a choice when one lane is full or blocked. Geometry comes from surveyed YAML, not
+The restocking scenarios use cans and bottles of a few sizes. Lanes are paired by class so the
+task has a choice when one lane is full or blocked. The generated perception catalogue holds 20
+fictional products, including contoured bottles and boxes; see
+[Catalogue and assets](/docs/perception/catalogue-and-assets). Geometry comes from surveyed YAML, not
 invented mesh sizes.
 
 World-frame plan with `rail_base` at the origin and the shelf at the baseline workcell pose

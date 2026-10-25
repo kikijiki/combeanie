@@ -129,6 +129,9 @@ message AttachmentStateValue {
   AttachmentIdentityValue attached_identity = 6;
   AttachmentEvidenceValue evidence = 7;
   AttachmentFidelityValue fidelity = 8;
+  // The configured hold mode: "weld" or "physical". Carried on every reply so a caller, a log
+  // and a test can tell which physics produced the state (spec 11.3 D1). Always present.
+  string hold_mode = 9;
 }
 
 message SetAttachmentRequest {

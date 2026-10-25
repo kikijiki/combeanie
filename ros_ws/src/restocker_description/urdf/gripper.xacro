@@ -2,7 +2,108 @@
 <!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
 <!-- SPDX-License-Identifier: MIT -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <xacro:macro name="restocker_gripper" params="prefix">
+  <!-- One finger's collision: finger.size_xyz_m tiled into finger.pad_rows equal rows along x
+       (spec M10 §11 D9). The union is exactly the finger box, so geometric consumers see the same
+       volume; each row is its own contact, which a single box is not under DART (no torsional
+       friction, §11.2 F13). This is the *planning* form; the simulation description replaces it
+       with compliant row links (§11 D10 item 3). -->
+  <xacro:macro name="restocker_finger_pad_rows" params="geometry row">
+    <xacro:if value="${row &lt; geometry.finger.pad_rows}">
+      <xacro:property name="row_height" value="${geometry.finger.size_xyz_m[0] / geometry.finger.pad_rows}"/>
+      <collision>
+        <origin
+          xyz="${geometry.finger.center_xyz_m[0] - 0.5 * geometry.finger.size_xyz_m[0] + (row + 0.5) * row_height} ${geometry.finger.center_xyz_m[1]} ${geometry.finger.center_xyz_m[2]}"
+          rpy="0 0 0"/>
+        <geometry>
+          <box size="${row_height} ${geometry.finger.size_xyz_m[1]} ${geometry.finger.size_xyz_m[2]}"/>
+        </geometry>
+      </collision>
+      <xacro:restocker_finger_pad_rows geometry="${geometry}" row="${row + 1}"/>
+    </xacro:if>
+  </xacro:macro>
+
+  <!-- Simulation description only (spec M10 §11 D10 item 3): the pad is 3.3 mm of 60 Shore A
+       silicone on the finger's inner face, so the finger body keeps the box minus that layer and
+       each pad row becomes its own link on a prismatic spring-damper joint along the pad normal.
+       At rest the body and the four rows occupy exactly the old finger box. inner_sign is -1 for
+       the left finger (its inner face is local -y) and +1 for the right one. -->
+  <xacro:macro name="restocker_finger_body_collision" params="geometry inner_sign">
+    <!-- The body stops behind the full depth of the pad-row spheres (one row height), not just the
+         3.3 mm layer: a product pressed 2-3 mm into the soft contact would otherwise reach the
+         rigid flat body, and the grip would be carried by a degenerate face contact instead of
+         the rows (measured at 80 N: most of the pad load went through the body). -->
+    <xacro:property name="row_depth" value="${geometry.finger.size_xyz_m[0] / geometry.finger.pad_rows}"/>
+    <xacro:property name="body_thickness" value="${geometry.finger.size_xyz_m[1] - row_depth}"/>
+    <collision>
+      <origin
+        xyz="${geometry.finger.center_xyz_m[0]} ${-inner_sign * 0.5 * row_depth} ${geometry.finger.center_xyz_m[2]}"
+        rpy="0 0 0"/>
+      <geometry>
+        <box size="${geometry.finger.size_xyz_m[0]} ${body_thickness} ${geometry.finger.size_xyz_m[2]}"/>
+      </geometry>
+    </collision>
+  </xacro:macro>
+
+  <xacro:macro name="restocker_compliant_pad_row" params="geometry prefix side row">
+    <xacro:if value="${row &lt; geometry.finger.pad_rows}">
+      <xacro:property name="row_height" value="${geometry.finger.size_xyz_m[0] / geometry.finger.pad_rows}"/>
+      <xacro:property name="pad_thickness" value="${geometry.finger.pad.thickness_m}"/>
+      <!-- The left finger's inner face is its local -y, the right finger's its local +y. -->
+      <xacro:property name="inner_sign" value="${-1 if side == 'left' else 1}"/>
+      <xacro:property name="row_x" value="${geometry.finger.center_xyz_m[0] - 0.5 * geometry.finger.size_xyz_m[0] + (row + 0.5) * row_height}"/>
+      <xacro:property name="row_y" value="${inner_sign * (0.5 * geometry.finger.size_xyz_m[1] - 0.5 * pad_thickness)}"/>
+      <xacro:property name="pad_link" value="${prefix}${side}_finger_pad_row_${row}"/>
+      <link name="${pad_link}">
+        <!-- A flat row, one row height deep: against the upright product cylinder it is a line
+             contact along the product axis whose normal is the pad normal. It is as deep as the
+             inset finger body behind it is thick (see restocker_finger_body_collision), so a 3 mm
+             press never reaches the box's back edges. Spheres were tried and rejected: the Bullet
+             sphere-to-cylinder-side test reports no contact until the overlap is ~2 mm, then
+             throws the product out, and a single rib pushes an off-centre product further off. -->
+        <collision name="${pad_link}_collision">
+          <origin
+            xyz="${row_x} ${inner_sign * (0.5 * geometry.finger.size_xyz_m[1] - 0.5 * row_height)} ${geometry.finger.center_xyz_m[2]}"
+            rpy="0 0 0"/>
+          <geometry>
+            <box size="${row_height} ${row_height} ${geometry.finger.size_xyz_m[2]}"/>
+          </geometry>
+        </collision>
+        <xacro:box_inertial
+          mass="${geometry.finger.pad.row_mass_kg}"
+          x="${row_height}"
+          y="${pad_thickness}"
+          z="${geometry.finger.size_xyz_m[2]}"
+          xyz="${row_x} ${row_y} ${geometry.finger.center_xyz_m[2]}" rpy="0 0 0"/>
+      </link>
+      <!-- The joint frame sits on the finger frame at rest, so spring_reference 0 is the
+           uncompressed pad and a positive displacement is compression (the axis points away from
+           the product). Every limit is physical (spec M10 section 11 D10 item 3): travel is
+           symmetric and generous so rest sits strictly inside it (the Card 057 M1 trap) and the
+           spring alone bounds it — the 3.3 mm layer cannot compress past its own thickness and the
+           bond keeps extension smaller still; effort is 500 N, the spring's own 222 N plus the
+           damping at the fastest the pad moves (1.71 m/s under a 40 N step), with 2x margin so
+           F14's clip can never engage; velocity is UNBOUNDED (-1), because a bonded pad has no
+           speed limit of its own — the jaw's 0.12 m/s copied here would be 14x too small for that
+           same step and DART enforces velocity limits as solver constraints that engage during
+           contact (sdformat maps a negative value to infinity; 0 would freeze the joint). The pad
+           row's mass is the silicone; the finger body keeps its own. -->
+      <joint name="${pad_link}_joint" type="prismatic">
+        <parent link="${prefix}${side}_finger"/>
+        <child link="${pad_link}"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <axis xyz="0 ${-inner_sign} 0"/>
+        <limit lower="-0.002" upper="0.002" effort="${geometry.finger.pad.effort_n}" velocity="-1"/>
+        <dynamics damping="${geometry.finger.pad.row_damping_n_s_per_m}"/>
+      </joint>
+      <gazebo reference="${pad_link}_joint">
+        <springReference>0</springReference>
+        <springStiffness>${geometry.finger.pad.row_stiffness_n_per_m}</springStiffness>
+      </gazebo>
+      <xacro:restocker_compliant_pad_row geometry="${geometry}" prefix="${prefix}" side="${side}" row="${row + 1}"/>
+    </xacro:if>
+  </xacro:macro>
+
+  <xacro:macro name="restocker_gripper" params="prefix compliant_pads:=false">
     <xacro:property name="geometry" value="${restocker_gripper_geometry}"/>
     <xacro:property name="body_size" value="${' '.join(str(value) for value in geometry.body.size_xyz_m)}"/>
     <xacro:property name="body_center" value="${' '.join(str(value) for value in geometry.body.center_xyz_m)}"/>
@@ -64,10 +165,14 @@
         <geometry><box size="${finger_size}"/></geometry>
         <material name="restocker_orange"/>
       </visual>
-      <collision>
-        <origin xyz="${finger_center}" rpy="0 0 0"/>
-        <geometry><box size="${finger_size}"/></geometry>
-      </collision>
+      <xacro:unless value="${compliant_pads}">
+        <xacro:restocker_finger_pad_rows geometry="${geometry}" row="0"/>
+      </xacro:unless>
+      <xacro:if value="${compliant_pads}">
+        <xacro:restocker_finger_body_collision geometry="${geometry}" inner_sign="-1"/>
+      </xacro:if>
+      <!-- The finger body keeps its own mass and box inertia (§11 D10's "unchanged" row); the pad
+           rows are the additional silicone, 4.9 g each. -->
       <xacro:box_inertial
         mass="${geometry.finger.mass_kg}"
         x="${geometry.finger.size_xyz_m[0]}"
@@ -90,10 +195,12 @@
         <geometry><box size="${finger_size}"/></geometry>
         <material name="restocker_orange"/>
       </visual>
-      <collision>
-        <origin xyz="${finger_center}" rpy="0 0 0"/>
-        <geometry><box size="${finger_size}"/></geometry>
-      </collision>
+      <xacro:unless value="${compliant_pads}">
+        <xacro:restocker_finger_pad_rows geometry="${geometry}" row="0"/>
+      </xacro:unless>
+      <xacro:if value="${compliant_pads}">
+        <xacro:restocker_finger_body_collision geometry="${geometry}" inner_sign="1"/>
+      </xacro:if>
       <xacro:box_inertial
         mass="${geometry.finger.mass_kg}"
         x="${geometry.finger.size_xyz_m[0]}"
@@ -101,5 +208,10 @@
         z="${geometry.finger.size_xyz_m[2]}"
         xyz="${finger_center}" rpy="0 0 0"/>
     </link>
+
+    <xacro:if value="${compliant_pads}">
+      <xacro:restocker_compliant_pad_row geometry="${geometry}" prefix="${prefix}" side="left" row="0"/>
+      <xacro:restocker_compliant_pad_row geometry="${geometry}" prefix="${prefix}" side="right" row="0"/>
+    </xacro:if>
   </xacro:macro>
 </robot>

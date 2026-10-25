@@ -16,7 +16,7 @@ const ENTRIES: Entry[] = [
   },
   {
     term: 'ColourDepthBackend',
-    def: 'Classical RGB-D perception backend: chromaticity segmentation plus cylinder depth fit. Not a neural net. Default camera producer when perception:=true.',
+    def: 'Classical RGB-D perception backend: chromaticity segmentation plus cylinder depth fit. Not a neural net. Runs on the wrist camera for the tray duties and, with perception:=true, on the overhead camera.',
     see: '/docs/architecture/perception-and-models',
   },
   {
@@ -45,14 +45,34 @@ const ENTRIES: Entry[] = [
     see: '/docs/architecture/ports',
   },
   {
+    term: 'GTIN',
+    def: 'Global Trade Item Number (EAN-13 here, check digit verified). Optional in the product registry: a product without one is keyed by an internal product id.',
+    see: '/docs/perception/registry-and-identity',
+  },
+  {
     term: 'gz_ros2_control',
     def: 'Gazebo system plugin that presents simulated joints as a ros2_control hardware interface so the same controllers work in simulation.',
     see: '/docs/architecture/simulation',
   },
   {
+    term: 'Identity ladder',
+    def: 'Escalation of /identify_object: barcode, then label text matched against registered text with a margin, then guidance for a re-look or turn, then needs-human. The embedding is a shortlist only and nothing is guessed.',
+    see: '/docs/perception/registry-and-identity',
+  },
+  {
+    term: 'Inventory (perception)',
+    def: 'Per-SKU totals split into confirmed, assumed and reported products, with staleness and discrepancy against the world state. Published on /perception/inventory and queried through /query_inventory.',
+    see: '/docs/perception/stock-and-inventory',
+  },
+  {
     term: 'Lane contents',
     def: 'Semantic membership of products in a shelf lane. Added by reservation-authorized placement commits; accepted lane surveys can reconcile FIFO sales and remove entries. Raw observations cannot directly commit inventory.',
     see: '/docs/architecture/world-state',
+  },
+  {
+    term: 'Lane stock',
+    def: 'Per-lane estimate of how many products a lane holds, its composition against the lane policy and an explicit cannot-tell, from the wrist survey depth frame.',
+    see: '/docs/perception/stock-and-inventory',
   },
   {
     term: 'MotionPort',
@@ -78,6 +98,11 @@ const ENTRIES: Entry[] = [
     term: 'Planning-scene projector',
     def: 'Node that copies enough geometry from world state and depth obstacle evidence (enabled by default) into MoveIt under leases, then gates motion on APPLIED status + revision.',
     see: '/docs/architecture/motion-planning',
+  },
+  {
+    term: 'Product registry',
+    def: 'Directory of registered products: product id, optional GTIN, eight reference views, label text and derived embedding and OCR caches. Registered from images or from the simulator catalogue.',
+    see: '/docs/perception/registry-and-identity',
   },
   {
     term: 'Reasoner',

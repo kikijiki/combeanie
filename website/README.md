@@ -39,6 +39,7 @@ Models load only after an explicit button press; static schematics remain availa
 
 ## Demo video
 
-`static/media/restocking-demo.mp4` remains labelled historical ground-truth footage. To re-record,
-follow [`scripts/record-demo.md`](scripts/record-demo.md) in a separately authorized, serialized
+`static/media/restocking-showcase.mp4` (with its poster and loop) is the recording of the showcase scene (`just demo`), made on the
+ground-truth path. It appears on the home page and in the Demo page. To re-record, follow
+[`scripts/record-demo.md`](scripts/record-demo.md) in a separately authorized, serialized
 simulator session. A docs build never runs the robot or overwrites media.

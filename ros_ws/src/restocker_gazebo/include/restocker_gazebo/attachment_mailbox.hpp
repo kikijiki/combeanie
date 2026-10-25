@@ -23,7 +23,8 @@ public:
   explicit AttachmentMailbox(
     std::string simulator_epoch, std::size_t journal_capacity,
     std::optional<AttachmentIdentity> recovered_attachment = std::nullopt,
-    std::size_t detach_attempt_reserve = 2);
+    std::size_t detach_attempt_reserve = 2,
+    std::string hold_mode = kDefaultHoldMode);
 
   [[nodiscard]] msgs::AttachmentReply handle_set(const msgs::SetAttachmentRequest & message);
   [[nodiscard]] msgs::AttachmentReply handle_query(

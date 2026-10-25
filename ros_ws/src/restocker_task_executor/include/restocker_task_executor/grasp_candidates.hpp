@@ -107,6 +107,17 @@ struct GraspGenerationConfig
   double rear_access_weight{1.0};
   double wrist_clearance_weight{1.0};
   double maximum_upright_tilt_rad{0.05};
+  // Jaw-hold policy from gripper_geometry.yaml (spec 11.3 D3), appended so existing positional
+  // aggregate initializers keep their meaning. physical_hold commands an aperture
+  // hold_interference_per_side_m narrower than the product so the fingers stop against it; weld
+  // commands one hold clearance wider so they stop short of it.
+  bool physical_hold{false};
+  double hold_interference_per_side_m{0.0};
+  // Vertical rise added to the retract pose. A held product rests on its support until the hand
+  // moves; a pure horizontal pull drags its base along the support below the grip line, and the
+  // friction there is a torque about the jaw axis that the pads cannot resist. Rising from the
+  // first millimetre of the retract unloads the base. Zero keeps the old straight pull.
+  double retract_lift_m{0.0};
 };
 
 // Inputs owned by the coordinator rather than by a candidate-producing backend. A returned batch
@@ -145,6 +156,10 @@ struct GraspCandidate
   GraspPoseSequence poses;
   GraspScore score;
   SelectedTaskPair selection;
+  // The jaw position planning-time continuation checks use for the held pose. Equals the weld
+  // hold aperture in both hold modes: the padded planning model cannot start from a jaw pressed
+  // into the product (physical hold_joint_position_m), so only the command uses that.
+  double planning_hold_joint_position_m{0.0};
 };
 
 struct GraspCandidateBatch

@@ -49,6 +49,7 @@ using DetectionMessage = restocker_interfaces::msg::ObjectDetection;
   if (name == "can") {return DetectionMessage::PRODUCT_CLASS_CAN;}
   if (name == "small_bottle") {return DetectionMessage::PRODUCT_CLASS_SMALL_BOTTLE;}
   if (name == "large_bottle") {return DetectionMessage::PRODUCT_CLASS_LARGE_BOTTLE;}
+  if (name == "box") {return DetectionMessage::PRODUCT_CLASS_BOX;}
   throw std::invalid_argument("'" + name + "' is not a known product class");
 }
 

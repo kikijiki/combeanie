@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
+<!-- The minimal pad-spring bisect (Card 057): one 4.9 g link on a prismatic joint with exactly
+     the pad row's axis, limits, spring_stiffness, damping, friction and force limit, starting on
+     the joint frame with its spring reference 1 mm away, and nothing else in the world - no
+     finger, no block, no contacts.
+
+     Two runs of the same file separate the two force paths:
+       * RESTOCKER_PAD_SPRING_OFF=1 -> the system reads and prints but writes nothing, so only
+         DART's own joint spring (copied from the SDF by gz-physics) can pull the link back;
+       * without it -> the system commands -k(x - x0) - c*v as the equal-and-opposite wrench
+         pair, which is what production relies on.
+
+     Both are run as `gz sim -s -r --iterations 200` (0.2 s of sim time; the ring settles in a
+     few ms), so the trace's first twenty steps show the whole settle. The joint name matches the
+     system's pad-row pattern so it is picked up without configuration. -->
+<sdf version="1.9">
+  <world name="pad_minimal">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="restocker_pad_spring_system" name="restocker_gazebo::PadSpringSystem"/>
+
+    <physics name="pad_minimal_physics" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <dart>
+        <collision_detector>bullet</collision_detector>
+      </dart>
+    </physics>
+
+    <gravity>0 0 -9.80665</gravity>
+
+    <model name="spring_probe">
+      <!-- Static base: welded to the world the same way the bench fixture welds its chassis. -->
+      <link name="base">
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>0.001</ixx><iyy>0.001</iyy><izz>0.001</izz>
+          </inertia>
+        </inertial>
+      </link>
+      <joint name="base_world_joint" type="fixed">
+        <parent>world</parent>
+        <child>base</child>
+      </joint>
+
+      <!-- The pad row: mass and box inertia exactly as in gripper_geometry.yaml. The link starts
+           ON the joint frame (so DART's q is 0, as in production) and the spring reference sits
+           1 mm away, which is how the engine is asked for a known force without a runtime
+           displacement: both springs must pull the link 1 mm along the axis and stop there. -->
+      <link name="test_pad_row_0">
+        <pose relative_to="base">0 0 0 0 0 0</pose>
+        <inertial>
+          <mass>0.0049</mass>
+          <inertia>
+            <ixx>8.008e-06</ixx><iyy>8.035e-06</iyy><izz>3.571e-08</izz>
+          </inertia>
+        </inertial>
+      </link>
+      <joint name="test_pad_row_0_joint" type="prismatic">
+        <pose relative_to="base">0 0 0 0 0 0</pose>
+        <parent>base</parent>
+        <child>test_pad_row_0</child>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit><lower>-0.002</lower><upper>0.002</upper><effort>500</effort><velocity>-1</velocity></limit>
+          <dynamics><damping>11.5</damping><friction>0</friction><spring_reference>0.001</spring_reference><spring_stiffness>111000</spring_stiffness></dynamics>
+        </axis>
+      </joint>
+    </model>
+  </world>
+</sdf>

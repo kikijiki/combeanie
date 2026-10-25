@@ -1,0 +1,87 @@
+---
+id: benchmarks
+title: Benchmarks
+sidebar_position: 6
+---
+
+# Benchmarks
+
+Perception is measured with `restocker_benchmarks`: seeded scenes, labelled frames, frozen splits,
+a scorer and acceptance bounds. The simulator supplies pixels, camera poses and intrinsics. Every
+label comes from the scenario document Gazebo is told to spawn, and the recorder refuses to write a
+frame unless ground truth reports every product within 3 cm of its scenario pose.
+
+## Protocol
+
+1. **Seeded scenes.** A seed selects the products, their poses, one of six lighting conditions
+   (`nominal`, `dim`, `bright`, `warm`, `cool`, `directional`, each with a seeded intensity scale) and
+   the camera views. The generator is SplitMix64 over arbitrary-precision integers, so a seed replays
+   the same scene on any machine.
+2. **Content-hashed datasets.** A dataset directory is named `pbench-<first 16 hex of dataset_hash>`
+   and holds a manifest, one label row per frame, the scenario documents and the frames (RGB and 16-bit
+   depth). `labels_hash` covers renderer-independent label content; `dataset_hash` also covers pixels
+   and camera poses. `benchmark_perception verify` re-checks every hash.
+3. **An append-only split chain.** `config/perception_splits*.json` assigns products and seeds to
+   train, validation and held-out. Each version embeds its predecessor and extends it only with new
+   seeds or products; earlier assignments never change, and `--verify` re-derives the whole chain.
+   Version 1 holds the first seeds. Later versions add seeds, add the four box products (with their own
+   catalogue hash), and add held-out seeds. Held-out seeds that a measurement has read are marked
+   `burned`: they are off-limits to calibration and may only be reported as a secondary number. At most
+   one member of each look-alike pair is held out, so every held-out product has a registered twin it
+   could be confused with. Train and validation seeds contain only registered products.
+4. **Bounds before data.** A bounds file states each bound, its sample-size requirement and the pass
+   rule, and is committed before any held-out scene is read. A frozen estimator or proposer
+   configuration is hashed and verified unchanged after the run.
+5. **One run.** A held-out result is produced once. `evaluate` refuses to overwrite an earlier
+   result, and the run description is checked against the split file
+   (`benchmark_perception check`): any overlap of registry products, training seeds or calibration
+   seeds with the held-out split fails with exit code 2.
+6. **Wilson intervals.** Proportions carry 95 % Wilson intervals; means carry bootstrap intervals;
+   proposal recall intervals resample whole scenes. A `min` bound passes only if the lower limit is at
+   or above it, a `max` bound only if the upper limit is at or below it, and only with the required
+   sample size. An interval that straddles a bound, or a sample below the requirement, is
+   **inconclusive**, not a pass.
+
+## What is scored
+
+| Benchmark | Frames | Scores |
+| --- | --- | --- |
+| Proposals | Wrist frames at the tray survey stations, two lane stations and one close view | Strict one-to-one recall at mask IoU 0.5, by stratum; foreign proposals; latency |
+| Lane stock | A wrist frame at each of the six lane survey stations | Count within one, refusal, wrong answers, empty lanes, misplaced recall, false alarms |
+| Identity ladder | Tray objects over a first look and up to three re-looks | False identity, unregistered look-alikes named, coverage, re-looks, latency, facing error |
+| Inventory | Recorded lane stock predictions replayed as inventories | Totals, completeness, staleness, discrepancy |
+
+- **Ground-truth masks** for proposals come from ray-casting the scene document through the recorded
+  camera, keeping a pixel where the recorded depth agrees with the model (-20 mm to +30 mm). The median
+  depth residual to the analytic model is 0.7 mm. A product is recallable with at least 250 visible
+  pixels, 30 % of its silhouette visible and 60 % of it inside the image.
+- **Noise.** The simulator's depth camera is ideal. The noise arms apply seeded Gaussian range noise of
+  0.5 %, 1 % or 2 % of range plus 2 % pixel dropout to the recorded depth. It has no flying pixels, no
+  range-dependent bias and no temporal correlation, and says nothing about a real camera.
+- **Arms.** Lane stock and inventory are run with `abstain` (no identity channel), `channel` (the real
+  `/identify_product` logic with the safe naming policy), `oracle` (an ablation: a perfect channel for
+  whatever face is framed) and `degrade` (half the frames lose a seeded band of 30 to 70 % of the depth
+  image rows).
+- **Rotation oracle.** The identity ladder asks for turns that no manipulation skill performs, so the
+  recorder re-records each scene with the objects turned by the suggested cumulative angle and views
+  drawn for look *k*.
+
+## Recording and scoring
+
+```bash
+tools/record_perception_dataset.py --out DIR --split held_out
+tools/record_perception_dataset.py --lane-views --close-views 0 --frames 1 --seed N --out DIR
+tools/record_proposal_dataset.py --out DIR --seed N
+ros2 run restocker_benchmarks benchmark_perception verify DIR/pbench-<hash>
+ros2 run restocker_benchmarks benchmark_perception stock-score --labels DIR... --predictions P --json out
+ros2 run restocker_benchmarks benchmark_perception stock-evaluate --bounds B --report ARM=score.json ...
+ladder_benchmark report --registry R --state S.pkl --budget 3 --out report.json --bounds B.json
+```
+
+Recording uses one simulator at a time under the machine-wide slot and a leased ROS domain.
+
+## Related benchmarks
+
+The `just benchmark` harness (restock transfers, failure taxonomy) is described on
+[Tests and benchmarks](/docs/run/tests-and-benchmarks). It measures the manipulation loop, not
+perception.

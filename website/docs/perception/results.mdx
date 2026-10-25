@@ -1,0 +1,328 @@
+---
+id: results
+title: Results
+sidebar_position: 7
+---
+
+# Results
+
+Each section is one measurement of the perception code as it stands: what was measured, on what
+data, against which bounds (committed before the held-out data was read), the outcome, and what the
+measurement does not cover. Failed and inconclusive bounds are stated in the same terms as passes.
+Method is on [Benchmarks](./benchmarks). Each section names the project measurement record it comes
+from.
+
+Every number is from Gazebo renders with ideal depth (plus a stated synthetic noise model where
+noted), fictional labels and the generated catalogue. None is a measurement of a real camera or
+real packaging.
+
+| Measurement | Held-out data | Bounds | Passed | Failed | Inconclusive |
+| --- | --- | --- | --- | --- | --- |
+| [Proposals, cylinders](#proposals) | 48 scenes | 9 | 9 | 0 | 0 |
+| [Proposals, boxes](#proposals-boxes) | 36 scenes | 9 | 8 | 0 | 1 |
+| [Lane stock](#lane-stock) | 450 lanes per arm | 19 | 19 | 0 | 0 |
+| [Lane stock, boxes under noise](#lane-stock-boxes) | 336 lanes per arm | 21 | 17 | 0 | 4 |
+| [`/identify_product` channel](#identify-product) | 234 known, 78 unregistered objects | 3 | 1 | 2 | 0 |
+| [Identity ladder](#identity-ladder) | 965 objects | 9 | 9 | 0 | 0 |
+| [Inventory](#inventory) | 450 lanes | 33 rows | 33 | 0 | 0 |
+
+## Proposals
+
+*Record: `2026-10-19-proposal-benchmark`.* Question: is depth geometry alone enough to propose every
+product in tray and lane scenes, including cluttered trays, lying products, contoured bottles and
+partly hidden products?
+
+- **Data:** 48 held-out scenes (8 per tray kind: sparse, dense, tight rows, lying, contour, tall
+  products in front of short ones), 287 wrist frames, 771 recallable products, 1467 proposals.
+  Bounds in `proposal_acceptance_bounds.json`, proposer configuration frozen in
+  `proposal_config_frozen.json` (disc and blob shapes), one run.
+- **Outcome:** every bound passed.
+
+| Bound | Result | Scene-clustered 95 % interval | Verdict |
+| --- | --- | --- | --- |
+| Overall strict recall at least 0.90 (lower limit at least 0.85) | 0.939 | [0.915, 0.962] | pass |
+| Lying products, same bound (lower limit at least 0.80) | 0.961 | [0.91, 1.00] | pass |
+| Contoured bottle | 0.966 | [0.93, 1.00] | pass |
+| Touching (gap under 3 mm) | 0.934 | [0.90, 0.96] | pass |
+| Partial occlusion (0.6 to 0.9 visible) | 0.915 | [0.87, 0.95] | pass |
+| Lane | 0.953 | [0.91, 0.99] | pass |
+| Cluttered trays (dense, rows, tall in front) | 0.908 | [0.871, 0.940] | pass, 0.008 above its bound |
+| Foreign proposals at most 0.05 | 0.0075 (11 of 1467) | [0.004, 0.013] | pass |
+| Latency p95 at most 500 ms | 163 ms (p50 90 ms) | | pass |
+
+Reported without a bound: loose recall 0.948, merged proposals 4.0 %, strict precision 0.49 (about
+1.9 proposals per recallable product: hidden products and cut plateaus fragment into extra proposals
+that overlap a real product), mean matched IoU 0.85. The weakest strata, all passing, are tray kind
+`rows` at 0.862 and dim light at 0.910.
+
+**Identity at the proposal.** Through the `/identify_product` channel (one crop per proposal, embedding
+and label text), held-out proposals with at least 1500 pixels gave:
+
+| Proposal covers | n | Named | Named correctly | Named wrongly |
+| --- | --- | --- | --- | --- |
+| A registered product | 691 | 299 | 171 | 128 |
+| An unregistered product | 343 | 215 | 0 | 215 (62.7 %) |
+| Neither (a fragment) | 16 | 12 | 0 | 12 |
+
+A consumer must not act on `IDENTIFIED` from one proposal crop. The state guarantees that no SKU is
+forced beyond the channel's own answer (0 unknown-product states carried a SKU in this data).
+
+**Not covered:** the production colour-and-depth backend (its colour stage cannot find label-textured
+products); real depth noise, shiny or transparent packaging; foreign shapes such as bags; masks other
+than the analytic ones. Lane products at the home pose are visible only at the image edge.
+
+### Proposals, boxes \{#proposals-boxes\}
+
+*Record: `2026-10-20-box-perception`.* The proposer in `proposal_config_cmb120.json` adds the
+rectangle shape. Bounds in `box_proposal_acceptance_bounds.json`; data: 36 held-out box scenes
+(seeds 2101 to 2136), 216 frames, one run, real Gazebo recordings. **Decision: inconclusive** (8
+checks pass, none fails, one check lacked the required sample).
+
+| Check | Bound | Result | Verdict |
+| --- | --- | --- | --- |
+| Boxes, strict recall | at least 0.85 | 0.940 (497 / 529) | pass |
+| Lying boxes | at least 0.70 | 0.805 (stratum 120 / 144 = 0.833) | pass |
+| Upright boxes | at least 0.90 | 0.980 | pass |
+| Matched boxes named a cylinder | at most 0.08 | 0.028 | pass |
+| Cylinders | at least 0.90 | 1.000 (can 66/66, small bottle 49/49, large bottle 35/35) | pass |
+| Lying cylinders | at least 0.85 | 1.000 | **inconclusive**: fewer than the required 30 lying cylinders |
+| Cylinders matched as a rectangle | at most 0.03 | 0.007 | pass |
+| Foreign proposals | at most 0.05 | 0.003 | pass |
+| Latency p95 | at most 500 ms | 281 ms | pass |
+
+Overall strict recall is 0.953 [0.94, 0.97] (647 / 679). The weak spots are lying products (0.833),
+touching products (0.921) and heavy occlusion (0.915). **Not covered:** the box scene builder uses the
+circumscribed circle of each box's footprint as its footprint, so box neighbours are never in true
+contact and the "touching" stratum for boxes is in that circle metric.
+
+## Lane stock
+
+*Record: `2026-10-19-lane-stock-estimator-round2`, with the identity arms of
+`2026-10-19-lane-stock-estimator`.* Question: from the frame the wrist survey takes of a lane, can the
+system say how many products are in it, say it cannot when it cannot see, and flag a wrong or mixed
+lane, with the identity channel treated as possibly abstaining?
+
+- **Data:** 450 held-out lanes per arm (75 fresh seeds, six lighting conditions), one wrist frame per
+  lane survey station, all views reached. Bounds in `lane_stock_acceptance_bounds_r2.json`, estimator
+  files hashed before the run, each arm run once.
+- **Outcome:** all 19 bounds pass.
+
+| Bound | Arm | Result |
+| --- | --- | --- |
+| Count within one on sufficient-coverage lanes at least 0.90 | abstain | 450 / 450 (exact on all) |
+| Clean lanes flagged misplaced at most 5 % | abstain, oracle | 0 / 338, 0 / 338 |
+| Visible wrong product flagged given a perfect channel at least 85 % | oracle | 56 / 56 |
+| Low-coverage lanes refused at least 90 % | degrade | 209 / 209 |
+| Answered-wrong at most 3 % | degrade | 0 / 238 |
+| Clean lanes flagged at most 5 % | degrade | 0 / 181 |
+| Answered at least 90 % | noise 0.5 %, 1 % | 449 / 450, 448 / 450 |
+| Answered at least 85 % | noise 2 % | 413 / 450 (91.8 %) |
+| Answered-wrong at most 3 % | noise 0.5 %, 1 %, 2 % | 0 / 449, 0 / 448, 0 / 413 |
+| Empty lanes read empty at least 90 % | noise 0.5 %, 1 %, 2 % | 82 / 82, 82 / 82, 80 / 82 |
+| Clean lanes flagged at most 5 % | noise 0.5 %, 1 %, 2 % | 0 / 337, 0 / 337, 0 / 314 |
+
+At 2 % noise 8 % of lanes are cannot-tells (all `REASON_INCONSISTENT_GEOMETRY`) and the estimator
+makes no class claim.
+
+**Misplaced detection is limited by what the camera sees and by the identity channel, not by the
+estimator.** With the `/identify_product` channel under the safe naming policy, none of 382 lane rear
+products was named: at lane range (1.0 to 1.4 m) every answer was embedding-alone, label text and the
+barcode never confirmed one, and the embedding alone was wrong two times in three; it named a
+registered SKU on all 81 lanes whose rear product was unregistered. Misplaced recall for the system as built is **0 / 132**
+wrong-SKU lanes. A perfect channel would reach 53 / 132 (40.2 %), because a survey frame shows only the
+rearmost product, and 53 / 53 when the wrong product is the visible one. A lane the estimator did not
+flag is not a verified-clean lane.
+
+**Not covered:** a real camera's noise structure (range-dependent bias, flying pixels, multipath on the
+translucent dividers); mixed-class columns, which only ray-cast unit tests cover; frames beyond a
+single camera pose per lane; the numpy depth port against the C++ node on the same recorded frames.
+
+### Lane stock, boxes under noise \{#lane-stock-boxes\}
+
+*Record: `2026-10-20-box-lane-noise-round2`.* Data: 56 held-out seeds (309 to 364), 336 lane frames,
+137 box lanes and 56 empty lanes, five arms, one run. Bounds in `lane_stock_acceptance_bounds_noise120.json`.
+**17 bounds pass, none fails, 4 are inconclusive** because the population fell short of the declared
+sample sizes (137 box lanes against 150 required, 297 answered lanes against 300).
+
+| Bound | Result | Verdict |
+| --- | --- | --- |
+| Box lanes exact on sufficient coverage at least 0.80 (n at least 150) | 134 / 137 = 0.978 [0.938, 0.993] | inconclusive: n 137 |
+| Box answered-wrong at most 0.05 (n at least 150) | 0 / 134 [0, 0.028] | inconclusive: n 134 |
+| All lanes within one at least 0.90 | 333 / 336 = 0.991 | pass |
+| All answered-wrong at most 0.03 | 0 / 333 [0, 0.011] | pass |
+| Empty lanes read empty at least 0.75 | 56 / 56 | pass |
+| Clean lanes flagged at most 0.10 | 0 / 255 | pass |
+| Degrade: low coverage refused at least 0.90 | 161 / 161 | pass |
+| Degrade: answered-wrong at most 0.05 (box 0.10) | 0 / 169 (box 0 / 73) | pass |
+| Answered at least 0.85: noise 0.5 %, 1 % | 333 / 336, 324 / 336 | pass |
+| Answered at least 0.80: noise 2 % | 297 / 336 = 0.884 | pass |
+| Answered-wrong at most 0.03: noise 0.5 %, 1 % | 0 / 333, 0 / 324 | pass |
+| Answered-wrong at most 0.03: noise 2 % | 0 / 297 [0, 0.013] | inconclusive: n 297 |
+| Box answered-wrong at most 0.05: noise 0.5 %, 1 % | 0 / 134, 0 / 126 | pass |
+| Box answered-wrong at most 0.05: noise 2 % (n at least 120) | 0 / 102 [0, 0.036] | inconclusive: n 102 |
+| Box exact among answered at least 0.80: noise 0.5 %, 1 % | 133 / 134, 125 / 126 | pass |
+| Empty lanes read empty: noise 0.5 %, 1 % | 56 / 56, 56 / 56 | pass |
+
+No inconclusive row has a failing point estimate (all had 0 wrong answers). Box lanes exact on
+sufficient coverage: 133 / 137 at 0.5 % noise, 125 / 137 (0.912) at 1 % and 94 / 137 (0.686) at 2 %,
+the rest refused or one product off. All refusals are inconsistent geometry.
+
+**Not covered:** a box turned a quarter turn in its lane is not a candidate and is not detected; a lane
+packed that way would be mis-counted or refused, and the simulator never produces one. The lane's own
+product wins among height matches, so a different box of nearly the same height (slim box against 1 L
+carton at 1 % noise or more) is counted with the lane's product's pitch unless the residual refuses it.
+The noise is the synthetic Gaussian model on an ideal render.
+
+## `/identify_product` channel \{#identify-product\}
+
+*Record: `2026-10-19-identity-channel-round2`.* The channel fuses a SigLIP 2 base embedding, label text
+and barcode with calibrated abstention. Data: held-out fresh seeds, one decision per object with up to
+five views, 234 known and 78 unregistered objects. Bounds in `identity_acceptance_bounds_r2.json`.
+
+| Bound | Result | Verdict |
+| --- | --- | --- |
+| False identity on known products at most 1 % | 3 / 234 = 1.28 % [0.44, 3.70] | **fail** (point estimate above the bound) |
+| Unregistered products named as a SKU at most 5 % | 34 / 78 = 43.6 % [33.1, 54.6] | **fail** |
+| p95 latency at most 2000 ms | 1977 ms (p50 1301 ms) | pass, with load average 15 to 16 on the host |
+
+Both sample-size requirements were met, so the bounds are refuted, not merely undemonstrated.
+Of the 34 unregistered products named, 33 were embedding-alone names of an unregistered twin of a
+registered single product. Per channel on known products: the embedding answers always (214 / 234
+correct), label text answered 18 / 234 (all correct), the barcode 53 / 234 (all correct). Dropping
+embedding-alone naming from the held-out decisions would have named 61 / 234 correctly, with none wrong
+and 1 / 78 unregistered products named; that is a post-hoc figure, not a result. It is the reason the
+lane stock estimator accepts only names that label text or the barcode confirm, and the reason the
+identity ladder uses the embedding as a shortlist only.
+
+**Not covered:** the barcode reads only at 0.22 m with the aimed orbit and a code that spans 137 degrees
+of the circumference, which real labels do not.
+
+## Identity ladder
+
+*Record: `2026-10-21-identity-text-reading-r4`.* The ladder, with its optional second text reader, is
+described on [Registry and identity](./registry-and-identity). Data: 240 fresh held-out seeds, 965 tray
+objects (892 of registered products, 73 unregistered look-alike twins), a registry of 18 products, up to
+three re-looks through the rotation oracle. Bounds in `identity_ladder_acceptance_bounds_r4.json`, committed
+before the first held-out scene was recorded; the headline arm is barcode off, with the aimed barcode
+close-ups left out as well, because a product without a barcode never gets them. One run.
+
+| Bound | Barcode off (headline) |
+| --- | --- |
+| False identity on named at most 1 % (n at least 400) | 0 / 672, upper limit 0.57 %: pass |
+| Unregistered named at most 10 % (n at least 40) | 1 / 73, upper limit 7.4 %: pass |
+| Coverage of known objects at least 0.60 | **75.3 % (672 / 892), lower limit 72.4 %: pass** |
+| Mean re-looks of named objects at most 1.2 | 1.01: pass |
+| p95 re-looks at most 3 | 3: pass |
+| Latency p95 per look at most 4000 ms (second reader excluded) | 3025 ms: pass |
+| Latency p95 per escalated read at most 40 s | 23.6 s: pass |
+| Wrong after a re-look / after a second-reader read, at most 2 each | 0 / 0: pass |
+
+**The headline arm passes every bound.** Coverage of known objects by number of re-looks: 29.6 % at look 0,
+then 52.2 %, 68.3 % and 75.3 %. The second reader named 389 of the 672 named objects on its own (548 after a
+second-reader read). No twin was confused with its registered pair, and the one unregistered object that was
+named (`sim:stock_small_bottle_01`, text rung, second look) is the look-alike case the bounds warn about.
+By class: box 400 / 495, can 118 / 155, large bottle 74 / 123, small bottle 80 / 119; lying products
+115 / 119, upright 557 / 773.
+
+Two comparison arms were measured on the same objects and are reported as they came out:
+
+| Arm | Coverage | Unknown named | Latency p95 per look |
+| --- | --- | --- | --- |
+| Barcode off, aimed views kept | 72.0 %, lower limit 68.9 % (bound 0.65): pass | 4.1 %, upper limit 11.4 %: inconclusive | 4889 ms: **fail** |
+| Barcode on | 74.6 %, lower limit 71.6 % (bound 0.70): pass | 8.2 %, upper limit 16.8 %: inconclusive | 4916 ms: **fail** |
+
+The barcode-on arm named one object wrongly (1 / 665, upper limit 0.85 %, under the bound). With only 73
+unregistered objects, the unregistered-named bound cannot be decided for these two arms.
+
+Guidance against the simulator's truth (1522 estimates): round bodies median error 26.8 degrees, 52.5 %
+within 30 degrees and 64.7 % within 45; boxes median 63.8 degrees, 22.5 % within 30 and 36.2 % within 45.
+
+**Two machines.** The 240 scenes were processed on two CPU-only machines, a shared workstation and a laptop.
+The headline arm passes both latency bounds on each separately (laptop 3.44 s per look and 8.7 s per
+second-reader read, workstation 1.60 s and 24.5 s), so the pooled verdict is not an artefact of mixing. The
+two comparison arms fail the per-look bound on the laptop alone (6.65 s there, 2.8 s on the workstation). The
+second reader runs about three times slower on the workstation, which was loaded; the cause was not isolated.
+Look 0 of three seeds recorded on both machines gave the same identification for every object visible on both,
+but a different set of visible objects, about as different as two recordings on one machine. Three seeds
+cannot rule out an effect of the hardware.
+
+**Not covered:** the unregistered products are twins of registered products and mostly bottles, so the
+unregistered-named rate for boxes is not bounded. On a replay with the true product removed, text alone
+named an unregistered twin for 6 of 91 objects, mostly boxes of one look-alike pair. Re-looks use the
+rotation oracle, since no manipulation skill turns a product. The scenes were recorded in simulation with
+generated labels. The run was interrupted by lost scratch data, pauses on the shared machine and a move to
+the laptop; the record lists each interruption, and one correction to the benchmark's bookkeeping (an
+open barcode-on arm with no guidance now asks for no turn). It does not change any decision of the
+headline arm.
+
+### Box identity, development diagnostic
+
+*Record: `2026-10-21-box-products-diagnostic`.* No bound was declared and none is claimed. On train
+seeds, with every box registered, the `/identify_product` channel named 16 of 16 box objects correctly
+(34 of 34 single views), with no barcode decoded in any of the 31 groups. The registry's box views come
+from the atlas the simulator shows, so this says the renderer and the simulator agree. The behaviour on
+an unregistered box was not measured.
+
+## Inventory
+
+*Record: `2026-10-20-inventory`.* Question: does the inventory layer over lane stock report per-SKU
+totals, staleness and discrepancy against the world state correctly, and does it refuse to claim what
+the evidence does not support?
+
+- **Data:** the 450 lane survey frames of the lane stock held-out seeds, replayed through the frozen
+  predictions, with the world state as the labelled truth, optionally perturbed by a declared seeded
+  schedule (ledger counts off by one or two, a third of lanes; rearmost SKU swapped, a quarter of
+  lanes). Bounds in `inventory_acceptance_bounds.json`. One run. **All 33 bound rows pass.**
+- These seeds were scored for the estimator before; the inventory code, bounds and perturbation schedule
+  were set on 115 development seeds (690 lanes).
+
+| Bound | Arm | Result |
+| --- | --- | --- |
+| Complete SKU total within one product at least 0.95 | abstain / oracle | 0.978 / 0.996 (459 pairs each) |
+| | noise 0.5 %, 1 %, 2 % | 0.978, 0.978, 0.984 |
+| | degrade | 0.980 (297) |
+| SKU with a refused policy lane reported complete at most 3 % | degrade | 0 / 162 |
+| Confirmed SKU contradicted by the labels at most 2 % | oracle | 0 / 368 lanes |
+| Lane older than the horizon flagged stale at least 95 % | abstain, oracle, degrade | 145 / 145 |
+| Lane inside the horizon flagged stale at most 2 % | same | 0 / 305 |
+| Totals with a stale lane equal totals without it at least 90 % | same | 68 / 68 scenes |
+| Perturbed ledger count flagged at least 90 % | abstain, oracle, noise 0.5 %, 1 % | 149 / 149 |
+| | noise 2 % / degrade | 129 / 133 (0.970) / 71 / 71 |
+| Truthful ledger flagged at most 3 % | abstain, oracle | 0 / 301 |
+| | noise 0.5 %, 1 %, 2 % / degrade | 0 / 300, 0 / 299, 0 / 280 / 0 / 167 |
+| Refused lane reported not comparable at least 97 % | degrade | 212 / 212 |
+| Swapped ledger SKU flagged given the rear was named at least 90 % | oracle | 89 / 89 |
+| Truthful ledger SKU contradicted at most 3 % | abstain, oracle | 0 / 361 |
+
+Reported without a bound: the SKU total is exactly right in 0.604 of the cases without identity and
+0.787 with a perfect channel, and the range `total_min` to `total_max` contains the labelled total in the
+same fractions. A wrong product hidden behind the rear one is invisible to a survey frame and unnamed
+products are assumed to be the lane policy's SKU, so per-SKU totals are wrong by one in about 40 % of
+(seed, SKU) pairs. A swapped ledger SKU is detected only when the rear product is named: for 0 of 89 lanes
+without an identity channel and 89 of 89 with a perfect one.
+
+**Not covered:** tray perception (the benchmark's wrist frames at home show nothing and the overhead
+frames are black, so the tray is the world state's); the staleness results test the age logic, with ages
+from a seeded schedule against a declared 600 s horizon, not a measured cadence; real ledger errors (a
+sale the world state missed, a product moved by a person); the node against the live simulator.
+
+## Not measured \{#not-measured\}
+
+- **Real sensors.** No real camera, no real depth noise (flying pixels, range-dependent bias,
+  multipath), no real lighting, no shiny or transparent packaging.
+- **Real labels.** All labels are generated, with large upright text and ideal print. Real packaging,
+  curved reflective print and barcodes that do not span 137 degrees are untested.
+- **The live stack.** The lane stock and inventory nodes were exercised in one-process graphs with fake
+  upstream nodes and replayed predictions, not against a running simulator with
+  `lane_stock:=true inventory:=true`.
+- **The tray.** Inventory totals use a world-sourced tray; tray perception with identity state is
+  covered by unit and node tests only.
+- **Manipulation of what perception sees.** No skill rotates a product, so the ladder's guidance has
+  no executor. No box is grasped, placed or inserted into a lane.
+- **Quarter-turned boxes and columns.** A box turned in its lane is not detected.
+- **Foreign shapes.** Bags and other non-catalogue shapes, and unregistered pairs of look-alikes, are
+  not in any scene.
+- **Mixed-class columns** in the benchmark: the staircase logic is covered by ray-cast unit tests.
+- **The overhead camera.** Its benchmark frames are almost entirely black; it is not scored.
+- **Closer aimed lane views.** Lane products are further from the rail than the camera can come to
+  reading range; lane-range identity is as measured above.

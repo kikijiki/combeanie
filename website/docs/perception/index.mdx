@@ -1,0 +1,70 @@
+---
+id: index
+title: Perception overview
+sidebar_position: 1
+---
+
+# Perception overview
+
+Perception turns camera and depth images into **observations with uncertainty**. World state
+validates them; nothing in perception commands motion or commits inventory. This section
+describes what the perception code does, how it is measured, and where it stops.
+
+| Page | Covers |
+| --- | --- |
+| [Registry and identity](/docs/perception/registry-and-identity) | The product registry, the identity ladder, the identify services |
+| [Proposals](/docs/perception/proposals) | Where products stand: the depth-based proposer |
+| [Stock and inventory](/docs/perception/stock-and-inventory) | Lane stock estimates and the inventory built from them |
+| [Catalogue and assets](/docs/perception/catalogue-and-assets) | The generated product catalogue, label textures, what is simulator-only |
+| [Benchmarks](/docs/perception/benchmarks) | Seeded scenes, split chain, pre-declared bounds |
+| [Results](/docs/perception/results) | Each measurement, its bounds and its outcome, and what is not measured |
+
+## Data flow
+
+![Perception data flow: cameras, producers, topics and consumers](/img/schematics/perception-data-flow.svg)
+
+Three groups of nodes run on the default launch: the wrist tray duties, the wrist lane survey
+and the overhead depth-obstacle node. The lane stock estimator and the inventory start with
+`lane_stock:=true` and `inventory:=true`. The identity services are separate executables.
+
+| Producer | Output | Consumer |
+| --- | --- | --- |
+| Tray overview duty | `/perception/tray_candidates`: hypotheses with no world identity | `survey_tray` action only; world state never ingests them |
+| Tray confirm duty | `/perception/object_observations`: close-range, admissible confirmations | World state |
+| Lane survey | `/perception/lane_observations`: free depth, coverage, obstruction | World state |
+| Depth obstacle node | `/perception/obstacle_observations`: axis-aligned boxes | Planning-scene projector |
+| Lane stock estimator | `/perception/lane_stock`: count, composition, cannot-tell | Inventory node |
+| Inventory node | `/perception/inventory`, service `/query_inventory` | Operators (`inventory_tool`) |
+
+Simulator ground truth publishes on `/perception/ground_truth/*`, which only the error evaluators
+read. The details of the tray survey, the classical colour-and-depth backend and the obstacle
+boxes are on [Perception and models](/docs/architecture/perception-and-models).
+
+## Two ways a product gets a name
+
+- **The stocking manifest, on the default path.** The wrist confirm duty measures where a
+  product is. Its name comes from the inventory the cell is stocked from (`load_object_manifest`):
+  a category stocked once names any well-formed detection of that category; a category stocked
+  more than once is named by position, accepted only if exactly one stocked instance lies within
+  0.035 m of the detection and every other instance is at least 0.020 m farther away. Anything
+  else is dropped. This path knows which products the scenario spawned and reads no label.
+- **The identity channel, as services.** `/identify_product` and `/identify_object` name a
+  product from its crops by comparing it with a registry of products (barcode, label text,
+  embedding shortlist). No launch file starts them and nothing in world state calls them. The lane
+  stock estimator calls `/identify_product` when the service is reachable.
+
+## Known boundaries
+
+- Boxes are observed (ground truth, lane evidence, world state, planning scene as a `BOX`
+  primitive) but not manipulated: the executor refuses to grasp or place one, no attachable
+  product exists for a box, and lane placement profiles skip the class.
+- The contoured bottle (`contour_bottle`) is perception-only. The executor's scene geometry
+  and the world-state lane configuration skip it.
+- Nothing consumes `/perception/lane_stock`, `/perception/inventory` or `/query_inventory`.
+  `/identify_object` has no client in the repository; `/identify_product` has one, the lane
+  stock estimator.
+- No manipulation skill rotates a product. The identity ladder asks for a turn; in simulation the
+  recorder turns the product in place (a rotation oracle).
+- The proposer runs offline in Python. No node publishes proposals.
+- Every measurement is on Gazebo renders with ideal depth, fictional labels and synthetic noise.
+  See [Results](/docs/perception/results#not-measured).

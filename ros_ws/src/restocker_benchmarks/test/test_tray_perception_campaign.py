@@ -44,6 +44,8 @@ def test_geometry_keys_match_the_shipped_collision_catalogue():
     """Every budget geometry restates the catalogue's SKU, class, radius and height."""
     catalog = _yaml_env("RESTOCKER_TEST_PRODUCT_CATALOG")
     shipped = {entry["geometry_key"]: entry for entry in catalog["geometries"]}
+    # Generated SKUs (Card 110) carry their own per-SKU keys and are covered by test_label_factory.
+    shipped = {key: entry for key, entry in shipped.items() if not entry["sku"].startswith("GEN-")}
     assert set(campaign.GEOMETRY) == set(shipped)
     for geometry_key, entry in campaign.GEOMETRY.items():
         assert shipped[geometry_key]["sku"] == entry["sku"]

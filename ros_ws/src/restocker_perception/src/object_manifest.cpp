@@ -26,6 +26,7 @@ using ObservationMessage = restocker_interfaces::msg::ObjectObservation;
   if (value == "can") {return ObservationMessage::PRODUCT_CLASS_CAN;}
   if (value == "small_bottle") {return ObservationMessage::PRODUCT_CLASS_SMALL_BOTTLE;}
   if (value == "large_bottle") {return ObservationMessage::PRODUCT_CLASS_LARGE_BOTTLE;}
+  if (value == "box") {return ObservationMessage::PRODUCT_CLASS_BOX;}
   throw std::invalid_argument("unknown product_class in the object manifest: " + value);
 }
 

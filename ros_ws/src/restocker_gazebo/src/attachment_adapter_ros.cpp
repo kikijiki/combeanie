@@ -251,6 +251,9 @@ restocker_interfaces::msg::SimulationAttachmentState to_ros_message(
   result.simulator_epoch = source.simulator_epoch;
   result.sequence = source.sequence;
   result.operation_id = operation_id;
+  // Carried straight through: a caller reading the latched state topic must be able to tell
+  // which hold physics produced it (spec 11.3 D1).
+  result.hold_mode = source.hold_mode;
   result.phase = ros_phase(source.phase);
   result.motion_gate = ros_gate(source.motion_gate);
   result.joint_observed = source.evidence && source.evidence->joint_observed;

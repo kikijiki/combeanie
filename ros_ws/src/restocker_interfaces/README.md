@@ -48,6 +48,23 @@ membership.
 granted reservation must complete under the policy it was granted rather than the lane's live
 one.
 
+`Inventory`, `InventoryLane` and `InventorySku` are the aggregate view of stock and `QueryInventory` its
+service (CMB-115). They are derived: `LaneStock` and the world state stay the sources. A SKU's figures keep
+`confirmed_count` (named by the identity channel), `expected_count_*` (counted in a lane whose policy lists
+the SKU) and `reported_count` (world state only) apart, and `complete` is false whenever a lane that could
+hold the SKU was refused, never read or older than `stale_after_s`. A `NOT_COMPARABLE` count discrepancy
+means the lane was not compared with the ledger, not that they agree.
+
+`IdentifyProduct` (round 2) and `IdentifyObject` (round 3, the identity ladder) are the identity
+channel's services; both only report, SKU write-once semantics stay in world state. `IdentifyObject`
+takes the crops of one look of one object (with each crop's body width and camera azimuth, which the
+detector and the viewpoint planner know) under an `object_key` the node keeps the looks under, and
+answers `STATUS_IDENTIFIED`, `STATUS_NOT_YET` (with guidance: the facing the camera saw, a suggested
+turn in degrees counter-clockwise seen from above, the side to show), `STATUS_NEEDS_HUMAN` (the look
+budget is spent) or `STATUS_UNKNOWN` (a valid GTIN nobody registered, or no sidecar). It never
+guesses: the embedding is a shortlist, and a product is named only by a barcode or by label text with
+a clear margin over the runner-up.
+
 Simulator protobufs, model-specific tensors, and application behavior do not belong here.
 
 `GetWorldState` returns the complete semantic snapshot shape: tracked objects, shelf lanes, robot

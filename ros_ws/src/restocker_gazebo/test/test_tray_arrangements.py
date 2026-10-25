@@ -29,6 +29,10 @@ def _product_catalog() -> dict:
 def test_the_restated_catalogue_matches_the_shipped_one():
     """Every geometry this module can stand is in the shipped collision catalogue."""
     geometries = {entry["geometry_key"]: entry for entry in _product_catalog()["geometries"]}
+    # Generated SKUs (Card 110) carry their own per-SKU keys and are covered by test_label_factory.
+    geometries = {
+        key: entry for key, entry in geometries.items() if not entry["sku"].startswith("GEN-")
+    }
     assert set(tray.TRAY_CATALOGUE) == set(geometries)
     for geometry_key, entry in tray.TRAY_CATALOGUE.items():
         shipped = geometries[geometry_key]

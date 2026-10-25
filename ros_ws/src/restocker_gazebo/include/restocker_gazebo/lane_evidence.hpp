@@ -8,6 +8,7 @@
 #include <gz/msgs/pose_v.pb.h>
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -24,6 +25,8 @@ struct ProductEnvelope
   std::string source_object_id;
   double radius_m{0.0};
   double height_m{0.0};
+  // Set for a box (x width, y depth, z height in the product frame); radius_m is then unused.
+  std::optional<Eigen::Vector3d> box_size_m;
 };
 
 struct LaneVolume

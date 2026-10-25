@@ -1,0 +1,46 @@
+{
+  "card": "CMB-113",
+  "declared_on": "2026-10-19",
+  "declared_before_any_proposal_benchmark_scene_was_recorded": true,
+  "question": "Is geometry alone (depth, no colour, no model) enough to propose every product in tray and lane scenes, including cluttered trays, lying products, contoured bottles and partly hidden products? If it is, a learned proposer is not needed and CMB-113 stops at the explicit unknown-product state; if it is not, open-vocabulary or segmentation proposers are evaluated offline on the same frames.",
+  "data": {
+    "scenes": "restocker_benchmarks.perception_proposals.build_proposal_scene, version 1: the identity benchmark's seeded lane columns plus one of six tray arrangements per seed (sparse, dense, rows, lying, contour, tall_front), every tray product pinned (static); lighting from lighting_for_seed",
+    "views": "wrist camera at the home pose, the two shipped tray survey stations, two lane survey stations of non-empty lanes, one close view of a tray product",
+    "development_seeds": "1001..1024: the only seeds on which the proposer's tolerances (ProposalConfig) may be examined or changed",
+    "held_out_seeds": "2001..2048: recorded, then not opened until this file is committed, the proposer configuration is frozen (its sha256 is written into the result), and then read exactly once; the result file is never overwritten",
+    "overhead_camera": "excluded: its frames in the benchmark are almost entirely black (the camera is inside the ceiling geometry); no proposal result is claimed for it"
+  },
+  "ground_truth": "analytic masks: the scene document ray-cast through the recorded camera pose as one cylinder per product (collision catalogue radius and height), nearest product per pixel, kept only where the recorded depth lies within -20 mm / +30 mm of the model; the median depth residual on kept pixels is reported",
+  "decision_unit": "one recallable product in one wrist frame (visible pixels >= 250, visible fraction >= 0.30, at least 60 % of its silhouette inside the image)",
+  "match_rule": "a proposal recalls a product when it is matched to it one to one at mask IoU >= 0.5, greedily from the best pair down (strict recall: a proposal that merges two touching products recalls at most one of them); loose recall (a proposal covers >= 50 % of the product's visible mask) is reported but decides nothing",
+  "bounds": {
+    "overall_strict_recall_min": 0.90,
+    "hard_stratum_strict_recall_min": 0.90,
+    "foreign_proposal_rate_max": 0.05,
+    "proposer_latency_p95_ms_max": 500
+  },
+  "hard_strata": [
+    "pose = lying",
+    "shape = contour_bottle",
+    "gap = touching (nearest other product within 3 mm surface to surface)",
+    "occlusion = partial (visible fraction 0.6..0.9)",
+    "surface = lane",
+    "tray_kind in {dense, rows, tall_front} (cluttered trays)"
+  ],
+  "required_sample": {
+    "recallable_products_overall_min": 400,
+    "per_hard_stratum_min": 50,
+    "scenes_per_hard_stratum_min": 8
+  },
+  "pass_rule": "a recall bound passes only if the LOWER limit of the scene-clustered bootstrap 95 % interval of strict recall (scenes resampled, 4000 draws, pinned seed) is at or above 0.80 for a hard stratum or 0.85 overall AND the point estimate is at or above the bound, and the required sample is met; the foreign-proposal bound passes if the point estimate is at or below it (a foreign proposal overlaps no labelled product by 30 % of its pixels); latency passes if p95 is at or below its bound. A stratum whose sample is too small is inconclusive and counts as not sufficient. Geometry is declared SUFFICIENT only if every bound passes; otherwise it is declared INSUFFICIENT and the learned proposers are evaluated.",
+  "if_sufficient": "stop at the unknown-product state; record that no learned proposer is needed, with the strata that came closest to the bound",
+  "if_insufficient": "evaluate public-weight open-vocabulary or segmentation proposers offline on the same held-out frames (no training, no fine-tuning, AGENT_BRIEF section 3.3 holds), report the same recall, precision and latency, with licence terms, and recommend one behind the same Proposal boundary without integrating it into the default path (that is CMB-117)",
+  "reported_without_bound": [
+    "loose recall",
+    "recall per lighting condition, view, shape, range band and tray kind",
+    "proposals by kind (disc, blob) and how many carry a catalogue class",
+    "mean IoU of matched proposals",
+    "merge rate (a proposal overlapping two or more products by 25 % each)"
+  ],
+  "training": "none; AGENT_BRIEF section 3.3 holds"
+}

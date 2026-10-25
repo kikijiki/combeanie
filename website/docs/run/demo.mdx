@@ -1,0 +1,230 @@
+---
+id: demo
+title: Demo
+sidebar_position: 2
+---
+
+import DemoVideo from '@site/src/components/DemoVideo';
+
+# Demo
+
+Fastest path to watch the robot restock:
+
+```bash
+just demo                # the showcase scene, on the ground-truth evidence path
+just demo 3              # at most three campaign cycles
+just demo sensor:=true   # the shipped sensor-driven path, on the three-product fixture
+just demo gt:=true       # the dense plain-coloured fixture, on the ground-truth path
+```
+
+Each variant brings up Gazebo, MoveIt, RViz, and the coordinator, waits until the coordinator
+reports ready, then starts the autonomous mode loop. At start of run the robot sweeps every
+front-lane station with its wrist camera, measures each lane's deficit against the declared
+target, and submits unaddressed `/restock_product` goals. A transfer goes out only after that
+survey's close-range confirmation (or against an already-admitted candidate) while every lane's
+evidence is inside its validity horizon. The loop parks in `IDLE` when every lane reaches its
+target. Every start prints which evidence path it is on.
+
+## Recording
+
+<DemoVideo
+  stem="restocking-showcase"
+  label="Showcase restocking run in the simulated workcell"
+  caption={<><strong>Showcase scene.</strong> Labelled cans and bottles in five SKUs, a stocked shelf and a packed back room. Ground-truth evidence path (<code>just demo</code>).</>}
+/>
+
+## Three scenes, two evidence paths
+
+| Command | Scene | Evidence path |
+| --- | --- | --- |
+| `just demo` | **Showcase.** Generated, labelled cans and bottles in five SKUs: six shelf lanes, some at target and some short, and a back room of packed one-SKU blocks. Eleven transfers fill the shelf. | Ground truth, pinned |
+| `just demo sensor:=true` | **Simple fixture.** Three empty lanes and three tray products, one per class: three transfers, then `PHASE_FRONT_FULL` and an idle loop. The table the sensor-driven acceptance test proves. | Sensor-driven (the shipped configuration) |
+| `just demo gt:=true` | **Dense fixture.** Six partly stocked lanes of plain-coloured cylinders and three dense-but-partial back grids: thirteen transfers. | Ground truth, pinned |
+
+**The default uses the ground-truth path, and says so when it starts.** The sensor-driven path
+identifies a product by its class: the camera identity assigner names a detection only when the
+object manifest stocks exactly one product of that class (or, on the dense tray, by stocking
+position). The showcase stocks several SKUs of every class side by side, so at tray and lane range
+the camera cannot yet say which SKU a can is. Rather than fake an identity, the showcase pins
+ground truth onto the ingest topics (both wrist tray duties off, one producer per topic): the
+producer reports each product's declared SKU. Nothing else is simulated; motion, planning,
+grasping and placement are the same on every path.
+
+The sensor-driven path is the shipped configuration, the same defaults as a plain
+`baseline.launch.py`: the wrist lane survey and the wrist tray-confirm duty own the world state's
+ingest topics, simulator ground truth is published on `/perception/ground_truth/*` where only the
+error evaluators read it, the evidence ages are the shipped 180 s profile, and the overhead camera
+is on for **obstacle detection only** (its object pipeline is off). `just demo sensor:=true` pins
+none of it. The ground-truth paths refresh evidence continuously, so they pin a tighter profile:
+`product_observation_max_age` 2.0 s, `selection_object_max_age_ms` 2000,
+`maximum_observation_age_ms` 2000 and `lane_evidence_validity_ms` 60000.
+
+## The showcase scene
+
+The showcase uses the generated catalogue's straight-cylinder SKUs (`tools/label_factory.py`).
+Each carries a printed label (front panel, nutrition and barcode panel, a lid) and shares one of the
+three base shapes' dimensions exactly, so every lane and tray formula applies unchanged. The
+contoured bottles and the boxes are not in the scene: the grasp and placement stack handles
+straight cylinders only.
+
+- **Shelf.** Lanes 1 and 4 hold two can SKUs, lanes 2 and 5 two small-bottle SKUs, and lanes 3 and
+  6 two facings of one large-bottle SKU. Columns stand against the front retainer with every label
+  facing the shelf front. Lanes 2 and 6 start at their target; lanes 1, 3, 4 and 5 start two or
+  three products short.
+- **Back room.** One two-column block per SKU, five blocks left to right. Rows stand 12 mm apart;
+  columns stand on the gripper's approach-corridor pitch, because the tool sweeps in along the
+  tray's depth axis and a product beside the target has to clear the padded wrist. Every shelf SKU
+  has a block. Each tray product stands at its own random yaw, fixed by its model name and a scene
+  seed, so the labels face every direction as on delivered stock; a cylinder is symmetric about its
+  axis, so the footprints and the pitch are those of an aligned block. Only the four SKUs with a
+  deficit are picked, and each block keeps what its deficit does not use.
+- **World.** `restocking_showcase.sdf` is the restocking world dressed as a cold-room store back: a
+  concrete-slab floor texture with a safety line, panelled walls, a spot key light (its shadow map
+  covers the cell instead of the whole room) and a shadowless fill. It carries the same physics and
+  plugins as `restocking.sdf`; only the showcase selects it.
+- **Materials.** The launch is given `bundle_scenario:=true` and `scene_materials:=…/showcase_materials.yaml`:
+  the workcell and every product are written into the world file, so the window opens on the
+  complete scene, and the workcell's visuals are restyled there (clear acrylic dividers, steel
+  retainer and rollers, a teal tray). The workcell description keeps its flat colours for every
+  test and benchmark; the robot keeps the description's materials.
+- **Camera.** The Gazebo window opens on the `wide` view. The named views (`wide`, `shelf`,
+  `shelf_closeup`, `tray`, `tray_closeup`, `action`, `side`) are listed in
+  `website/scripts/showcase_views.py`, which also frames the recording and the screenshots.
+
+The scenario and its lane policy are generated: `tools/generate_showcase_scenario.py` writes
+`showcase_products.yaml` and `showcase_lanes.yaml`, and `--check` reports a stale pair.
+
+## What you see
+
+RViz opens with a predefined three-pane layout instead of the plain MoveIt window:
+
+- **Centre — planning view.** The same MoveIt `MotionPlanning` display as
+  [`just launch-baseline`](./scenarios): robot model, planning scene, fixed frame `world`.
+- **Right, top — Overhead Camera.** The fixed shelf-facing RGB-D camera's colour stream on
+  `/overhead_camera/image` (960x720, about 6 Hz): the whole shelf face, so you can watch deficits
+  empty and transfers land. On every path this camera feeds obstacle detection, not product
+  perception.
+- **Right, bottom — Wrist Camera.** The gripper-mounted colour stream on
+  `/wrist_camera/image` (1280x720, about 5 Hz): whatever the arm is looking at — lane survey
+  stations and tray confirmation viewpoints as they happen. On the sensor-driven path this is the
+  camera the evidence comes from.
+- **Left — Displays and Views panels**, docked rather than floating.
+
+Both image panes subscribe reliably, matching the Gazebo→ROS bridge's publisher. The layout lives
+in `ros_ws/src/restocker_bringup/rviz/demo_camera_view.rviz` and is selected only by this demo
+through the `rviz_config` launch argument; `just launch-baseline` and every headless test or
+benchmark keep the default `moveit.rviz`, so nothing else changes behaviour. Depth images,
+`camera_info` are not part of the layout. Gazebo's own window is separate: the showcase opens it
+on the `wide` view.
+
+The optional number limits mode-loop **cycles**, and every progress cycle submits at most one
+transfer goal — so `just demo 3` moves about three products at most, not three survey-and-drain
+phases. With no number the campaign continues until Ctrl-C.
+
+## What to expect
+
+**Showcase.** Eleven transfers fill the shelf: three cans into lane 1, three large bottles into
+lane 3, two cans into lane 4 and three small bottles into lane 5. Back stock covers each deficit
+with room to spare. The loop ends in `PHASE_FRONT_FULL` with the reserve blocks and the surplus of
+the picked blocks still on the tray. The cold-start sweep and each transfer are slow because the
+scene is large: the headless run measured 0.8 to 1.0 of real time (see the limitations below), and the
+survey and three transfers of the recording took about seven minutes of wall-clock time; `just demo 3`
+shows the survey and the first transfers sooner.
+
+**Sensor-driven fixture.** Three lanes each want one product, one product per class in the tray
+behind, so the loop needs **three transfers** to reach `PHASE_FRONT_FULL` with zero deficit and
+then idles until evidence changes. That is the table the sensor-driven acceptance test proves. The
+dense scenario's repeated products are named by camera identity too, by their stocking position,
+but the dense scenario has not yet completed a sensor-driven run (see the repository README's
+*Known limitations*). The dense sensor-driven end-to-end check exists as its own serialized gate,
+`just dense-gate`, which is excluded by label from `just test` and `nix flake check` — a green
+default suite never implies that coverage (see [Tests and benchmarks](tests-and-benchmarks)).
+
+On every path the acceptance gate is the same shape: fill every measured deficit against the
+declared targets and end in `PHASE_FRONT_FULL`, not `PHASE_STOCK_EXHAUSTED` or `PHASE_BLOCKED`.
+A full dense run takes about 45 minutes; the sensor-driven fixture's three transfers take a few
+minutes after the cold-start sweep. Individual transfers fail closed if motion, evidence, or
+outcome verification is invalid; a blocked phase returns to surveying on the next cycle instead
+of claiming success or retrying a failed pair in a tight loop.
+
+## Current limitations of the showcase
+
+- It runs on the ground-truth evidence path. Several SKUs of one class cannot be named by the
+  sensor-driven identity path at tray and lane range yet.
+- Only the twelve straight-cylinder SKUs of the generated catalogue are manipulable, and the scene
+  uses five of them; the contoured bottles and boxes stay out.
+- The scene is still the heaviest the simulator runs. Headless real-time factors measured on a
+  32-core development machine at a load of 3 to 6: 0.8 to 0.95 for the showcase (84 products) with
+  the campaign running and about 0.95 while the arm is idle. The attachment plugin used to look every
+  product up by scanning the world's children three times per step and kept its pad contact request
+  standing on every step, which held the same scene at 0.28; the request is now made only while a
+  product is within 0.3 m of the gripper, and that stretch of a transfer is the remaining cost. The
+  Gazebo window's real-time factor on a GPU was not measured.
+- The lane dividers are nearly transparent, so they show only as faint edges. Shadow edges are a
+  little stepped in close-ups: Gazebo exposes no shadow-map resolution.
+- The robot keeps the description's materials.
+- Packed columns stand on the gripper corridor pitch (about 0.13 m for cans), which is wider than
+  the 12 mm between rows: the grid is tight in depth and open sideways.
+
+Measured reliability of that loop on the sensor-driven path: a predeclared 24-run campaign on
+2026-09-29 passed **14/24 (58.3 %, Wilson 95 % 38.8–75.5 %)**; every failure ended at a
+named refusal (the tray survey finding no candidate, the recovery ladder ending in
+`motion inhibited`, or the survey-recovery skip budget being spent).
+
+A 24-attempt weld population passed **19/24** (79.2%, Wilson 95% 59.5–90.8%). The two populations are
+not statistically separated (Fisher p=0.2124), and passing console summaries do not retain enough
+detail to compare intermediate refusals. These are fixture-specific outcomes of the revisions they
+were measured on, not a reliability guarantee for the current one; see
+[the evidence limitations](./tests-and-benchmarks#interpret-reliability-evidence).
+
+## Requirements
+
+- Graphical session: `DISPLAY` or `WAYLAND_DISPLAY` (Xwayland counts)
+- Built workspace (`just build`)
+- Flake shell active (`direnv` or `nix develop .`)
+
+Without a display, `scripts/demo.bash` exits immediately and points you at headless alternatives.
+
+## Isolation
+
+The demo leases a `ROS_DOMAIN_ID` and `GZ_PARTITION` via `scripts/domain_isolation.py`. A second
+terminal that inspects topics must use the same domain the demo printed.
+
+## Under the hood
+
+1. Launch `baseline.launch.py` with `motion_enabled:=true`, `autonomous_campaign:=true`,
+   `campaign_restart_acknowledged:=true` (the demo world is fresh, so the campaign's restart gate
+   is acknowledged up front),
+   `lane_policy_state:=…/demo_lane_policy_state.absent` (no persisted SetLanePolicy document can
+   overlay the fixture's targets), and `rviz_config:=…/restocker_bringup/rviz/demo_camera_view.rviz`
+   (the camera layout above). `just demo sensor:=true` passes **no evidence arguments at all**; the
+   ground-truth paths (`just demo`, `just demo gt:=true`) additionally pass
+   `object_observation_topic`, `lane_observation_topic`, both tray duties off,
+   `product_observation_max_age:=2.0`, `selection_object_max_age_ms:=2000` and
+   `placement_require_column_growth:=false`, and the showcase passes its own `world:=`
+2. Wait up to 300 s for `/restock_action_coordinator/status` with `admission_ready: true`
+3. Sweep all six front-lane stations before the first transfer; survey the tray when a deficit
+   lacks an admitted candidate
+4. Restock from current evidence until the front is full or no compatible pair remains, then
+   repeat the scheduled survey cycle
+5. Leave the GUI up until Ctrl-C or the optional maximum cycle count is reached
+
+Showcase fixture (`showcase_products.yaml` + `showcase_lanes.yaml`): the lane policy names one
+generated SKU per lane with targets of can 10, small bottle 9 and large bottle 6, short of
+surveyed capacity for the same reason as the dense fixture's. The sensor-driven fixture
+(`sensor_acceptance_products.yaml` + `sensor_acceptance_lanes.yaml`): lanes
+`lane_01`/`lane_02`/`lane_03` each want one product, `lane_04`–`lane_06` want none, and the tray
+stocks exactly one can, one small bottle and one large bottle at interleaved poses. The dense
+fixture pairs its scenario with `dense_restock_lanes.yaml`, whose targets (can 10, small bottle 9,
+large bottle 6 per lane) are what the shipped front columns can reach cleanly; the shipped
+baseline want of six per lane is already satisfied by that overstocked fixture, so the loop would
+otherwise idle immediately, and packed-capacity targets drive the last placements where the
+depth-derived held count under-counts them.
+
+Which scene a bare `just demo` runs is one line, `DEFAULT_MODE` in `scripts/demo.bash`.
+
+Rebuild the showcase fixture with `tools/generate_showcase_scenario.py`, the dense one with
+`tools/generate_dense_restock_scenario.py` and the sensor-driven one with
+`tools/generate_sensor_acceptance_scenario.py` if a surveyed layout changes. To drive the
+sparse baseline yourself, use [`just launch-baseline`](./scenarios) and send a `RestockProduct`
+action explicitly.

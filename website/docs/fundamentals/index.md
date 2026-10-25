@@ -17,7 +17,7 @@ authority.
 | [URDF, Xacro, and TF2](./urdf-and-tf.mdx) | Robot description and live transforms |
 | [Gazebo and ros2_control](./gazebo-and-control.mdx) | Simulation and controllers |
 | [MoveIt 2](./moveit.mdx) | Planning scene, OMPL, execution |
-| [Perception](./perception.mdx) | RGB-D, poses, obstacle boxes |
+| [Perception](./perception.mdx) | RGB-D, poses, obstacle boxes (the full section is [Perception](/docs/perception)) |
 | [World state vs planning scene](./world-state-vs-scene.mdx) | Inventory authority vs collision geometry |
 | [Classical vs learned](./classical-vs-learned.mdx) | Why models stay advisory |
 

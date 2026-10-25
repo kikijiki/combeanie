@@ -85,14 +85,17 @@
         </axis>
       </joint>
 
-      <!-- The can's hold_joint_target_m, which the plugin requires both fingers to be within
-           0.0005 m of before it will attach. Derived from gripper_geometry.yaml's
-           hold_clearance_per_side_m (0.0025), so it moves with that. -->
+      <!-- Physical contact position for the can: 0.5 * (diameter - zero_gap) = 0.5 * (0.066 -
+           0.042) = 0.012, i.e. the faces exactly on the catalogued surface, which is where
+           hold_mode: physical's contact band wants them. The jaws spawn here rather than at an
+           interference command so the first physics step opens on touching surfaces, not on the
+           penetration that produced non-finite poses when release_contact tried it; the
+           load-bearing interference grip is measured by the carry probe, not by this fixture. -->
       <plugin filename="gz-sim-joint-position-controller-system"
               name="gz::sim::systems::JointPositionController">
         <joint_name>left_finger_joint</joint_name>
         <topic>/attachment_test/left_finger_position</topic>
-        <initial_position>0.0145</initial_position>
+        <initial_position>0.012</initial_position>
         <use_velocity_commands>true</use_velocity_commands>
         <cmd_max>1.0</cmd_max>
       </plugin>
@@ -100,7 +103,7 @@
               name="gz::sim::systems::JointPositionController">
         <joint_name>right_finger_joint</joint_name>
         <topic>/attachment_test/right_finger_position</topic>
-        <initial_position>0.0145</initial_position>
+        <initial_position>0.012</initial_position>
         <use_velocity_commands>true</use_velocity_commands>
         <cmd_max>1.0</cmd_max>
       </plugin>

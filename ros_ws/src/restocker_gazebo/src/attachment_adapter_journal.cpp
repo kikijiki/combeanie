@@ -363,11 +363,13 @@ AdapterReply AttachmentAdapterJournal::observe_transport_reply(
       transport_reply.state.attached_identity ==
       std::optional<AttachmentIdentity>(record->transport_request->identity) :
       !transport_reply.state.attached_identity;
-    const bool joint_evidence_matches = record->request.command == AttachmentCommand::kAttach ?
-      transport_reply.operation && transport_reply.operation->evidence &&
-      transport_reply.operation->evidence->joint_observed :
-      transport_reply.operation && transport_reply.operation->evidence &&
-      !transport_reply.operation->evidence->joint_observed;
+    // Only a weld attach creates a joint to observe; a physical hold creates nothing, so its
+    // honest terminal evidence has no joint in either direction (spec 11.4).
+    const bool joint_expected = record->request.command == AttachmentCommand::kAttach &&
+      transport_reply.state.hold_mode != kHoldModePhysical;
+    const bool joint_evidence_matches = transport_reply.operation &&
+      transport_reply.operation->evidence &&
+      transport_reply.operation->evidence->joint_observed == joint_expected;
     if (!transport_reply.operation || !transport_reply.operation->evidence ||
       transport_reply.operation->simulator_epoch != transport_reply.state.simulator_epoch ||
       transport_reply.operation->phase != expected_phase ||

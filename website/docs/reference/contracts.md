@@ -51,13 +51,13 @@ coordinator sets them and which statuses never carry them.
 
 ### Survey results: busy and backend-loss outcomes
 
-A survey goal that the survey layer refuses as busy (an earlier survey may still be moving the arm),
-and a motion backend lost after the trajectory was handed to it, are no longer reported as
-`OUTCOME_UNAVAILABLE` / a retryable non-start. `SurveyViewpoint` reports `OUTCOME_EXECUTION_FAILED`;
+A survey goal that the survey layer refuses as busy (a survey in flight may still be moving the arm),
+and a motion backend lost after the trajectory was handed to it, are not reported as
+`OUTCOME_UNAVAILABLE` or a retryable non-start. `SurveyViewpoint` reports `OUTCOME_EXECUTION_FAILED`;
 `SurveyLane` reports its usual unreached or unavailable outcome with
-`motion_definitely_not_started` and `execution_reached_terminal_stop` both false. A client that
-retried on `OUTCOME_UNAVAILABLE` for these cases must not retry on them now: `OUTCOME_UNAVAILABLE`
-means the backend was unavailable before anything was submitted.
+`motion_definitely_not_started` and `execution_reached_terminal_stop` both false. A client must not
+retry on these cases: `OUTCOME_UNAVAILABLE` means the backend was unavailable before anything was
+submitted.
 
 ### Campaign status: unresolved motion
 
@@ -78,6 +78,12 @@ not fence clients of the public endpoints, and it does not survive a restart.
 `/perception/object_observations`, `/perception/lane_observations`,
 `/perception/obstacle_observations`, plus `/perception/ground_truth/*` peers when producers
 are swapped. See [Perception and models](/docs/architecture/perception-and-models).
+
+Optional perception outputs, none of which anything consumes: `/perception/lane_stock`
+(`LaneStock`), `/perception/inventory` (`Inventory`) and the `/query_inventory` service
+(`QueryInventory`). The identity services `/identify_product` (`IdentifyProduct`) and
+`/identify_object` (`IdentifyObject`) only report: SKU write-once semantics stay in world state. See
+[Perception](/docs/perception).
 
 `admission_ready` is distinct from having fresh product/lane evidence. Campaign status reports
 progress; a blocked phase, CLI timeout or cancel acknowledgement is not terminal motion proof.

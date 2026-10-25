@@ -54,6 +54,7 @@ template<typename T>
     case ProductClass::Can: return CatalogProductClass::Can;
     case ProductClass::SmallBottle: return CatalogProductClass::SmallBottle;
     case ProductClass::LargeBottle: return CatalogProductClass::LargeBottle;
+    case ProductClass::Box: return std::nullopt;  // planned scene object only; never a pick
     case ProductClass::Unknown: return std::nullopt;
   }
   return std::nullopt;

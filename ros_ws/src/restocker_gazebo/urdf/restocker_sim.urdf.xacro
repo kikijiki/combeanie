@@ -11,9 +11,14 @@
   <!-- gz_ros2_control drives ideal velocity motors whose effort clamp is a numerical actuator
        envelope, not a hardware torque rating. Keep that simulator-only setting out of the
        planning and visualization descriptions. -->
+  <!-- compliant_pads (spec M10 §11 D10 item 3) is the other simulator-only form: each finger pad
+       is 4 small links on prismatic spring-damper joints so the load is shared across the rows.
+       MoveIt plans against restocker_planning.urdf.xacro, which keeps D9's plain tiled
+       collisions and never sees these links. -->
   <xacro:restocker_robot
     prefix="$(arg prefix)"
     joint_limits_parameters_file="$(find restocker_description)/config/ur10e_sim_joint_limits.yaml"
-    wrist_camera_sensor="$(arg wrist_camera_sensor)"/>
+    wrist_camera_sensor="$(arg wrist_camera_sensor)"
+    compliant_pads="true"/>
   <xacro:restocker_ros2_control prefix="$(arg prefix)" controller_config="$(arg controller_config)"/>
 </robot>

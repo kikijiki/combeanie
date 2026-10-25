@@ -78,6 +78,8 @@ template<typename T>
       return CatalogProductClass::SmallBottle;
     case TrackedObjectMessage::PRODUCT_CLASS_LARGE_BOTTLE:
       return CatalogProductClass::LargeBottle;
+    case TrackedObjectMessage::PRODUCT_CLASS_BOX:
+      return CatalogProductClass::Box;
     default:
       return std::nullopt;
   }

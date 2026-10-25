@@ -26,8 +26,8 @@ struct ExpectedController
 
 const std::map<std::string, ExpectedController> kExpectedControllers{
   {"joint_state_broadcaster", {"joint_state_broadcaster/JointStateBroadcaster", {}}},
-  // Arm and rail feed planned velocity forward; the gripper keeps position for attachment
-  // accuracy. See config/controllers.yaml.
+  // Arm and rail feed planned velocity forward; the gripper claims effort, because its fingers
+  // are a force-limited position controller (spec M10 §11 D10 item 5). See config/controllers.yaml.
   {"arm_controller",
     {"joint_trajectory_controller/JointTrajectoryController",
       {"shoulder_pan_joint/velocity", "shoulder_lift_joint/velocity", "elbow_joint/velocity",
@@ -37,7 +37,7 @@ const std::map<std::string, ExpectedController> kExpectedControllers{
     {"joint_trajectory_controller/JointTrajectoryController", {"rail_joint/velocity"}}},
   {"gripper_controller",
     {"joint_trajectory_controller/JointTrajectoryController",
-      {"left_finger_joint/position", "right_finger_joint/position"}}},
+      {"left_finger_joint/effort", "right_finger_joint/effort"}}},
 };
 
 std::string join(const std::set<std::string> & values)

@@ -25,8 +25,8 @@ controller_manager  →  gz_ros2_control  →  Gazebo joints
 
 `just launch-baseline` starts the stack below, **sensor-driven by default**: the wrist tray
 duties own the world state's object ingest topic and the wrist lane survey its lane topic, with
-simulator ground truth demoted to `/perception/ground_truth/*` for the evaluators. The overhead
-camera stays on and is used for **obstacle detection only** (`depth_obstacle_node`, obstacle
+simulator ground truth published on `/perception/ground_truth/*` for the evaluators. The overhead
+camera is on and is used for **obstacle detection only** (`depth_obstacle_node`, obstacle
 boxes on); the overhead *object* pipeline and the reasoner are off by default.
 
 <CompositionDiagram />

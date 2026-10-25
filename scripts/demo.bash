@@ -1,24 +1,30 @@
 #!/usr/bin/env bash
 # Watch the system do the thing it exists to do: bring up the workcell, survey the lanes whose
-# evidence needs it, and run the sensor-driven mode loop -- deficit-driven tray surveys with
-# confirmation, transfers, and idle-until-evidence changes -- until every lane reaches its
-# declared target. The optional first argument is a maximum mode-loop cycle count; zero is
-# unbounded. The optional second argument is `gt`, the labelled ground-truth opt-in.
+# evidence needs it, and run the mode loop -- deficit-driven tray surveys, transfers, and
+# idle-until-evidence changes -- until every lane reaches its declared target. The optional
+# numeric argument is a maximum mode-loop cycle count; zero is unbounded.
 #
-# The DEFAULT is the shipped sensor-driven path: no evidence pins at all, so this demo runs
-# exactly what `baseline.launch.py` runs -- wrist lane survey and wrist tray confirm own the
-# world state's ingest topics, simulator ground truth is demoted to /perception/ground_truth/*
-# where only the error evaluators read it, and the overhead camera is on for obstacle detection
-# only (its object pipeline stays off). It drives the sensor acceptance fixture
-# (sensor_acceptance_products/lanes) -- three lanes, three transfers, then PHASE_FRONT_FULL and
-# an idle loop. Camera identity also names the dense tray's repeated products (by stocking
-# position), but the dense scenario has not yet completed a sensor-driven run, so the default
-# stays on this fixture. The dense sensor-driven end-to-end check runs only as its own gate:
-# `just dense-gate` (one serialized run; excluded by label from `just test` / `nix flake check`).
+# Three scenes, chosen by one option each; the DEFAULT_MODE line below is the only thing that
+# decides which one runs with no option:
 #
-# `demo.bash 0 true` (just demo gt:=true) is the opt-in ground-truth demo: the dense fixture
-# with 13 transfers, ground truth pinned back onto the ingest topics and both wrist tray duties
-# off, so exactly one producer owns each topic. It is labelled every time it starts.
+#   showcase (default; `showcase:=true`): the generated, labelled catalogue cans and bottles --
+#     three shapes, five SKUs -- as a stocked shelf (six lanes, some at target, some short) and a
+#     back room of packed one-SKU blocks, in an art-directed world. It runs on the GROUND-TRUTH
+#     evidence path: ground truth is pinned onto the ingest topics and both wrist tray duties are
+#     off, so exactly one producer owns each topic. The sensor-driven path cannot run this scene
+#     yet, because its identity assigner names a product by its class and so cannot tell several
+#     SKUs of one class apart at tray and lane range. Nothing about identity is simulated: the
+#     ground-truth producer reports each product's declared SKU, which is what that path is.
+#   gt (`gt:=true`): the dense plain-coloured fixture, thirteen transfers, same ground-truth path.
+#   sensor (`sensor:=true`): the shipped sensor-driven path -- no evidence pins at all, so this
+#     runs exactly what `baseline.launch.py` runs: wrist lane survey and wrist tray confirm own the
+#     world state's ingest topics, simulator ground truth is demoted to /perception/ground_truth/*
+#     where only the error evaluators read it, and the overhead camera is on for obstacle
+#     detection only. It drives the sensor acceptance fixture (three lanes, three transfers, then
+#     PHASE_FRONT_FULL and an idle loop). The dense sensor-driven end-to-end check runs only as its
+#     own gate: `just dense-gate` (excluded by label from `just test` / `nix flake check`).
+#
+# Every start prints which evidence path it is on.
 #
 # This is deliberately not a test and not a benchmark. The acceptance tests run headless and assert;
 # the benchmark harness runs headless and tallies. This one shows you the robot.
@@ -84,16 +90,25 @@ if [[ -z "${RESTOCKER_ISOLATION_TAG:-}" ]]; then
   exec python3 "$repo_root/scripts/domain_isolation.py" --seed demo -- "${BASH_SOURCE[0]}" "$@"
 fi
 
-max_cycles="${1:-0}"
-ground_truth="${2:-false}"
-if [[ ! "$max_cycles" =~ ^[0-9]+$ ]]; then
-  printf 'error: max_cycles must be a non-negative integer (zero runs until Ctrl-C)\n' >&2
-  exit 2
-fi
-if [[ "$ground_truth" != "true" && "$ground_truth" != "false" ]]; then
-  printf 'error: the ground-truth opt-in must be true or false, got %s\n' "$ground_truth" >&2
-  exit 2
-fi
+# The one line that decides what a bare `just demo` runs: showcase, gt or sensor.
+DEFAULT_MODE=showcase
+
+max_cycles=0
+mode="$DEFAULT_MODE"
+for argument in "$@"; do
+  case "$argument" in
+    showcase:=true | gt:=true | sensor:=true) mode="${argument%%:=*}" ;;
+    showcase:=false | gt:=false | sensor:=false) ;;
+    *[!0-9]* | "")
+      printf 'error: unknown argument %s (expected a cycle count, showcase:=true, gt:=true or sensor:=true)\n' \
+        "$argument" >&2
+      exit 2
+      ;;
+    *) max_cycles="$argument" ;;
+  esac
+done
+ground_truth=false
+[[ "$mode" == "sensor" ]] || ground_truth=true
 
 launch_pid=""
 cleanup() {
@@ -135,15 +150,35 @@ if [[ "$ground_truth" == "true" ]]; then
     maximum_observation_age_ms:=2000
     placement_require_column_growth:=false
   )
-  scenario_args=(
-    scenario_config:="$repo_root/ros_ws/src/restocker_gazebo/config/dense_restock_products.yaml"
-    lane_semantics:="$repo_root/ros_ws/src/restocker_world_state/config/dense_restock_lanes.yaml"
-  )
-  printf -- '-- GROUND-TRUTH MODE (opt-in: gt:=true) --\n'
-  printf -- '-- dense fixture, 13 transfers; ground truth pinned onto the ingest topics and the\n'
-  printf -- '-- wrist tray duties off, so each ingest topic has exactly one producer. --\n'
+  if [[ "$mode" == "showcase" ]]; then
+    # The showcase also selects its own dressed world (same physics and plugins as the default
+    # one) whose GUI opens framed on the `wide` view of website/scripts/showcase_views.py.
+    scenario_args=(
+      scenario_config:="$repo_root/ros_ws/src/restocker_gazebo/config/showcase_products.yaml"
+      lane_semantics:="$repo_root/ros_ws/src/restocker_world_state/config/showcase_lanes.yaml"
+      world:="$repo_root/ros_ws/src/restocker_gazebo/worlds/restocking_showcase.sdf"
+      # The workcell and every product are written into the world file, so the window opens on
+      # the complete scene instead of watching eighty-odd models spawn one at a time.
+      bundle_scenario:=true
+      scene_materials:="$repo_root/ros_ws/src/restocker_gazebo/config/showcase_materials.yaml"
+    )
+    printf -- '-- SHOWCASE SCENE, GROUND-TRUTH EVIDENCE PATH --\n'
+    printf -- '-- labelled cans and bottles, five SKUs: a stocked shelf and a packed back room.\n'
+    printf -- '-- Ground truth is pinned onto the ingest topics and the wrist tray duties are off,\n'
+    printf -- '-- so each ingest topic has exactly one producer. The sensor-driven path cannot name\n'
+    printf -- '-- several SKUs of one class yet, so this scene does not run on it. --\n'
+    printf -- '-- The sensor-driven path: just demo sensor:=true. Dense plain fixture: gt:=true. --\n'
+  else
+    scenario_args=(
+      scenario_config:="$repo_root/ros_ws/src/restocker_gazebo/config/dense_restock_products.yaml"
+      lane_semantics:="$repo_root/ros_ws/src/restocker_world_state/config/dense_restock_lanes.yaml"
+    )
+    printf -- '-- GROUND-TRUTH MODE (gt:=true) --\n'
+    printf -- '-- dense fixture, 13 transfers; ground truth pinned onto the ingest topics and the\n'
+    printf -- '-- wrist tray duties off, so each ingest topic has exactly one producer. --\n'
+  fi
 else
-  # The shipped default: no evidence pins. baseline.launch.py's own defaults are the
+  # The shipped configuration: no evidence pins. baseline.launch.py's own defaults are the
   # sensor-driven configuration (ground truth demoted to /perception/ground_truth/*, wrist lane
   # survey and wrist tray confirm owning the ingest topics, 180 s evidence ages, overhead camera
   # obstacles-only). Leaving the pins out is the point: the demo runs what the product ships.
@@ -152,11 +187,11 @@ else
     scenario_config:="$repo_root/ros_ws/src/restocker_gazebo/config/sensor_acceptance_products.yaml"
     lane_semantics:="$repo_root/ros_ws/src/restocker_world_state/config/sensor_acceptance_lanes.yaml"
   )
-  printf -- '-- SENSOR-DRIVEN MODE (the shipped default; no evidence pins) --\n'
+  printf -- '-- SENSOR-DRIVEN MODE (sensor:=true; the shipped configuration, no evidence pins) --\n'
   printf -- '-- wrist lane survey and wrist tray confirm own the evidence, ground truth is demoted\n'
   printf -- '-- to /perception/ground_truth/* for the evaluators, the overhead camera is on for\n'
   printf -- '-- obstacle detection only. Three lanes, three transfers, then PHASE_FRONT_FULL. --\n'
-  printf -- '-- Opt in to the dense ground-truth demo with: just demo gt:=true --\n'
+  printf -- '-- The stocked, textured showcase (ground-truth path): just demo --\n'
 fi
 
 printf -- '-- starting the workcell (Gazebo, controllers, MoveIt, coordinator) --\n'

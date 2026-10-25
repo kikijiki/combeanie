@@ -136,6 +136,7 @@ constexpr double kSkipMarkClearRadiusM = 0.04;
     case CampaignStatus::PRODUCT_CLASS_CAN: return "can";
     case CampaignStatus::PRODUCT_CLASS_SMALL_BOTTLE: return "small_bottle";
     case CampaignStatus::PRODUCT_CLASS_LARGE_BOTTLE: return "large_bottle";
+    case CampaignStatus::PRODUCT_CLASS_BOX: return "box";
     default: return "unknown";
   }
 }

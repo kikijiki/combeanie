@@ -1,0 +1,164 @@
+---
+id: stock-and-inventory
+title: Stock and inventory
+sidebar_position: 4
+---
+
+# Stock and inventory
+
+Two optional nodes read the lane survey and say how much of what is in stock. Both are readers:
+`LaneObservation`, `ShelfLane.contents` (the ledger) and every existing consumer are untouched,
+and nothing consumes their output. Both cores are pure Python with no ROS import; only the node
+modules use ROS.
+
+```bash
+ros2 launch restocker_bringup baseline.launch.py lane_stock:=true inventory:=true
+inventory_tool query --sku GEN-001
+```
+
+## Lane stock
+
+`restocker_perception.stock` states, per lane, what is in it and how many: a count, a composition
+against the lane policy, free depth, coverage and an explicit cannot-tell. `lane_stock_node`
+publishes `LaneStock` on `/perception/lane_stock` from the survey's wrist frame. The wrist survey
+frame looks down the lane from its rear entrance, so it shows the rearmost product and hides the
+rest.
+
+```text
+wrist survey frame (depth, RGB, lane <- optical at the frame's stamp)
+  -> lane depth histogram (the same window and thresholds as lane_depth_measurement.cpp)
+  -> free depth, coverage, obstruction
+  -> top-height staircase: the rear product's class, runs of equal products
+  -> count = occupied depth over the contact pitch, cross-checked against the top surface
+  -> crop of the rear product -> /identify_product -> naming policy
+  -> LaneStock
+```
+
+### Count
+
+A column is packed against the front retainer. With `n` upright products of one class the nearest
+surface lies at `bed_datum - r - extent - (n-1) * pitch`. The estimator inverts it and takes the
+nearest whole number. It reports an exact count when the column length is within 0.2 pitch of a whole
+number, a one-product range within 0.35 pitch, and a refusal (`REASON_INCONSISTENT_GEOMETRY`) beyond
+that. A cross-check counts the bins of the top surface in units of the pitch; if the two disagree by
+more than 1.2 products the estimator refuses.
+
+### Products and orientations
+
+A product is a pair the formulas need: half its extent along the lane (`r`) and its height. A
+standing cylinder is `(radius, height)`. A box is `size_xyz_m = (across, along, up)` with
+`r = along / 2`, and a box resting on another face is another pair (its six faces).
+
+- The lane policy names a class and a SKU. Class 4 (box) covers every box shape, so the SKU's
+  registered shape decides what the lane expects.
+- The rear top height is matched against the catalogue: every product standing, every orientation
+  of the lane's expected product except its quarter turns.
+- A quarter turn (the registered box turned about the vertical) has the same top height and another
+  side along the lane. Height cannot tell it from the registered orientation, and under a few
+  millimetres of noise a 55 mm pitch fits a 25 mm column by chance. Lanes are packed with the depth
+  side along them, so a box turned in a lane is outside what the estimator counts, and it is not
+  detected.
+- When several candidates fit by height, the lane's own product is the answer; the estimator
+  refuses if it does not count the column in whole products. Another product is named only when the
+  lane's own is not among the candidates, by the column length in metres against the noise, and two
+  that fit and count differently are refused as ambiguous.
+- A column of another shape than expected is `class_mismatch` (misplaced), even when both are boxes.
+- A column whose top height steps (a bottle in a can lane) is counted run by run and flagged as
+  misplaced.
+- A surface that tops out lower than every catalogued product is refused, not counted: through
+  range noise the bed's own speckle reads as a product at the lane mouth.
+
+### Cannot-tell
+
+`STATE_CANNOT_TELL` always comes with a reason, never a low-confidence number: the producer refused
+(`REASON_NO_EVIDENCE`), coverage is below the survey's 0.90 floor (`REASON_LOW_COVERAGE`), something
+protrudes from the mouth, no class or geometry explains the column, or the top surface disagrees with
+the depth count. A lane seen to be empty along its whole length is an answer
+(`COMPOSITION_EMPTY`, count 0); a lane that was not seen is not. All count and composition fields of
+a refusal are zero and must be ignored.
+
+The estimator follows the noise of the frame. The floor margin is `max(10 mm, |bed offset| + 4
+robust sigmas)` of the bed's own height residuals; the nearest surface moves back by 4 sigmas. A
+surface under three bins wide (not a product) and a step in the top height shorter than a product
+are refused. Above 8 mm of bed sigma the estimator reads no class and makes no class claim.
+
+### Identity and composition
+
+Identity is a possibly-abstaining input. The estimator calls `/identify_product` on the rear
+product's crop and applies a **safe naming policy**: a name is accepted only when label text or the
+barcode confirms the same GTIN; anything the embedding alone says is an abstention. With the identity
+node absent, unreachable, or the face too small to ask about, the count is reported and
+`identity_channel_reachable` says what happened.
+
+Composition is not a boolean. `COMPOSITION_CONFORMING` needs every product named and expected,
+`PARTIAL` some, `MISPLACED` a named wrong SKU or a class the policy does not hold (set only from
+evidence, never from an abstention), `UNKNOWN` none. `unverified_count` is the number of products
+nobody named. A survey frame shows the rear product and hides the rest, so at most one product per
+lane can be named, and **an unflagged lane is not a verified-clean lane**.
+
+## Inventory
+
+`restocker_perception.inventory` aggregates the lane stock estimates and the tray into one
+queryable inventory: per-SKU totals with their uncertainty spelled out, per-lane contents, the age of
+every reading against a declared horizon, and a comparison with the authoritative world state.
+`inventory_node` publishes `/perception/inventory` and serves `/query_inventory`.
+
+### What a total means
+
+A SKU's total is the sum of three kinds of product, kept apart in the message:
+
+| Kind | Meaning |
+| --- | --- |
+| **confirmed** | The identity channel named the product. Only this is evidence of the SKU. |
+| **assumed** | Counted by the sensor in a lane whose policy lists the SKU and not named individually; a range, the estimator's count range. |
+| **reported** | Listed by the world state only (the tray's fallback). |
+
+The assumed share can hide a wrong product behind the rear one, so the total's range covers the
+count, not the SKU. A lane flagged misplaced is contested: its unnamed products are not assumed to be
+the policy SKU (that share's lower end is zero), and a class mismatch with no name puts the wrong
+products in an unknown-SKU bucket. A product the identity channel positively said is unregistered goes
+to that bucket too.
+
+### What is left out
+
+A lane that was refused, never read, or last read longer ago than the horizon contributes nothing to
+any total and makes the SKUs whose policy lane it is `complete = false`, with the lane named
+(`unread_lanes`, `stale_lanes`). A SKU is complete only when every lane that could hold it was read
+and fresh and the tray is covered. The horizon is a deployment parameter (`stale_after_s`, default
+900 s; the per-query `max_age_s` overrides it), not a measured constant.
+
+### Tray
+
+The tray comes from the perception path when it has a fresh reading (`tray_observation_topic`, off by
+default): each `ObjectObservation` is `IDENTIFIED` and so confirmed, `UNKNOWN_PRODUCT`, or not assessed
+and so assumed from the manifest. Otherwise it comes from the world state (tracked free objects that no
+lane's ledger or fresh occupancy accounts for), where it is reported, not sensed. In simulation the
+world state is fed ground truth by default, so a world-sourced tray is the simulator's belief.
+
+### Discrepancy
+
+Each counted lane is compared with its ledger (`ShelfLane.contents`). A discrepancy is raised when the
+observed count range lies above or below the ledger's count (`count_delta` says by how much), or when a
+name the identity channel gave contradicts the SKU the ledger records for the rearmost product
+(`sku_discrepancy`, never raised from an abstention). A lane that could not be compared is
+`NOT_COMPARABLE`, which is not agreement. Per SKU, the world's figure and the difference are given when
+the SKU is complete.
+
+### Query
+
+`QueryInventory` takes a SKU, a lane or neither, an evidence floor (`min_confidence`: `any`,
+`expected` = sensor-counted only, `confirmed` = identity-named only) and a `max_age_s`. A SKU query
+returns the count, its range, how much of it is confirmed, how many products the floor excluded, whether
+the answer is complete and a sentence saying why. `inventory_tool` is the operator front end:
+
+```text
+inventory_tool query --sku GEN-001
+inventory_tool query --sku GEN-001 --min-confidence confirmed
+inventory_tool query --lane lane_03 --max-age 120
+inventory_tool show
+inventory_tool replay --datasets <pbench-dir>... --predictions <rows.jsonl> --seed 12 --sku GEN-001
+```
+
+With no identity channel running, every lane's SKU is the policy's: the counts are exact, the SKU is an
+assumption, and a wrong product hidden behind the rear one is not seen. That is what the `confirmed` and
+`assumed` split reports.

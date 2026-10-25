@@ -177,7 +177,7 @@ class TestControlSmokeInitialState(unittest.TestCase):
                 _controller(
                     "gripper_controller",
                     trajectory_type,
-                    ["left_finger_joint/position", "right_finger_joint/position"],
+                    ["left_finger_joint/effort", "right_finger_joint/effort"],
                 ),
             ]
             return response

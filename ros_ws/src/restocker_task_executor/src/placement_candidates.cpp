@@ -69,7 +69,10 @@ template<typename T>
     case ProductClass::SmallBottle:
     case ProductClass::LargeBottle:
       return true;
+    case ProductClass::Box:
     case ProductClass::Unknown:
+      // A box is a rectangular body: neither the side grasp nor the lane placement is derived
+      // for one yet (CMB-119 stage 1), so it is refused rather than treated as a cylinder.
       return false;
   }
   return false;

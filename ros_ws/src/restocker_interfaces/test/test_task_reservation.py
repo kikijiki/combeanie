@@ -51,7 +51,8 @@ def test_reservation_summary_has_no_capability_token() -> None:
         reservation.PRODUCT_CLASS_CAN,
         reservation.PRODUCT_CLASS_SMALL_BOTTLE,
         reservation.PRODUCT_CLASS_LARGE_BOTTLE,
-    } == {0, 1, 2, 3}
+        reservation.PRODUCT_CLASS_BOX,
+    } == {0, 1, 2, 3, 4}
     assert reservation.stage == reservation.STAGE_RESERVED
     assert reservation.placed_in_destination is False
     assert "token" not in reservation.get_fields_and_field_types()

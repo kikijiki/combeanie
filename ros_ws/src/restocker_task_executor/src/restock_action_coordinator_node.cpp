@@ -2644,10 +2644,15 @@ private:
       node_.declare_parameter<double>("grasp.pregrasp_distance_m", 0.18);
     grasp_generation_config_.retract_distance_m =
       node_.declare_parameter<double>("grasp.retract_distance_m", 0.12);
+    grasp_generation_config_.retract_lift_m =
+      node_.declare_parameter<double>("grasp.retract_lift_m", 0.010);
     grasp_generation_config_.open_clearance_per_side_m =
       gripper_geometry_.open_clearance_per_side_m;
     grasp_generation_config_.hold_clearance_per_side_m =
       gripper_geometry_.hold_clearance_per_side_m;
+    grasp_generation_config_.physical_hold = gripper_geometry_.physical_hold;
+    grasp_generation_config_.hold_interference_per_side_m =
+      gripper_geometry_.hold_interference_per_side_m;
     grasp_generation_config_.maximum_open_joint_position_m =
       gripper_geometry_.maximum_open_target_m;
     grasp_generation_config_.rail_travel_weight =
@@ -2679,6 +2684,8 @@ private:
       grasp_generation_config_.pregrasp_distance_m <= 0.0 ||
       !std::isfinite(grasp_generation_config_.retract_distance_m) ||
       grasp_generation_config_.retract_distance_m <= 0.0 ||
+      !std::isfinite(grasp_generation_config_.retract_lift_m) ||
+      grasp_generation_config_.retract_lift_m < 0.0 ||
       !std::isfinite(grasp_generation_config_.rail_travel_weight) ||
       grasp_generation_config_.rail_travel_weight < 0.0 ||
       !std::isfinite(grasp_generation_config_.rear_access_weight) ||

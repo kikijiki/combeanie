@@ -149,9 +149,25 @@ int main()
     attached->state.phase != AttachmentPhase::kAttached ||
     attached->state.motion_gate != AttachmentMotionGate::kValid ||
     !attached->operation || !attached->operation->mutation_started ||
-    !attached->operation->evidence || !attached->operation->evidence->joint_observed ||
+    !attached->operation->evidence || attached->operation->evidence->joint_observed ||
+    attached->state.hold_mode != "physical" ||
     !near(attached->operation->evidence->parent_to_child.translation[2], 0.14, 1.0e-4))
   {
+    if (!attached) {
+      return fail("attach never reached a terminal state (await_terminal timed out)");
+    }
+    std::cout << "attach refusal: code " << static_cast<int>(attached->status.code)
+              << " detail=" << attached->status.detail
+              << " phase=" << static_cast<int>(attached->state.phase)
+              << " hold_mode=" << attached->state.hold_mode
+              << " mutation_started=" << attached->operation->mutation_started
+              << " joint_observed="
+              << (attached->operation->evidence ?
+    (attached->operation->evidence->joint_observed ? "yes" : "no") : "no-evidence")
+              << " state_status=" << static_cast<int>(attached->state.status.code) << "/"
+              << attached->state.status.detail
+              << " op_phase=" << static_cast<int>(attached->operation->phase)
+              << std::endl;
     return fail("attach did not reach a physics-verified terminal state");
   }
 

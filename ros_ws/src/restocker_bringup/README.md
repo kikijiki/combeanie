@@ -12,3 +12,13 @@ plan and execute the complete grasp, carry, insert, release, verification, and r
 through MoveIt, `ros2_control`, Gazebo attachment, and authoritative world state. Set
 `planning_scene_projection:=false` or `task_coordinator:=false` only for isolated subsystem
 diagnostics.
+
+## Demo scenes
+
+`just demo` drives `baseline.launch.py` with the autonomous campaign on one of three scenes
+(`scripts/demo.bash`): the showcase (default; ground-truth evidence pins, the dressed
+`restocking_showcase.sdf` world), `gt:=true` (the dense plain-coloured fixture, same pins) and
+`sensor:=true` (no evidence pins at all, the shipped sensor-driven configuration, on the sensor
+acceptance fixture). `test/test_showcase_restock_runtime.py` runs the showcase composition headless
+for two campaign cycles; `test/test_autonomous_restock_demo_runtime.py` runs the dense one to a full
+shelf.

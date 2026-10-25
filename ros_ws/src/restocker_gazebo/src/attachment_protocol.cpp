@@ -280,6 +280,11 @@ std::optional<AttachmentPhysicalState> decode_state(
   if (state.simulator_epoch().empty() || state.sequence() == 0 || !state.has_status()) {
     return std::nullopt;
   }
+  // The mode is part of the receipt: a reply that does not state a recognised one cannot be
+  // interpreted, so it is rejected rather than defaulted (spec 11.3 D1).
+  if (!known_hold_mode(state.hold_mode())) {
+    return std::nullopt;
+  }
   const auto phase = decode_phase(state.phase());
   const auto motion_gate = decode_motion_gate(state.motion_gate());
   const auto status = decode_status(state.status());
@@ -292,6 +297,7 @@ std::optional<AttachmentPhysicalState> decode_state(
   result.phase = *phase;
   result.motion_gate = *motion_gate;
   result.status = *status;
+  result.hold_mode = state.hold_mode();
   if (state.has_attached_identity()) {
     result.attached_identity = decode_identity(state.attached_identity());
     if (!valid_identity(*result.attached_identity)) {
@@ -389,6 +395,7 @@ msgs::AttachmentStateValue encode_state(const AttachmentPhysicalState & state)
   result.set_sequence(state.sequence);
   result.set_phase(static_cast<msgs::AttachmentPhaseValue>(state.phase));
   result.set_motion_gate(static_cast<msgs::AttachmentMotionGateValue>(state.motion_gate));
+  result.set_hold_mode(state.hold_mode);
   *result.mutable_status() = encode_status(state.status);
   if (state.attached_identity) {
     *result.mutable_attached_identity() = encode_identity(*state.attached_identity);

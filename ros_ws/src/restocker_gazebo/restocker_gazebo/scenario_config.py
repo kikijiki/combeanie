@@ -13,7 +13,7 @@ from typing import Any
 import yaml
 
 ProductCatalog = dict[str, dict[str, Any]]
-VALID_PRODUCT_CLASSES = {"can", "small_bottle", "large_bottle"}
+VALID_PRODUCT_CLASSES = {"can", "small_bottle", "large_bottle", "contour_bottle", "box"}
 
 # Only this generator version's bounds are understood. A scenario that bumps its version without
 # this constant stops the launch instead of being drawn from a schema the generator cannot honour.
@@ -161,6 +161,7 @@ def load_scenario(path: str | Path) -> dict[str, Any]:
         raise RuntimeError("scenario_config product model names must be non-empty and unique")
     for item in products:
         _validate_label_texture(item.get("label_texture"))
+        _validate_visual_mesh(item.get("visual_mesh"))
     # Validated eagerly so a typo in the bounds is caught by the tests and the default launch, not
     # on the first randomized run.
     if "randomization" in scenario:
@@ -181,6 +182,18 @@ def _validate_label_texture(value: Any) -> None:
         raise RuntimeError("scenario_config label_texture must be a non-empty filename")
     if "/" in value or value in {".", ".."}:
         raise RuntimeError(f"scenario_config label_texture must be a bare filename: {value}")
+
+
+def _validate_visual_mesh(value: Any) -> None:
+    """Reject a visual-mesh filename the launch file cannot resolve into the installed meshes."""
+    # Visual only: the collision stays the catalogue cylinder, so the mesh must fit inside it. Same
+    # bare-filename rule as label_texture, for the same reason.
+    if value is None:
+        return
+    if not isinstance(value, str) or not value:
+        raise RuntimeError("scenario_config visual_mesh must be a non-empty filename")
+    if "/" in value or value in {".", ".."}:
+        raise RuntimeError(f"scenario_config visual_mesh must be a bare filename: {value}")
 
 
 def _require_positive_finite(value: Any, label: str) -> float:
@@ -416,12 +429,22 @@ def load_product_catalog(path: str | Path) -> ProductCatalog:
             raise RuntimeError(f"product_catalog geometry_key is empty or duplicated: {key}")
         if product_class not in VALID_PRODUCT_CLASSES:
             raise RuntimeError(f"product_catalog has invalid product_class: {product_class}")
-        if not isinstance(shape, dict) or shape.get("type") != "cylinder":
-            raise RuntimeError(f"product_catalog geometry {key} is not a supported cylinder")
-        for field in ("radius_m", "height_m"):
-            value = float(shape.get(field, 0.0))
-            if not math.isfinite(value) or value <= 0.0:
-                raise RuntimeError(f"product_catalog geometry {key} has invalid {field}")
+        if not isinstance(shape, dict) or shape.get("type") not in ("cylinder", "box"):
+            raise RuntimeError(
+                f"product_catalog geometry {key} is not a supported cylinder or box"
+            )
+        if shape["type"] == "box":
+            size = shape.get("size_xyz_m", [])
+            if not isinstance(size, list) or len(size) != 3:
+                raise RuntimeError(f"product_catalog geometry {key} box needs three size_xyz_m")
+            for value in size:
+                if not math.isfinite(float(value)) or float(value) <= 0.0:
+                    raise RuntimeError(f"product_catalog geometry {key} has invalid size_xyz_m")
+        else:
+            for field in ("radius_m", "height_m"):
+                value = float(shape.get(field, 0.0))
+                if not math.isfinite(value) or value <= 0.0:
+                    raise RuntimeError(f"product_catalog geometry {key} has invalid {field}")
         if geometry.get("class_fallback", False):
             if product_class in fallback_classes:
                 raise RuntimeError(f"product_catalog has multiple fallbacks for {product_class}")

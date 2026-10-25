@@ -1,0 +1,22 @@
+{
+  "facing_confidence": 0.5,
+  "max_relooks": 3,
+  "max_views": 5,
+  "min_turn_deg": 22.5,
+  "ocr_crops": 3,
+  "reader": {
+    "max_line_words": 3,
+    "min_line_score": 0.5,
+    "unrolled": true,
+    "upscale": 2
+  },
+  "scoring": "max",
+  "shortlist_rank": 3,
+  "text": {
+    "max_contradictions": 0,
+    "min_margin": 0.25,
+    "min_matched": 2,
+    "min_score": 0.5
+  },
+  "whiten": true
+}

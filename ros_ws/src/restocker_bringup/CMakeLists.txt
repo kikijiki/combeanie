@@ -103,6 +103,15 @@ if(BUILD_TESTING)
     ENV
       GZ_PARTITION=restocker_autonomous_demo_acceptance
   )
+  # The showcase scene `just demo` opens: both initial surveys, the measured inventory of labelled
+  # products across five SKUs, then two campaign cycles of real transfers out of the packed tray.
+  add_launch_test(
+    test/test_showcase_restock_runtime.py
+    TARGET test_showcase_restock_runtime
+    TIMEOUT 3600
+    ENV
+      GZ_PARTITION=restocker_showcase_acceptance
+  )
   # Card 010 SC-001/SC-002: sensor-driven acceptance from an unordered mixed tray into three
   # depleted lanes, with the ground-truth subscription-graph and producer-authentication
   # assertions. Cold start on the wrist lane topic, no external transfer goal.
@@ -228,6 +237,16 @@ if(BUILD_TESTING)
     ENV
       GZ_PARTITION=restocker_perception
   )
+  # Perception benchmark recorder (Card 109): wrist and overhead frames of the shipped
+  # sensor-acceptance scenario with ground-truth labels. The one simulator run of the benchmark's
+  # unit suite; tools/record_perception_dataset.py drives it per seeded scene.
+  add_launch_test(
+    test/test_perception_recorder_runtime.py
+    TARGET test_perception_recorder_runtime
+    TIMEOUT 600
+    ENV
+      GZ_PARTITION=restocker_perception_recorder
+  )
   # Lane survey: the arm visits all six lane stations and the free depth the camera reads is
   # compared against the simulator's, on known columns from empty to full. Six plan-and-execute
   # segments plus twenty-three static product spawns.
@@ -300,6 +319,7 @@ if(BUILD_TESTING)
     test_restock_manipulation_runtime
     test_restock_lane_routing_runtime
     test_autonomous_restock_demo_runtime
+    test_showcase_restock_runtime
     test_sensor_driven_acceptance_runtime
     test_dense_sensor_driven_runtime
     test_restock_obstructed_lane_runtime
@@ -314,6 +334,7 @@ if(BUILD_TESTING)
     test_tray_survey_runtime
     test_tray_overview_dwell_runtime
     test_perception_runtime
+    test_perception_recorder_runtime
     test_attachment_adapter_runtime
     APPEND PROPERTY LABELS "renderer")
   # One rendered world at a time, enforced by ctest scheduling rather than inside the test:
@@ -327,6 +348,7 @@ if(BUILD_TESTING)
     test_restock_manipulation_runtime
     test_restock_lane_routing_runtime
     test_autonomous_restock_demo_runtime
+    test_showcase_restock_runtime
     test_sensor_driven_acceptance_runtime
     test_dense_sensor_driven_runtime
     test_restock_obstructed_lane_runtime
@@ -341,6 +363,7 @@ if(BUILD_TESTING)
     test_tray_survey_runtime
     test_tray_overview_dwell_runtime
     test_perception_runtime
+    test_perception_recorder_runtime
     test_attachment_adapter_runtime
     APPEND PROPERTY RESOURCE_LOCK "restocker-renderer-simulator")
 

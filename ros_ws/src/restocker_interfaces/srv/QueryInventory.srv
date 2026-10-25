@@ -1,0 +1,36 @@
+# Query the inventory (CMB-115): by SKU, by lane, or everything, with an evidence floor and an
+# age ceiling. The reply carries the inventory restricted to the query and, for a SKU query, the
+# answer to "how many of this are in stock" with its uncertainty spelled out.
+
+# Evidence floor for what counts toward a total. A product that rests on less evidence than this is
+# left out of the answer (and `excluded_count` says how many).
+# ANY: confirmed, policy-expected and world-state-reported products.
+uint8 CONFIDENCE_ANY=0
+# EXPECTED: sensor-counted products (confirmed or policy-expected); the world state's reports are out.
+uint8 CONFIDENCE_EXPECTED=1
+# CONFIRMED: only products the identity channel named.
+uint8 CONFIDENCE_CONFIRMED=2
+
+# Empty `sku` and `lane_id`: the whole inventory. `sku` alone: that SKU's line (and the lanes that
+# can hold it). `lane_id` alone: that lane. Both: that SKU's contribution in that lane.
+string sku
+string lane_id
+uint8 min_confidence
+# Observations older than this are stale for this query. Zero means the node's declared horizon.
+float64 max_age_s
+---
+bool ok
+string message
+
+# A SKU query's answer. `count_known` is false when no lane that could hold the SKU was readable.
+bool count_known
+uint32 count_min
+uint32 count_max
+uint32 count_estimate
+uint32 confirmed_count
+# Products left out because they rest on less evidence than min_confidence asked for.
+uint32 excluded_count
+bool complete
+string explanation
+
+restocker_interfaces/Inventory inventory

@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <shape_msgs/msg/solid_primitive.hpp>
+#include <yaml-cpp/yaml.h>
 
 #include "restocker_task_executor/scene_geometry.hpp"
 
@@ -62,7 +63,16 @@ TEST(SceneGeometryCatalogTest, LoadsPinnedCatalogAndResolvesExactThenFallback)
 {
   auto catalog = ProductCollisionCatalog::load(RESTOCKER_TEST_PRODUCT_CATALOG);
   ASSERT_TRUE(catalog) << catalog.error().detail;
-  EXPECT_EQ(catalog.value().entries().size(), 4U);
+  // Counted from the file: the catalogue grows (the generated SKUs and, with CMB-119, the boxes
+  // were added after this test pinned four). The contour bottle is perception-only and skipped.
+  size_t loadable = 0;
+  for (const auto & geometry : YAML::LoadFile(RESTOCKER_TEST_PRODUCT_CATALOG)["geometries"]) {
+    if (geometry["product_class"].as<std::string>() != "contour_bottle") {
+      ++loadable;
+    }
+  }
+  EXPECT_EQ(catalog.value().entries().size(), loadable);
+  EXPECT_GT(loadable, 4U);
 
   auto exact = catalog.value().resolve(CatalogProductClass::Can, "SIM-CAN-STD");
   ASSERT_TRUE(exact) << exact.error().detail;
@@ -319,6 +329,39 @@ TEST(SceneGeometryWorkcellTest, RejectsMovingUnnamedAndMeshGeometry)
       description, "world", Eigen::Isometry3d::Identity());
     EXPECT_FALSE(result);
   }
+}
+
+TEST(SceneGeometryCatalogTest, ABoxIsABoxPrimitiveWithNoClassFallback)
+{
+  auto catalog = ProductCollisionCatalog::load(RESTOCKER_TEST_PRODUCT_CATALOG);
+  ASSERT_TRUE(catalog) << catalog.error().detail;
+  auto box = catalog.value().resolve(CatalogProductClass::Box, "GEN-019");
+  ASSERT_TRUE(box) << box.error().detail;
+  EXPECT_EQ(box.value().primitive.type, shape_msgs::msg::SolidPrimitive::BOX);
+  ASSERT_EQ(box.value().primitive.dimensions.size(), 3U);
+  EXPECT_DOUBLE_EQ(box.value().primitive.dimensions[0], 0.095);
+  EXPECT_DOUBLE_EQ(box.value().primitive.dimensions[1], 0.06);
+  EXPECT_DOUBLE_EQ(box.value().primitive.dimensions[2], 0.165);
+  // No dimensions stand for "a box": an unknown box SKU resolves to nothing, not to a cylinder.
+  EXPECT_FALSE(catalog.value().resolve(CatalogProductClass::Box, "NO-SUCH-SKU"));
+  EXPECT_FALSE(catalog.value().resolve(CatalogProductClass::Box, std::nullopt));
+  auto collision = make_product_collision_object(
+    7U, "world", Eigen::Isometry3d::Identity(), box.value());
+  ASSERT_TRUE(collision) << collision.error().detail;
+  EXPECT_EQ(collision.value().primitives.front().type, shape_msgs::msg::SolidPrimitive::BOX);
+}
+
+TEST(SceneGeometryCatalogTest, ABoxCatalogEntryNeedsThreePositiveSizes)
+{
+  const auto path = write_fixture(
+    R"(schema_version: 1
+geometries:
+  - {geometry_key: can.a, product_class: can, sku: A, class_fallback: true,
+     shape: {type: cylinder, radius_m: 0.03, height_m: 0.1}}
+  - {geometry_key: box.a, product_class: box, sku: B, class_fallback: false,
+     shape: {type: box, size_xyz_m: [0.1, 0.0, 0.1]}}
+)", "box_bad_size.yaml");
+  EXPECT_FALSE(ProductCollisionCatalog::load(path));
 }
 
 }  // namespace

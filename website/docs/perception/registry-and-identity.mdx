@@ -1,0 +1,188 @@
+---
+id: registry-and-identity
+title: Registry and identity
+sidebar_position: 2
+---
+
+# Registry and identity
+
+The identity channel names a product by comparing what a camera saw with a **product registry**.
+Nothing is trained or fine-tuned, and nothing in the channel is specific to one product: any
+product that is registered can be named.
+
+## Product registry
+
+`restocker_perception.registry` is a pure-Python registry with no ROS runtime and no
+machine-learning dependency. One directory holds one registry, one sub-directory per product:
+
+```text
+<registry>/registry.json                  schema, sorted product ids, content hash, notes
+<registry>/products/<id>/product.json     the record
+<registry>/products/<id>/views/az000.png ... az315.png
+<registry>/.cache/                        derived data, never part of the registry
+```
+
+A record holds:
+
+- the **product id**, the key of the record, its directory and every derived-cache entry;
+- an optional **GTIN** (EAN-13, check digit verified);
+- a display name, a product class and a geometry reference (`geometry_key`, `radius_m`,
+  `height_m`, plus `size_xyz_m` for a box);
+- **eight reference views** at 45-degree steps around the product;
+- the printed **label text** (OCR strings), optional aliases and a source note.
+
+The view azimuth orders the views and says which one matched; it is not a pose. The registry
+refuses a duplicate id, GTIN or alias, a bad check digit, anything but eight views, and a
+directory whose view hashes or content hash do not match.
+
+Embeddings and OCR reads are **derived** data, cached under
+`.cache/<kind>/<backend name>/<backend version>/<product id>`. An entry is read only if it was
+made by that backend name and version from the same views, so changing an encoder or editing a
+product re-derives exactly what depends on it.
+
+![The eight registry views of a can: the label turns around the barrel](/img/perception/registry-can.png)
+
+### Products without a barcode
+
+The GTIN is an attribute of a product, not its key. A product with a GTIN uses the GTIN as its
+product id. A product without one gets `prod-<12 hex>`: the first 12 hex digits of the SHA-256 of
+its display name and view hashes, computed once at registration and stored in `product.json`.
+An id can also be assigned by hand. `gtin` is `null` when absent, never an empty string. Loose
+produce, bakery goods and refilled bottles are registered the same way as a barcoded can.
+
+### Registering products
+
+```bash
+product_registry add-images --registry R --images DIR --gtin 2000000000015 --name "Real Cola" \
+    --product-class can --geometry-key can.real --radius 0.033 --height 0.122 --ocr COLA
+product_registry add-images --registry R --images DIR --name "Loose pear" \
+    --product-class pear --geometry-key pear.loose --radius 0.04 --height 0.09 --ocr PEAR
+product_registry add-sim --registry R --use-mesh --exclude-held-out \
+    ros_ws/src/restocker_benchmarks/config/perception_splits.json
+product_registry verify --registry R --splits .../perception_splits.json
+```
+
+- **From images:** `add-images` takes eight photographs, named `az000.png` to `az315.png` or in
+  turntable order.
+- **From the simulator catalogue:** `add-sim` renders the eight views offline from each product's
+  label texture (CPU, numpy only, byte-identical on every run). A box is rendered from its face
+  atlas at eight yaws and a 20-degree look-down: yaw 0 faces the front squarely, 90 the left,
+  180 the back, 270 the right, and the odd multiples show two faces. `--use-mesh` follows the
+  contoured bottle's radius profile.
+- **Benchmark registries** are built with `--exclude-held-out`: held-out products are left out,
+  the split file's hash is recorded in the registry notes, and `verify --splits` fails if a
+  held-out product is present.
+
+![The eight registry views of a 1 L carton, from the front through each side](/img/perception/registry-box.png)
+
+## Identity ladder
+
+`/identify_object` names one object across several looks. The ladder spends cheap evidence first,
+asks for another look when that is not enough, and never guesses.
+
+![Identity ladder: barcode, label text, not yet with guidance, needs human](/img/schematics/identity-ladder.svg)
+
+1. **Barcode.** A barcode that decodes to a valid GTIN of a registered product names it exactly.
+   The reader tries the unrolled barrel and the raw crop, and accepts a decode only with a valid
+   GTIN-13 check digit and an exact registry lookup. Only a product with a GTIN can be named
+   this way.
+2. **Label text.** The reader cuts each crop to the object's own columns (a crop also holds its
+   neighbours), reads the cut as it is and, for a body of revolution, unrolled. Lines of more than
+   three words (ingredients, storage text, addresses) are prose and are dropped. The words are
+   scored against the label text of **every** registered product: the weighted share of a
+   product's words that were read, weighted by inverse document frequency over the registry so a
+   flavour counts more than a brand, tolerant of joined words and dropped letters. A product is
+   named only if it
+   - scores at least 0.5 and leads the runner-up by at least 0.25,
+   - matched at least two words,
+   - has no contradicting word (a word another registered product prints and this one does not),
+   - and sits in the embedding's top three.
+
+   When the cheap reader leaves a look open, an optional **second reader** reads the same look
+   (Florence-2 base, a 0.23 B parameter pretrained model, run on the CPU). It sees the two largest
+   crops and its words replace the cheap reader's words for that look, so the same rules decide
+   (rung `text_escalated`, with its own latency). It is slow, about 25 seconds per object-look on a
+   loaded CPU, so it runs only on a look the cheap reader could not settle, and it is off unless the
+   ladder config enables it. Nothing is trained: both readers are used as published.
+3. **Not yet.** The reply carries guidance: the facing the camera saw, the side to show next, and a
+   suggested turn.
+4. **Needs human.** After `max_relooks` further looks (default 3) the object is left to a human.
+
+The **embedding is a shortlist only**. It cannot tell a product from an unregistered look-alike,
+so it never names a product by itself. Two look-alikes that share brand and kind score the same on
+the shared words, and neither is named until the word that tells them apart is read. An
+unregistered look-alike of a registered product is refused for the same reason.
+
+### Guidance
+
+The registry's eight views are a turntable. Two registry-only measurements place a crop on it: the
+crop's embedding similarity to each exemplar and, for round bodies, a colour signature of the
+visible barrel correlated with the panorama rebuilt from the registered views. They are pooled over
+a look's crops, each shifted by the difference of the camera azimuths. The peak is the *facing*;
+the target is the side whose registered view carries the most label text that no earlier look
+showed; the suggested turn is the difference, counter-clockwise seen from above. A box has four
+faces: its facing is the best of the views at 0, 90, 180 and 270 degrees (`front`, `left`,
+`back`, `right`) and its turn is a multiple of 90. Only differences are used, so the estimate needs
+no agreement between the registry's azimuth convention and the world's.
+
+### Services
+
+| Service | Input | Reply |
+| --- | --- | --- |
+| `/identify_object` (`IdentifyObject`) | Crops of one look with each crop's body width and camera azimuth, an `object_key`, optional barcode images | `STATUS_IDENTIFIED`, `STATUS_NOT_YET`, `STATUS_NEEDS_HUMAN` or `STATUS_UNKNOWN`; SKU and GTIN; the rung (`barcode` or `text`); guidance (`guidance_kind` `turn` or `new_view`, `estimated_facing_deg`, `visible_face`, `suggested_turn_deg`, `target_azimuth_deg`, `target_face`, confidence); the text evidence |
+| `/identify_product` (`IdentifyProduct`) | RGB8 or BGR8 crops of one object, optional barcode images | Status, SKU and evidence from embedding, label text and barcode fused with explicit abstention |
+
+- The node under `/identify_object` keeps what each look measured (not the images) under the
+  caller's `object_key`, so the next look of the same key adds to the earlier ones.
+- `STATUS_UNKNOWN` means a valid GTIN nobody registered, or no identity sidecar (the node answers
+  with `sidecar_available: false` and a reason).
+- `sku` is the registry product id: the GTIN for a product that has one, `prod-<hex>` for one that
+  has none. `has_gtin` and `gtin` say which; an empty string is never a GTIN.
+- **`barcode_enabled`** is a node parameter (and an engine argument). When false, the barcode
+  channel takes no part in any decision whatever images are passed. It defaults to true. A
+  registry of products without barcodes behaves the same way, because the barcode channel can only
+  name a product that has a GTIN.
+- Both services only report. SKU write-once semantics stay in world state, and the world-state
+  identity path does not call either service.
+- Run them with `ros2 run restocker_perception identify_object_node` and
+  `ros2 run restocker_perception identify_product_node`. Parameters include `registry_path`,
+  `whitener_path`, `backend` (`siglip2` or `fake`), `barcode` (`none` or `zxing`) and
+  `barcode_enabled`.
+
+### Thresholds are fitted, options are set beforehand
+
+The ladder's options are set before any data is read: SigLIP 2 base for the embedding, PCA
+whitening (64 components), up to five voted views, `max` scoring over the eight exemplars, the
+text policy above and a shortlist of three. `identity_benchmark calibrate` fits only thresholds
+for the `/identify_product` channel, on train and validation seeds, with unknown products made by
+leaving products out of the index in three folds that put look-alike twins in different folds.
+The acceptance bounds are written to a file and committed before any held-out data is read; see
+[Benchmarks](./benchmarks).
+
+### Limits
+
+- **Reading the flavour word is the binding limit.** Text recognition at the wrist camera's
+  resolution reads brand and kind but often not the flavour (white on a coloured box, curved
+  surface, oblique view). Look-alikes that tie are correctly not named, so they end as
+  `NEEDS_HUMAN`. The label's source pixels set the limit: halving them roughly halves what is
+  named, and enlarging beyond twice or unrolling a cylinder adds nothing. See
+  [Results](./results#identity-ladder) for the measured coverage.
+- **The second reader costs time.** About a quarter of a minute per escalated look on a CPU, so a
+  product that needs it is identified after a pause, not instantly.
+- **An unregistered look-alike can still be named.** On a registry-only replay with the true
+  product removed, text alone named an unregistered twin for 6 of 91 objects (mostly boxes of one
+  pair), against 0 of 31 for bottles. The held-out test used bottle twins only, so the rate for boxes
+  is not bounded.
+- **The facing estimate is approximate.** Against the simulator's truth, round bodies have a
+  median error of 26.8 degrees (52.5 % within 30 degrees) and boxes a median of 63.8 degrees
+  (22.5 % within 30 degrees).
+- **Barcodes are read only at close range.** The generated code spans about 137 degrees of a
+  cylinder's circumference. A small carton's barcode is about 58 mm wide; a decode succeeded for
+  one box at 0.10 m and for none of the other two barcoded boxes between 0.10 and 0.24 m.
+- **No manipulation skill turns a product.** In simulation the recorder re-records the scene with
+  the product turned in place (a rotation oracle); on a robot the guidance has no executor.
+- **Barcode-off drops the aimed views.** The headline arm of the benchmark turns the decode off
+  and also leaves out the aimed barcode close-ups, which a product without a barcode never gets.
+  A second off arm that keeps them, and a barcode-on arm, are reported next to it.
+- **A crop that includes a neighbour can name the neighbour.** The embedding shortlist guard is the
+  only protection in that case; a detector's class and size would add another.

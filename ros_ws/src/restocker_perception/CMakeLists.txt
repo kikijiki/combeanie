@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(restocker_interfaces REQUIRED)
@@ -194,6 +195,14 @@ ament_target_dependencies(lane_depth_error_evaluator_node rclcpp restocker_inter
 target_link_libraries(lane_depth_error_evaluator_node lane_depth_evaluation)
 target_compile_options(lane_depth_error_evaluator_node PRIVATE -Wall -Wextra -Wpedantic)
 
+# --- Product registry (pure Python) ----------------------------------------------------------------
+# Registry data model, registration tool and retrieval API. Pure Python (numpy, PyYAML): no ROS
+# runtime, no ML dependency (embedding backends are loaded lazily and are not in the flake).
+
+ament_python_install_package(${PROJECT_NAME})
+install(PROGRAMS scripts/product_registry scripts/identity_benchmark scripts/ladder_benchmark scripts/identify_product_node scripts/identify_object_node scripts/lane_stock_node scripts/stock_benchmark
+  scripts/inventory_node scripts/inventory_tool DESTINATION lib/${PROJECT_NAME})
+
 # --- Installation --------------------------------------------------------------------------------
 
 install(DIRECTORY include/ DESTINATION include)
@@ -325,6 +334,52 @@ if(BUILD_TESTING)
     test_wrist_tray_topics test/test_wrist_tray_topics.py
     ENV
       RESTOCKER_TEST_TRAY_PERCEPTION_CONFIG=${CMAKE_CURRENT_SOURCE_DIR}/config/wrist_tray_perception.yaml)
+
+  # Product registry (Card 111): format, integrity, registration tool, renderer, derived cache and
+  # retrieval, against the shipped catalogue and the frozen benchmark split file. Pure Python.
+  ament_add_pytest_test(
+    test_product_registry test/test_product_registry.py
+    ENV
+      RESTOCKER_TEST_GENERATED_LABELS=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_gazebo/config/generated_product_labels.yaml
+      RESTOCKER_TEST_PRODUCT_CATALOG=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description/config/product_collision_catalog.yaml
+      RESTOCKER_TEST_TEXTURES=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_gazebo/materials/textures
+      RESTOCKER_TEST_MESHES=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_gazebo/meshes
+      RESTOCKER_TEST_PERCEPTION_SPLITS=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_benchmarks/config/perception_splits_v3.json
+    TIMEOUT 600)
+
+  # Identity channel (Card 112): OCR matching, barcode, fusion rules, calibration. Pure Python.
+  ament_add_pytest_test(test_identity_channel test/test_identity_channel.py TIMEOUT 300)
+  # Identity ladder (round 3): label text with margin, facing and turn, rungs, budget, oracle driver.
+  ament_add_pytest_test(test_identity_ladder test/test_identity_ladder.py TIMEOUT 600)
+  ament_add_pytest_test(test_ladder_benchmark test/test_ladder_benchmark.py TIMEOUT 300)
+  ament_add_pytest_test(test_identity_escalation test/test_identity_escalation.py TIMEOUT 600)
+  ament_add_pytest_test(test_identify_object test/test_identify_object.py TIMEOUT 600)
+  ament_add_pytest_test(test_identify_object_node test/test_identify_object_node.py TIMEOUT 300)
+  ament_add_pytest_test(
+    test_identity_benchmark test/test_identity_benchmark.py
+    ENV
+      RESTOCKER_TEST_GENERATED_LABELS=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_gazebo/config/generated_product_labels.yaml
+      RESTOCKER_TEST_PRODUCT_CATALOG=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description/config/product_collision_catalog.yaml
+      RESTOCKER_TEST_PERCEPTION_SPLITS=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_benchmarks/config/perception_splits.json
+    TIMEOUT 600)
+
+  # Lane stock estimator (Card 114): the estimator core, the numpy depth port and pipeline on
+  # ray-cast frames, and the node over a private ROS graph. Pure Python.
+  ament_add_pytest_test(test_lane_stock test/test_lane_stock.py TIMEOUT 120)
+  ament_add_pytest_test(test_lane_stock_pipeline test/test_lane_stock_pipeline.py TIMEOUT 300)
+  ament_add_pytest_test(test_lane_stock_node test/test_lane_stock_node.py TIMEOUT 300)
+  ament_add_pytest_test(test_lane_stock_benchmark test/test_lane_stock_benchmark.py TIMEOUT 300)
+  # Inventory (Card 115): aggregation and query on synthetic readings, the replay, and the node.
+  ament_add_pytest_test(test_inventory test/test_inventory.py TIMEOUT 120)
+  ament_add_pytest_test(test_inventory_replay test/test_inventory_replay.py TIMEOUT 120)
+  ament_add_pytest_test(test_inventory_node test/test_inventory_node.py TIMEOUT 300)
+  ament_add_pytest_test(test_inventory_contract test/test_inventory_contract.py TIMEOUT 60)
+
+  # Proposal identity state (Card 113): a proposal the channel cannot name is an unknown product.
+  ament_add_pytest_test(test_proposal_identity test/test_proposal_identity.py TIMEOUT 120)
+
+  ament_add_pytest_test(test_identify_service test/test_identify_service.py TIMEOUT 120)
+  ament_add_pytest_test(test_identify_product_node test/test_identify_product_node.py TIMEOUT 180)
 
   ament_lint_auto_find_test_dependencies()
 endif()

@@ -106,6 +106,8 @@ def generate_launch_description() -> LaunchDescription:
             "lane_policy_state": lane_policy_state,
             "placement_require_column_growth": placement_require_column_growth,
             "spawn_scenario": spawn_scenario,
+            "bundle_scenario": LaunchConfiguration("bundle_scenario"),
+            "scene_materials": LaunchConfiguration("scene_materials"),
             "ground_truth": ground_truth,
             "perception": perception,
             # Forwarded so compositions above the simulator can disable the renderers, and so the
@@ -118,6 +120,8 @@ def generate_launch_description() -> LaunchDescription:
             "lane_evidence_validity_ms": lane_evidence_validity_ms,
             "maximum_observation_age_ms": maximum_observation_age_ms,
             "lane_survey": lane_survey_active,
+            "lane_stock": LaunchConfiguration("lane_stock"),
+            "inventory": LaunchConfiguration("inventory"),
             "tray_overview_perception": LaunchConfiguration("tray_overview_perception"),
             "tray_confirm_perception": LaunchConfiguration("tray_confirm_perception"),
         }.items(),
@@ -603,6 +607,20 @@ def generate_launch_description() -> LaunchDescription:
                 ),
             ),
             DeclareLaunchArgument("spawn_scenario", default_value="true"),
+            DeclareLaunchArgument(
+                "scene_materials",
+                default_value="",
+                description="With bundle_scenario: a YAML file restyling the bundled models' visuals",
+            ),
+            DeclareLaunchArgument(
+                "bundle_scenario",
+                default_value="false",
+                description=(
+                    "Place the workcell and products in the world file, so the scene is complete "
+                    "when the Gazebo window opens, instead of spawning them over the first half "
+                    "minute"
+                ),
+            ),
             DeclareLaunchArgument("ground_truth", default_value="true"),
             DeclareLaunchArgument(
                 "cameras",
@@ -747,6 +765,23 @@ def generate_launch_description() -> LaunchDescription:
                 description=(
                     "Start the wrist-camera survey action server, which aims "
                     "wrist_camera_optical_frame at a commanded viewpoint"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "lane_stock",
+                default_value="false",
+                description=(
+                    "Run the lane stock estimator (CMB-114) beside the lane survey; it publishes "
+                    "LaneStock on /perception/lane_stock. Nothing consumes it yet"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "inventory",
+                default_value="false",
+                description=(
+                    "Run the inventory (CMB-115) over /perception/lane_stock and the world state: "
+                    "/perception/inventory and /query_inventory. Needs lane_stock:=true for lane "
+                    "readings. Nothing consumes it yet"
                 ),
             ),
             DeclareLaunchArgument(

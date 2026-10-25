@@ -46,7 +46,7 @@ overrides several of them for the sensor-driven default — see the baseline tab
 | `cameras` | `true` | Bridge cameras from Gazebo |
 | `wrist_camera` | `true` | Include wrist camera |
 | `perception` | `false` | Overhead **object** producer (off: the overhead camera is obstacles-only) |
-| `object_observation_topic` | `/perception/object_observations` | Where the ground-truth adapter publishes — still the ingest topic in this composition |
+| `object_observation_topic` | `/perception/object_observations` | Where the ground-truth adapter publishes — the ingest topic in this composition |
 | `lane_observation_topic` | `/perception/ground_truth/lane_observations` | Lane ingest topic (ground truth, in this composition) |
 | `lane_survey` | `true` | Lane survey composition |
 | `tray_overview_perception` | `false` | Tray overview perception |
@@ -66,7 +66,7 @@ ros2 topic echo --once /robot_telemetry
 Full deterministic stack: simulation + MoveIt + planning-scene projector + attachment adapter +
 task coordinator. With no arguments it is the **sensor-driven default**: the wrist tray duties
 own the world state's object ingest topic, the wrist lane survey owns its lane topic, ground
-truth is demoted to `/perception/ground_truth/*` for the evaluators, and the overhead camera is
+truth is published on `/perception/ground_truth/*` for the evaluators, and the overhead camera is
 used for **obstacle detection only**.
 
 ```bash
@@ -131,12 +131,14 @@ transfers its close-confirmed candidate this way. A lane without an object is re
 | `perception` | `false` | Overhead **object** producer — off by default: the overhead camera is obstacles-only |
 | `tray_overview_perception` | `true` | Wrist tray overview → `/perception/tray_candidates` (hypotheses) |
 | `tray_confirm_perception` | `true` | Wrist tray confirm → `/perception/object_observations` (the world state's object source) |
-| `object_observation_topic` | `/perception/ground_truth/object_observations` | Where **ground truth** publishes; demoted off the ingest topic on the default path |
+| `object_observation_topic` | `/perception/ground_truth/object_observations` | Where **ground truth** publishes; off the ingest topic on the default path |
 | `lane_observation_topic` | `/perception/lane_observations` | World-state lane ingest topic (wrist lane survey on the default path) |
 | `product_observation_max_age` | `600.0` | Projector reports older product evidence as aged; the product stays in the scene (seconds) |
 | `selection_object_max_age_ms` | `180000` | Selection evidence age limit |
 | `lane_evidence_validity_ms` | `180000` | Lane evidence validity window |
 | `maximum_observation_age_ms` | `180000` | Reservation observation age limit |
+| `lane_stock` | `false` | Lane stock estimator: publishes `LaneStock` on `/perception/lane_stock` (needs `lane_survey`; nothing consumes it) |
+| `inventory` | `false` | Inventory over the lane stock and the world state: `/perception/inventory` and `/query_inventory` (needs `lane_stock:=true` for lane readings; nothing consumes it) |
 | `tray_survey` | `false` | Coordinated tray overview/confirmation action; also enables viewpoint action |
 | `survey_viewpoint` | `false` | Wrist survey viewpoint action |
 | `autonomous_campaign` | `false` | Enable shelf/tray evidence acquisition and one-transfer cycles until idle |
@@ -191,16 +193,16 @@ just launch-baseline scenario_seed:=42
 ## Perception topic collision (important)
 
 The world state ingests `/perception/object_observations` and admits **one publisher** per ingest
-topic. On the default `baseline.launch.py` path ground truth is already demoted to
+topic. On the default `baseline.launch.py` path ground truth publishes on
 `/perception/ground_truth/object_observations` and the wrist confirm duty is the ingest topic's
 only producer, so nothing collides until a second producer is added: enabling the overhead
-`perception:=true` pipeline while the confirm duty is still on puts two publishers on the ingest
+`perception:=true` pipeline while the confirm duty is on puts two publishers on the ingest
 topic and the world state refuses both (fail-closed / refused authentication).
 
 To put a second producer on the ingest topic you must move the first one aside; that is the whole
 rule — `tray_confirm_perception:=false` with `perception:=true` on the baseline (ground truth is
-already demoted there), or `object_observation_topic:=/perception/ground_truth/object_observations`
-on `simulation.launch.py`, whose own defaults still put ground truth on the ingest topic. The
+already off the ingest topic there), or `object_observation_topic:=/perception/ground_truth/object_observations`
+on `simulation.launch.py`, whose own defaults put ground truth on the ingest topic. The
 overhead object pipeline ships off for a deeper reason than the collision: as the executor's pose
 source the swap deadlocks the retreat after a release (see the `restocker_perception` README),
 which is why the default path keeps the wrist confirm duty there and leaves the overhead camera

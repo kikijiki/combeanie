@@ -96,6 +96,16 @@ struct LaneDepthConfig
   std::size_t minimum_accepted_returns{200U};
   // Returns behind the rear entrance plane before `obstructed` is raised.
   std::size_t minimum_obstruction_returns{40U};
+  // Range noise lifts bed returns above a fixed floor margin and reads the bed as product, and
+  // smears the retainer's face into the window. When positive, the margin widens to
+  // |bed offset| + factor * sigma, where sigma is the robust standard deviation of the heights
+  // of returns near the bed plane in this very frame, and the front inset to twice factor * sigma
+  // (a depth error is about twice a height error at the station's grazing angle). Never below
+  // the fixed values, so an ideal frame measures as before. 0 disables it.
+  double floor_noise_sigma_factor{0.0};
+  // The least depth of many noisy returns sits before the surface by a few depth sigmas; the
+  // nearest surface is moved back by this many bed sigmas when a sigma was estimated.
+  double edge_bias_sigma_factor{0.0};
 };
 
 struct LaneDepthMeasurement
@@ -138,6 +148,10 @@ struct LaneDepthMeasurement
   // told apart from a depth image that was never unprojected.
   std::size_t valid_depth_samples{0U};
   std::size_t sampled_pixels{0U};
+  // The floor margin used (the fixed one, or the noise-widened one), and the bed's robust height
+  // sigma in this frame (0 when not estimated).
+  double floor_margin_m{0.0};
+  double bed_sigma_m{0.0};
 };
 
 [[nodiscard]] bool valid_lane_depth_window(const LaneDepthWindow & window) noexcept;

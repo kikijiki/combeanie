@@ -82,7 +82,7 @@ AttachmentEvidence evidence(bool joint_observed)
 
 AttachmentJournalReply transport_terminal(
   const std::string & operation_id, const AttachmentRequest & request,
-  AttachmentStatusCode terminal)
+  AttachmentStatusCode terminal, const std::string & hold_mode = "weld")
 {
   const bool attached = terminal == AttachmentStatusCode::kAttached;
   AttachmentOperationRecord operation;
@@ -93,9 +93,11 @@ AttachmentJournalReply transport_terminal(
   operation.phase = attached ? AttachmentPhase::kAttached : AttachmentPhase::kDetached;
   operation.status = AttachmentStatus{terminal, "terminal"};
   operation.mutation_started = true;
-  operation.evidence = evidence(attached);
+  // A physical hold creates no joint, so only a weld attach carries one in its evidence.
+  operation.evidence = evidence(attached && hold_mode != "physical");
 
   AttachmentPhysicalState state;
+  state.hold_mode = hold_mode;
   state.simulator_epoch = "sim-epoch";
   state.sequence = 3;
   state.phase = operation.phase;
@@ -192,6 +194,44 @@ TEST(AttachmentAdapterJournalTest, AuthorizesAndRevalidatesACompleteAttach)
   EXPECT_EQ(replayed.status.code, AttachmentStatusCode::kAttached);
   EXPECT_TRUE(replayed.replayed);
   EXPECT_EQ(replayed.action, AdapterAction::kNone);
+}
+
+TEST(AttachmentAdapterJournalTest, AcceptsAPhysicalAttachWhoseEvidenceHasNoJoint)
+{
+  auto journal = ready_journal();
+  ASSERT_EQ(
+    journal.submit("attach-1", attach_request()).status.code, AttachmentStatusCode::kPending);
+  const auto authorized = journal.complete_initial_authorization("attach-1", authorization());
+  ASSERT_EQ(
+    journal.mark_transport_submitted("attach-1").status.code, AttachmentStatusCode::kPending);
+  const auto terminal = transport_terminal(
+    "attach-1", *authorized.transport_request, AttachmentStatusCode::kAttached, "physical");
+  ASSERT_TRUE(terminal.operation && terminal.operation->evidence);
+  EXPECT_FALSE(terminal.operation->evidence->joint_observed);
+  EXPECT_EQ(
+    journal.observe_transport_reply("attach-1", terminal).action,
+    AdapterAction::kValidateTerminalCapabilities);
+  EXPECT_EQ(
+    journal.complete_terminal_authorization("attach-1", authorization()).status.code,
+    AttachmentStatusCode::kAttached);
+  EXPECT_FALSE(journal.motion_inhibited());
+}
+
+TEST(AttachmentAdapterJournalTest, RefusesAPhysicalAttachThatReportsAJoint)
+{
+  auto journal = ready_journal();
+  ASSERT_EQ(
+    journal.submit("attach-1", attach_request()).status.code, AttachmentStatusCode::kPending);
+  const auto authorized = journal.complete_initial_authorization("attach-1", authorization());
+  ASSERT_EQ(
+    journal.mark_transport_submitted("attach-1").status.code, AttachmentStatusCode::kPending);
+  auto contradictory = transport_terminal(
+    "attach-1", *authorized.transport_request, AttachmentStatusCode::kAttached, "physical");
+  contradictory.operation->evidence->joint_observed = true;
+  EXPECT_EQ(
+    journal.observe_transport_reply("attach-1", contradictory).status.code,
+    AttachmentStatusCode::kExternalInconsistency);
+  EXPECT_TRUE(journal.motion_inhibited());
 }
 
 TEST(AttachmentAdapterJournalTest, AcceptsOneUlpQuaternionRenormalizationFromGazebo)
@@ -546,7 +586,7 @@ AdapterReply complete_operation(
 TEST(AttachmentAdapterJournalTest, ProtectsDetachAcrossIndependentJournalExhaustion)
 {
   auto adapter = ready_journal(4);
-  AttachmentJournal simulator("sim-epoch", 3);
+  AttachmentJournal simulator("sim-epoch", 3, std::nullopt, 2, "weld");
   ASSERT_EQ(
     complete_operation(adapter, simulator, "attach", attach_request()).status.code,
     AttachmentStatusCode::kAttached);
@@ -617,7 +657,7 @@ TEST(AttachmentAdapterJournalTest, RejectedAttachReleasesUnusedCleanupCredits)
   for (const bool physical_rejection : {false, true}) {
     SCOPED_TRACE(physical_rejection);
     auto adapter = ready_journal(4);
-    AttachmentJournal simulator("sim-epoch", 4);
+    AttachmentJournal simulator("sim-epoch", 4, std::nullopt, 2, "weld");
     if (physical_rejection) {
       ASSERT_EQ(
         complete_operation(adapter, simulator, "rejected", attach_request(), true).status.code,
@@ -648,7 +688,7 @@ TEST(AttachmentAdapterJournalTest, RejectedAttachReleasesUnusedCleanupCredits)
 TEST(AttachmentAdapterJournalTest, MatchingAuthorizationFailuresUseFiniteDetachAttemptBudget)
 {
   auto adapter = ready_journal(3);
-  AttachmentJournal simulator("sim-epoch", 3);
+  AttachmentJournal simulator("sim-epoch", 3, std::nullopt, 2, "weld");
   ASSERT_EQ(
     complete_operation(adapter, simulator, "attach", attach_request()).status.code,
     AttachmentStatusCode::kAttached);
@@ -686,7 +726,7 @@ TEST(AttachmentAdapterJournalTest, RefusesAttachWithoutItsConfiguredCleanupReser
   ASSERT_EQ(
     configured.initialize(detached_state(), true).status.code,
     AttachmentStatusCode::kDetached);
-  AttachmentJournal simulator("sim-epoch", 4, std::nullopt, 3);
+  AttachmentJournal simulator("sim-epoch", 4, std::nullopt, 3, "weld");
   ASSERT_EQ(
     complete_operation(configured, simulator, "attach", attach_request()).status.code,
     AttachmentStatusCode::kAttached);

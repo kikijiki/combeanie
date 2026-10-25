@@ -30,6 +30,10 @@
       <render_engine>ogre2</render_engine>
     </plugin>
     <plugin filename="restocker_attachment_system" name="restocker_gazebo::AttachmentSystem"/>
+    <!-- The pad rubber (spec M10 §11 D10 item 3): the engine does not act on the joint
+         spring_stiffness/spring_reference/damping the description carries, so this system
+         commands F = -k(x - x_ref) - c·ẋ itself. Without it the pad rows are free sliders. -->
+    <plugin filename="restocker_pad_spring_system" name="restocker_gazebo::PadSpringSystem"/>
 
     <gravity>0 0 -9.80665</gravity>
     <scene>

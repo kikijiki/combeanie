@@ -1,0 +1,564 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
+<!-- The production-faithful physical-grasp fixture (Card 057, SC-002): the same lane, pad,
+     pinned column and carried can as `release_contact.sdf`, gripped the way production grips.
+
+     `grasp_candidates.cpp` builds a horizontal side grasp: grasp-centre +z is the horizontal
+     approach, +y the jaw closing axis (horizontal, perpendicular to the approach) and +x world up;
+     placement yaws that approach onto the lane's insertion axis. So the straight-line insert and
+     gravity both load the finger pads tangentially, and the grip holds by friction alone.
+     `release_contact.sdf` keeps its inverted top-down gripper, whose insert runs along the jaw
+     axis (one face pushes through its normal); it stays as Card 019's weld fixture.
+
+       * gripper frame rpy (0, -pi/2, -pi/2): +x world +z, +y world +x, +z world +y;
+       * grasp centre at the can's base + 0.111 m, `restock_action_coordinator.yaml`'s
+         `grasp.minimum_center_height_above_base_m`, so the palm clears the pad and the bed;
+       * gripper body, finger box and finger joint (limits, damping, friction) from
+         `gripper_geometry.yaml`; finger links declared at joint zero, so the aperture the
+         attachment plugin derives from a joint reading is the aperture in the world;
+       * the test-only `restocker_gazebo::GripForceProbe` logs the squeeze it measures;
+       * spec M10 §11 D10 mirrors here too: 40 N effort-limited fingers driven in force mode,
+         compliant pad rows (4.9 g links on prismatic spring-damper joints, 111 kN/m and
+         56 N·s/m), the box-value finger izz, and pad-to-product friction set by the attachment
+         plugin's contact-surface callback (0.8 for the aluminium can).
+
+     The can loads parked on the floor (the jaws start at joint zero, which is inside a can
+     standing between them) and the probe places it once the jaws are open. Bullet narrowphase
+     for the same reason as `worlds/restocking.sdf`: every product here is a cylinder. -->
+<sdf version="1.9">
+  <world name="restocking">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="restocker_attachment_system" name="restocker_gazebo::AttachmentSystem"/>
+    <!-- The pad rubber of spec M10 §11 D10 item 3: the engine drops the joint spring, so the
+         spring-damper force is commanded here by our own system (same reason as production). -->
+    <plugin filename="restocker_pad_spring_system" name="restocker_gazebo::PadSpringSystem"/>
+    <plugin filename="grip_force_probe_system" name="restocker_gazebo::GripForceProbe"/>
+
+    <physics name="physical_grasp_physics" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <dart>
+        <collision_detector>bullet</collision_detector>
+      </dart>
+    </physics>
+
+    <gravity>0 0 -9.80665</gravity>
+
+    <!-- Floor: the fallback surface a product that falls through the bed would come to rest on,
+         which the probe tells apart from a correct bed settle by height. -->
+    <model name="floor">
+      <static>true</static>
+      <link name="floor_link">
+        <collision name="floor_collision">
+          <pose>0 0 -0.05 0 0 0</pose>
+          <geometry><box><size>8 5 0.1</size></box></geometry>
+          <surface>
+            <friction>
+              <ode><mu>0.9</mu><mu2>0.9</mu2></ode>
+            </friction>
+          </surface>
+        </collision>
+      </link>
+    </model>
+
+    <!-- The rear pad: a level platform at the pre-insert height, standing in for the free space
+         behind the shelf where the arm holds the product before the horizontal insert. Level so
+         the can rests upright (roll pi, matching the inverted gripper's grasp frame) rather than
+         taking the bed's 4 degree lean, which the 0.03 rad attach fidelity bound would refuse.
+         mu 0.9 like the shipped floor: spawned flush with the pad top, the contact solver's
+         first lateral impulses walk a mu 0.1 contact off the pad within a second (measured: the
+         can tips, slides rearward and falls); at 0.9 it holds position under 0.3 mm for the
+         whole pre-attach window. The insert itself is welded, so this value never gates it.
+         Rear edge 0.13 m behind the lane datum so every measured stall-band release (the can
+         settles up to 41 mm behind spawn after the weld relaxes) keeps its whole base on the
+         pad instead of teetering on the edge, which would deny the settle measurement a resting
+         product. -->
+    <model name="grasp_pad">
+      <static>true</static>
+      <link name="pad_link">
+        <collision name="pad_collision">
+          <pose>0 -0.0575 0.405369261 0 0 0</pose>
+          <geometry><box><size>0.12 0.145 0.810738522</size></box></geometry>
+          <surface>
+            <friction>
+              <ode><mu>0.9</mu><mu2>0.9</mu2></ode>
+            </friction>
+          </surface>
+        </collision>
+      </link>
+    </model>
+
+    <!-- The roller bed: one slab tangent to the shipped shelf's roller surface, top face at
+         lane height (0.84 - depth) * tan(4 deg) + 0.75 m, spanning lane depth 0 to 0.87 m.
+         mu 0.05 is the shipped roller-bed value: under tan(4 deg) so a released product runs
+         forward, far enough under that it is not one perturbation from stalling. -->
+    <model name="lane_bed">
+      <static>true</static>
+      <link name="bed_link">
+        <collision name="bed_collision">
+          <pose>0 0.433604871 0.758369078 -0.069813170 0 0</pose>
+          <geometry><box><size>0.30 0.872124451 0.04</size></box></geometry>
+          <surface>
+            <friction>
+              <ode><mu>0.05</mu><mu2>0.05</mu2></ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="bed_visual">
+          <pose>0 0.433604871 0.758369078 -0.069813170 0 0</pose>
+          <geometry><box><size>0.30 0.872124451 0.04</size></box></geometry>
+          <material>
+            <ambient>0.58 0.64 0.70 1</ambient>
+            <diffuse>0.58 0.64 0.70 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- The front retainer. Face plane at lane depth 0.84 m, the bed datum, which is where
+         `lane_columns.py` stands the frontmost product of a column. -->
+    <model name="front_retainer">
+      <static>true</static>
+      <link name="retainer_link">
+        <collision name="retainer_collision">
+          <pose>0 0.86 0.83 0 0 0</pose>
+          <geometry><box><size>0.30 0.04 0.30</size></box></geometry>
+        </collision>
+        <visual name="retainer_visual">
+          <pose>0 0.86 0.83 0 0 0</pose>
+          <geometry><box><size>0.30 0.04 0.30</size></box></geometry>
+          <material>
+            <ambient>0.45 0.50 0.55 1</ambient>
+            <diffuse>0.45 0.50 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- The pinned column: three catalogued cans at `lane_columns.py` index 0/1/2 poses
+         (depth = 0.84 - radius - index * 2 * radius * cos(4 deg), roll -4 deg), leaning on the
+         retainer exactly as a standing column does. Static, as every stocked product in the
+         dense demo fixture is. The rearmost (index 2) is the one the released product must come
+         to rest against. -->
+    <model name="lane_pinned_can_01">
+      <static>true</static>
+      <pose>0 0.807000000 0.813456541 -0.069813170 0 0</pose>
+      <link name="product_body">
+        <collision name="product_collision">
+          <geometry><cylinder><radius>0.033</radius><length>0.122</length></cylinder></geometry>
+        </collision>
+        <inertial>
+          <mass>0.355</mass>
+          <inertia>
+            <ixx>0.0005</ixx><iyy>0.0005</iyy><izz>0.0002</izz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+    <model name="lane_pinned_can_02">
+      <static>true</static>
+      <pose>0 0.741160773 0.818060468 -0.069813170 0 0</pose>
+      <link name="product_body">
+        <collision name="product_collision">
+          <geometry><cylinder><radius>0.033</radius><length>0.122</length></cylinder></geometry>
+        </collision>
+        <inertial>
+          <mass>0.355</mass>
+          <inertia>
+            <ixx>0.0005</ixx><iyy>0.0005</iyy><izz>0.0002</izz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+    <model name="lane_pinned_can_03">
+      <static>true</static>
+      <pose>0 0.675321545 0.822664395 -0.069813170 0 0</pose>
+      <link name="product_body">
+        <collision name="product_collision">
+          <geometry><cylinder><radius>0.033</radius><length>0.122</length></cylinder></geometry>
+        </collision>
+        <inertial>
+          <mass>0.355</mass>
+          <inertia>
+            <ixx>0.0005</ixx><iyy>0.0005</iyy><izz>0.0002</izz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+
+    <!-- The gripper in production's side-grasp pose. Model pose = grasp centre minus 0.14 m
+         along the approach: grasp centre (0, -0.032, 0.921738522) is the can's axis at base
+         + 0.111 m. `carry_joint` stands in for the arm's 0.12 m straight-line insert along the
+         approach (model +z = world +y). Entity names are the attachment boundary's own. -->
+    <model name="restocker">
+      <pose>0 -0.172 0.921738522 0 -1.570796327 -1.570796327</pose>
+      <link name="gripper">
+        <inertial>
+          <mass>1.2</mass>
+          <inertia>
+            <ixx>0.0017</ixx><iyy>0.0031</iyy><izz>0.0036</izz>
+          </inertia>
+        </inertial>
+        <collision name="palm_collision">
+          <pose>0 0 0.035 0 0 0</pose>
+          <geometry><box><size>0.16 0.11 0.07</size></box></geometry>
+        </collision>
+      </link>
+      <!-- Chassis welded to the world so `carry_joint` is a model-internal prismatic, as in
+           release_contact.sdf (a prismatic whose parent is `world` never moved, measured). -->
+      <link name="chassis">
+        <inertial>
+          <mass>20.0</mass>
+          <inertia>
+            <ixx>1.0</ixx><iyy>1.0</iyy><izz>1.0</izz>
+          </inertia>
+        </inertial>
+      </link>
+      <joint name="chassis_world_joint" type="fixed">
+        <parent>world</parent>
+        <child>chassis</child>
+      </joint>
+      <joint name="carry_joint" type="prismatic">
+        <parent>chassis</parent>
+        <child>gripper</child>
+        <axis>
+          <!-- Model +z is world +y: a positive position is travel toward the retainer. -->
+          <xyz>0 0 1</xyz>
+          <limit>
+            <lower>-0.05</lower>
+            <upper>0.25</upper>
+            <effort>80</effort>
+            <velocity>0.05</velocity>
+          </limit>
+          <dynamics><damping>5</damping></dynamics>
+        </axis>
+      </joint>
+      <!-- Fingers declared at joint zero (see release_contact.sdf for what declaring them open
+           did); box, effort, velocity, damping and friction are gripper_geometry.yaml's. The
+           lower limit alone is -0.001, not 0: a joint declared at its limit starts there, and
+           DART enforces a violated position limit instead of the servo command, so a finger
+           whose first step rounds to q = -2e-33 never moves (measured, Card 057 run M1: right
+           finger stuck at its limit for the whole run, left opened normally). Production never
+           starts there -- gz_ros2_control resets the fingers to initial_value 0.005 -- and the
+           attachment plugin reads its limits from gripper_geometry.yaml, not from this file. -->
+      <!-- The finger body keeps the box minus the 3.3 mm pad layer; the pad-row links below are
+           the pad (spec M10 §11 D9 + D10 item 3). Together they occupy exactly the old finger
+           box. izz is the box value m/12*(x^2+y^2) = 0.18/12*(0.035^2+0.018^2) = 2.32e-5; the
+           fixture used to carry a hand-set 1e-4. -->
+      <link name="left_finger">
+        <pose relative_to="gripper">0 0.03 0.07 0 0 0</pose>
+        <inertial>
+          <pose>0 0 0.07 0 0 0</pose>
+          <mass>0.18</mass>
+          <inertia>
+            <ixx>0.0003</ixx><iyy>0.0003</iyy><izz>2.324e-05</izz>
+          </inertia>
+        </inertial>
+        <collision name="left_finger_body_collision">
+          <pose>0 0.004375 0.07 0 0 0</pose>
+          <geometry><box><size>0.035 0.00925 0.14</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="left_finger_joint" type="prismatic">
+        <pose relative_to="gripper">0 0.03 0.07 0 0 0</pose>
+        <parent>gripper</parent>
+        <child>left_finger</child>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit><lower>-0.001</lower><upper>0.035</upper><effort>40</effort><velocity>0.12</velocity></limit>
+          <dynamics><damping>2</damping><friction>0.5</friction></dynamics>
+        </axis>
+      </joint>
+      <link name="right_finger">
+        <pose relative_to="gripper">0 -0.03 0.07 0 0 0</pose>
+        <inertial>
+          <pose>0 0 0.07 0 0 0</pose>
+          <mass>0.18</mass>
+          <inertia>
+            <ixx>0.0003</ixx><iyy>0.0003</iyy><izz>2.324e-05</izz>
+          </inertia>
+        </inertial>
+        <collision name="right_finger_body_collision">
+          <pose>0 -0.004375 0.07 0 0 0</pose>
+          <geometry><box><size>0.035 0.00925 0.14</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="right_finger_joint" type="prismatic">
+        <pose relative_to="gripper">0 -0.03 0.07 0 0 0</pose>
+        <parent>gripper</parent>
+        <child>right_finger</child>
+        <axis>
+          <xyz>0 -1 0</xyz>
+          <limit><lower>-0.001</lower><upper>0.035</upper><effort>40</effort><velocity>0.12</velocity></limit>
+          <dynamics><damping>2</damping><friction>0.5</friction></dynamics>
+        </axis>
+      </joint>
+      <link name="left_finger_pad_row_0">
+        <pose relative_to="left_finger">0 0 0 0 0 0</pose>
+        <inertial>
+          <pose>-0.013125 -0.00735 0.07 0 0 0</pose>
+          <mass>0.0049</mass>
+          <inertia>
+            <ixx>8.008e-06</ixx><iyy>8.035e-06</iyy><izz>3.571e-08</izz>
+          </inertia>
+        </inertial>
+        <collision name="left_finger_pad_row_0_collision">
+          <pose>-0.013125 -0.004625 0.07 0 0 0</pose>
+          <geometry><box><size>0.00875 0.00875 0.14</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="left_finger_pad_row_0_joint" type="prismatic">
+        <pose relative_to="left_finger">0 0 0 0 0 0</pose>
+        <parent>left_finger</parent>
+        <child>left_finger_pad_row_0</child>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit><lower>-0.002</lower><upper>0.002</upper><effort>500</effort><velocity>-1</velocity></limit>
+          <dynamics><damping>56</damping><friction>0</friction><spring_reference>0</spring_reference><spring_stiffness>111000</spring_stiffness></dynamics>
+        </axis>
+      </joint>
+      <link name="left_finger_pad_row_1">
+        <pose relative_to="left_finger">0 0 0 0 0 0</pose>
+        <inertial>
+          <pose>-0.004375 -0.00735 0.07 0 0 0</pose>
+          <mass>0.0049</mass>
+          <inertia>
+            <ixx>8.008e-06</ixx><iyy>8.035e-06</iyy><izz>3.571e-08</izz>
+          </inertia>
+        </inertial>
+        <collision name="left_finger_pad_row_1_collision">
+          <pose>-0.004375 -0.004625 0.07 0 0 0</pose>
+          <geometry><box><size>0.00875 0.00875 0.14</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="left_finger_pad_row_1_joint" type="prismatic">
+        <pose relative_to="left_finger">0 0 0 0 0 0</pose>
+        <parent>left_finger</parent>
+        <child>left_finger_pad_row_1</child>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit><lower>-0.002</lower><upper>0.002</upper><effort>500</effort><velocity>-1</velocity></limit>
+          <dynamics><damping>56</damping><friction>0</friction><spring_reference>0</spring_reference><spring_stiffness>111000</spring_stiffness></dynamics>
+        </axis>
+      </joint>
+      <link name="left_finger_pad_row_2">
+        <pose relative_to="left_finger">0 0 0 0 0 0</pose>
+        <inertial>
+          <pose>0.004375 -0.00735 0.07 0 0 0</pose>
+          <mass>0.0049</mass>
+          <inertia>
+            <ixx>8.008e-06</ixx><iyy>8.035e-06</iyy><izz>3.571e-08</izz>
+          </inertia>
+        </inertial>
+        <collision name="left_finger_pad_row_2_collision">
+          <pose>0.004375 -0.004625 0.07 0 0 0</pose>
+          <geometry><box><size>0.00875 0.00875 0.14</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="left_finger_pad_row_2_joint" type="prismatic">
+        <pose relative_to="left_finger">0 0 0 0 0 0</pose>
+        <parent>left_finger</parent>
+        <child>left_finger_pad_row_2</child>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit><lower>-0.002</lower><upper>0.002</upper><effort>500</effort><velocity>-1</velocity></limit>
+          <dynamics><damping>56</damping><friction>0</friction><spring_reference>0</spring_reference><spring_stiffness>111000</spring_stiffness></dynamics>
+        </axis>
+      </joint>
+      <link name="left_finger_pad_row_3">
+        <pose relative_to="left_finger">0 0 0 0 0 0</pose>
+        <inertial>
+          <pose>0.013125 -0.00735 0.07 0 0 0</pose>
+          <mass>0.0049</mass>
+          <inertia>
+            <ixx>8.008e-06</ixx><iyy>8.035e-06</iyy><izz>3.571e-08</izz>
+          </inertia>
+        </inertial>
+        <collision name="left_finger_pad_row_3_collision">
+          <pose>0.013125 -0.004625 0.07 0 0 0</pose>
+          <geometry><box><size>0.00875 0.00875 0.14</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="left_finger_pad_row_3_joint" type="prismatic">
+        <pose relative_to="left_finger">0 0 0 0 0 0</pose>
+        <parent>left_finger</parent>
+        <child>left_finger_pad_row_3</child>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit><lower>-0.002</lower><upper>0.002</upper><effort>500</effort><velocity>-1</velocity></limit>
+          <dynamics><damping>56</damping><friction>0</friction><spring_reference>0</spring_reference><spring_stiffness>111000</spring_stiffness></dynamics>
+        </axis>
+      </joint>
+      <link name="right_finger_pad_row_0">
+        <pose relative_to="right_finger">0 0 0 0 0 0</pose>
+        <inertial>
+          <pose>-0.013125 0.00735 0.07 0 0 0</pose>
+          <mass>0.0049</mass>
+          <inertia>
+            <ixx>8.008e-06</ixx><iyy>8.035e-06</iyy><izz>3.571e-08</izz>
+          </inertia>
+        </inertial>
+        <collision name="right_finger_pad_row_0_collision">
+          <pose>-0.013125 0.004625 0.07 0 0 0</pose>
+          <geometry><box><size>0.00875 0.00875 0.14</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="right_finger_pad_row_0_joint" type="prismatic">
+        <pose relative_to="right_finger">0 0 0 0 0 0</pose>
+        <parent>right_finger</parent>
+        <child>right_finger_pad_row_0</child>
+        <axis>
+          <xyz>0 -1 0</xyz>
+          <limit><lower>-0.002</lower><upper>0.002</upper><effort>500</effort><velocity>-1</velocity></limit>
+          <dynamics><damping>56</damping><friction>0</friction><spring_reference>0</spring_reference><spring_stiffness>111000</spring_stiffness></dynamics>
+        </axis>
+      </joint>
+      <link name="right_finger_pad_row_1">
+        <pose relative_to="right_finger">0 0 0 0 0 0</pose>
+        <inertial>
+          <pose>-0.004375 0.00735 0.07 0 0 0</pose>
+          <mass>0.0049</mass>
+          <inertia>
+            <ixx>8.008e-06</ixx><iyy>8.035e-06</iyy><izz>3.571e-08</izz>
+          </inertia>
+        </inertial>
+        <collision name="right_finger_pad_row_1_collision">
+          <pose>-0.004375 0.004625 0.07 0 0 0</pose>
+          <geometry><box><size>0.00875 0.00875 0.14</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="right_finger_pad_row_1_joint" type="prismatic">
+        <pose relative_to="right_finger">0 0 0 0 0 0</pose>
+        <parent>right_finger</parent>
+        <child>right_finger_pad_row_1</child>
+        <axis>
+          <xyz>0 -1 0</xyz>
+          <limit><lower>-0.002</lower><upper>0.002</upper><effort>500</effort><velocity>-1</velocity></limit>
+          <dynamics><damping>56</damping><friction>0</friction><spring_reference>0</spring_reference><spring_stiffness>111000</spring_stiffness></dynamics>
+        </axis>
+      </joint>
+      <link name="right_finger_pad_row_2">
+        <pose relative_to="right_finger">0 0 0 0 0 0</pose>
+        <inertial>
+          <pose>0.004375 0.00735 0.07 0 0 0</pose>
+          <mass>0.0049</mass>
+          <inertia>
+            <ixx>8.008e-06</ixx><iyy>8.035e-06</iyy><izz>3.571e-08</izz>
+          </inertia>
+        </inertial>
+        <collision name="right_finger_pad_row_2_collision">
+          <pose>0.004375 0.004625 0.07 0 0 0</pose>
+          <geometry><box><size>0.00875 0.00875 0.14</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="right_finger_pad_row_2_joint" type="prismatic">
+        <pose relative_to="right_finger">0 0 0 0 0 0</pose>
+        <parent>right_finger</parent>
+        <child>right_finger_pad_row_2</child>
+        <axis>
+          <xyz>0 -1 0</xyz>
+          <limit><lower>-0.002</lower><upper>0.002</upper><effort>500</effort><velocity>-1</velocity></limit>
+          <dynamics><damping>56</damping><friction>0</friction><spring_reference>0</spring_reference><spring_stiffness>111000</spring_stiffness></dynamics>
+        </axis>
+      </joint>
+      <link name="right_finger_pad_row_3">
+        <pose relative_to="right_finger">0 0 0 0 0 0</pose>
+        <inertial>
+          <pose>0.013125 0.00735 0.07 0 0 0</pose>
+          <mass>0.0049</mass>
+          <inertia>
+            <ixx>8.008e-06</ixx><iyy>8.035e-06</iyy><izz>3.571e-08</izz>
+          </inertia>
+        </inertial>
+        <collision name="right_finger_pad_row_3_collision">
+          <pose>0.013125 0.004625 0.07 0 0 0</pose>
+          <geometry><box><size>0.00875 0.00875 0.14</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="right_finger_pad_row_3_joint" type="prismatic">
+        <pose relative_to="right_finger">0 0 0 0 0 0</pose>
+        <parent>right_finger</parent>
+        <child>right_finger_pad_row_3</child>
+        <axis>
+          <xyz>0 -1 0</xyz>
+          <limit><lower>-0.002</lower><upper>0.002</upper><effort>500</effort><velocity>-1</velocity></limit>
+          <dynamics><damping>56</damping><friction>0</friction><spring_reference>0</spring_reference><spring_stiffness>111000</spring_stiffness></dynamics>
+        </axis>
+      </joint>
+      <!-- Jaws start open around the resting can, as an approach does; the probe closes them to
+           the can's hold_joint_target_m (0.0145 m) before attaching. Open target stays
+           gripper_geometry.yaml's attachment.open_target_m: the plugin decouples only there. -->
+      <!-- Force-mode position control (spec M10 §11 D10 item 5, F12): gz-sim's own controller
+           defaults to a PID writing JointForceCmd, so a jaw blocked by the product pushes with
+           exactly the clamp. The two numbers are production's derived pair —
+           p = effort_n/(hold_interference_m - effort_n/pad_row_stiffness) = 62535 N/m and
+           d = effort_n/velocity_mps - joint damping = 331 N*s/m — clamped to +-40 N. It runs at
+           the 1 kHz physics step, the rate D10 item 5 requires. -->
+      <plugin filename="gz-sim-joint-position-controller-system"
+              name="gz::sim::systems::JointPositionController">
+        <joint_name>left_finger_joint</joint_name>
+        <topic>/release_contact/left_finger_position</topic>
+        <initial_position>0.032</initial_position>
+        <p_gain>62535</p_gain>
+        <i_gain>0</i_gain>
+        <d_gain>331</d_gain>
+        <cmd_max>40</cmd_max>
+        <cmd_min>-40</cmd_min>
+      </plugin>
+      <plugin filename="gz-sim-joint-position-controller-system"
+              name="gz::sim::systems::JointPositionController">
+        <joint_name>right_finger_joint</joint_name>
+        <topic>/release_contact/right_finger_position</topic>
+        <initial_position>0.032</initial_position>
+        <p_gain>62535</p_gain>
+        <i_gain>0</i_gain>
+        <d_gain>331</d_gain>
+        <cmd_max>40</cmd_max>
+        <cmd_min>-40</cmd_min>
+      </plugin>
+      <!-- The insert's drive: a trapezoidal profile in simulated time, not
+           JointPositionController's dead-beat step (see trapezoidal_carry_system.cpp). 0.05 m/s
+           is the joint's own limit, as before; 0.5 m/s^2 is a conservative upper bound on the
+           tool acceleration production's retiming allows (acceleration scaling 0.2,
+           motion_port.hpp, on joint limits of 0.5-2.0 rad/s^2, joint_limits.yaml), declared
+           before it was measured against. -->
+      <plugin filename="trapezoidal_carry_system" name="restocker_gazebo::TrapezoidalCarry">
+        <joint_name>carry_joint</joint_name>
+        <topic>/release_contact/carry_position</topic>
+        <initial_position>0</initial_position>
+        <max_velocity>0.05</max_velocity>
+        <max_acceleration>0.5</max_acceleration>
+      </plugin>
+      <!-- Joint states give the probe the carry and finger positions directly: the model pose
+           no longer tracks the gripper once the chassis is welded to the world. -->
+      <plugin filename="gz-sim-joint-state-publisher-system"
+              name="gz::sim::systems::JointStatePublisher">
+        <topic>/release_contact/joint_state</topic>
+      </plugin>
+    </model>
+
+    <!-- The carried product: the scenario allowlist's `stock_can_01`, upright-inverted (roll pi,
+         identical cylinder physics, and the orientation the inverted grasp frame authorises).
+         It loads parked on the floor clear of the jaws, which start at joint zero; the probe
+         moves it to the pre-insert pose (0, -0.032, 0.871738522), resting level on the rear
+         pad, once the jaws are open. -->
+    <model name="stock_can_01">
+      <pose>0.4 -0.032 0.061 3.141592654 0 0</pose>
+      <link name="product_body">
+        <inertial>
+          <mass>0.355</mass>
+          <inertia>
+            <ixx>0.0005</ixx><iyy>0.0005</iyy><izz>0.0002</izz>
+          </inertia>
+        </inertial>
+        <collision name="product_collision">
+          <geometry><cylinder><radius>0.033</radius><length>0.122</length></cylinder></geometry>
+        </collision>
+      </link>
+    </model>
+  </world>
+</sdf>

@@ -17,6 +17,7 @@
   <exec_depend>restocker_task_executor</exec_depend>
   <exec_depend>restocker_world_state</exec_depend>
   <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>restocker_benchmarks</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
   <test_depend>geometry_msgs</test_depend>

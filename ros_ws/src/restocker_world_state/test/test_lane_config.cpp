@@ -283,7 +283,16 @@ TEST(LaneConfig, DerivesTheLaneDepthEachCataloguedProductCosts)
   // was added for the same-shape recognition work after this test was written, and a hardcoded
   // three failed on a tree where nothing about lane depth had changed.
   const YAML::Node catalog = YAML::LoadFile(RESTOCKER_TEST_PRODUCT_CATALOG);
-  ASSERT_EQ(profiles.size(), catalog["geometries"].size());
+  // The contour bottle is perception-only (Card 110) and a box has no lane placement model yet
+  // (CMB-119 stage 1): the loader skips both, so neither has a profile.
+  size_t laneable = 0;
+  for (const auto & geometry : catalog["geometries"]) {
+    const std::string product_class = geometry["product_class"].as<std::string>();
+    if (product_class != "contour_bottle" && product_class != "box") {
+      ++laneable;
+    }
+  }
+  ASSERT_EQ(profiles.size(), laneable);
   const double incline = 4.0 * std::acos(-1.0) / 180.0;
   const double entry = 0.045;
   struct Case

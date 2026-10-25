@@ -3776,7 +3776,7 @@ void RestockCoordinatorDriver::request_motion_segment(
       grasp->poses.world_from_retract_tool0;
     goal.required_postcontinuation_linear_egress_pose = *carry_start;
     goal.required_postcontinuation_gripper_joint_position_m =
-      grasp->hold_joint_position_m;
+      grasp->planning_hold_joint_position_m;
     // A continuation-safe pose can have several disconnected IK branches; try a bounded set of
     // endpoints so one difficult branch does not burn the grasp.
     goal.free_space_plan_candidates = 4U;
@@ -3882,7 +3882,7 @@ void RestockCoordinatorDriver::request_motion_segment(
     // the roller bed during the straight insert; prove the continuation when choosing it.
     goal.required_linear_continuation_pose = placement->poses.world_from_final_tool0;
     goal.required_linear_continuation_gripper_joint_position_m =
-      grasp->hold_joint_position_m;
+      grasp->planning_hold_joint_position_m;
     const auto carry_start = build_carry_start_tool0_pose(
       grasp->poses.world_from_retract_tool0,
       placement->poses.world_from_preinsertion_tool0,
@@ -4122,6 +4122,11 @@ void RestockCoordinatorDriver::request_gripper(
   switch (aperture) {
     case GripperAperture::kHold:
       goal.target_position_m = candidate->hold_joint_position_m;
+      if (grasp->config.physical_hold) {
+        // Commanded past the surface, the fingers stop against the product short of the target.
+        goal.stall_band_m =
+          grasp->config.hold_interference_per_side_m + kAttachmentJointToleranceM;
+      }
       break;
     case GripperAperture::kEscapeClearance:
       goal.target_position_m = escape_record->open_joint_position_m;

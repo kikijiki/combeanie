@@ -16,6 +16,8 @@
 # growth and terminal placement-evidence verdict as a receipt.
 
 import os
+from pathlib import Path
+import tempfile
 import unittest
 
 import launch
@@ -27,6 +29,22 @@ import launch_testing
 import launch_testing.actions
 import launch_testing.asserts
 import pytest
+
+
+def _weld_gripper_geometry() -> str:
+    """Pin this fixture to hold_mode: weld and let the probe assert the receipt."""
+    # Card 019's attach/carry/release verdicts were measured with the welded carry and are
+    # re-measured under contact by Card 057's remeasurement (spec 11.6), so this fixture opts
+    # into the non-physical mode explicitly rather than silently following the shipped default.
+    # The probe asserts hold_mode == "weld" from the attachment state, so the opt-in is a
+    # receipt and not just a test-side substitution: the simulator reports which physics it ran.
+    source = Path(os.environ["RESTOCKER_TEST_GRIPPER_GEOMETRY"]).read_text(encoding="utf-8")
+    if "hold_mode: weld" not in source and "hold_mode: physical" not in source:
+        raise AssertionError("gripper_geometry.yaml carries no hold_mode")
+    pinned = source.replace("hold_mode: physical", "hold_mode: weld")
+    target = Path(tempfile.gettempdir()) / "restocker_release_contact_gripper_weld.yaml"
+    target.write_text(pinned, encoding="utf-8")
+    return str(target)
 
 
 @pytest.mark.launch_test
@@ -64,9 +82,10 @@ def generate_test_description():
                     os.environ["RESTOCKER_TEST_ATTACHMENT_BOUNDARY"],
                 ),
                 SetEnvironmentVariable(
-                    "RESTOCKER_GRIPPER_GEOMETRY_CONFIG",
-                    os.environ["RESTOCKER_TEST_GRIPPER_GEOMETRY"],
+                    "RESTOCKER_GRIPPER_GEOMETRY_CONFIG", _weld_gripper_geometry()
                 ),
+                SetEnvironmentVariable("RESTOCKER_RELEASE_CONTACT_HOLD_MODE", "weld"),
+                SetEnvironmentVariable("RESTOCKER_RELEASE_CONTACT_HOLD_TARGET", "0.0145"),
                 SetEnvironmentVariable(
                     "RESTOCKER_PRODUCT_CATALOG_CONFIG",
                     os.environ["RESTOCKER_TEST_PRODUCT_CATALOG"],

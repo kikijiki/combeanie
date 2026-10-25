@@ -8,6 +8,7 @@ find_package(ament_cmake REQUIRED)
 find_package(action_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 
@@ -18,8 +19,12 @@ rosidl_generate_interfaces(
   "action/SurveyTray.action"
   "action/SurveyViewpoint.action"
   "msg/AutonomousRestockCampaignStatus.msg"
+  "msg/Inventory.msg"
+  "msg/InventoryLane.msg"
+  "msg/InventorySku.msg"
   "msg/LaneDepthErrorSample.msg"
   "msg/LaneObservation.msg"
+  "msg/LaneStock.msg"
   "msg/ObjectDetection.msg"
   "msg/ObjectObservation.msg"
   "msg/ObjectSegmentation.msg"
@@ -50,7 +55,10 @@ rosidl_generate_interfaces(
   "srv/GetPlanningSceneProjectionStatus.srv"
   "srv/GetSimulationAttachmentState.srv"
   "srv/GetWorldState.srv"
+  "srv/IdentifyObject.srv"
+  "srv/IdentifyProduct.srv"
   "srv/InvalidateLaneEvidence.srv"
+  "srv/QueryInventory.srv"
   "srv/ReleasePlanningSceneLease.srv"
   "srv/ReleaseTaskReservation.srv"
   "srv/ReserveTask.srv"
@@ -59,7 +67,7 @@ rosidl_generate_interfaces(
   "srv/ValidateExecutionWorldAuthority.srv"
   "srv/ValidatePlanningSceneLease.srv"
   "srv/ValidateTaskReservation.srv"
-  DEPENDENCIES action_msgs builtin_interfaces geometry_msgs std_msgs
+  DEPENDENCIES action_msgs builtin_interfaces geometry_msgs sensor_msgs std_msgs
 )
 
 ament_export_dependencies(rosidl_default_runtime)
@@ -77,6 +85,7 @@ if(BUILD_TESTING)
     test_simulation_attachment test/test_simulation_attachment.py TIMEOUT 30)
   ament_add_pytest_test(test_task_reservation test/test_task_reservation.py TIMEOUT 30)
   ament_add_pytest_test(test_set_lane_policy test/test_set_lane_policy.py TIMEOUT 30)
+  ament_add_pytest_test(test_inventory_messages test/test_inventory_messages.py TIMEOUT 30)
   ament_add_pytest_test(test_robot_telemetry test/test_robot_telemetry.py TIMEOUT 30)
   ament_add_pytest_test(
     test_restock_coordinator_status test/test_restock_coordinator_status.py TIMEOUT 30)

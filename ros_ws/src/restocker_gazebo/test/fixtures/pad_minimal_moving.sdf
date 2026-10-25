@@ -1,0 +1,87 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
+<!-- Bisect step 2 for Card 057: pad_minimal.sdf with the pad joint's parent made a MOVING link
+     (a second prismatic joint under it), which is the structural difference from the minimal
+     world that production actually has: there the parent is the finger, itself on a joint, not a
+     body welded to the world. Everything else is unchanged: same child mass, same axis, limits,
+     spring_stiffness 111000, damping 11.5, spring_reference 1 mm away from the start.
+
+     Run with RESTOCKER_PAD_SPRING_OFF=1 to watch the engine's own spring only: q must ramp to
+     0.001 and stop. The finger is free but has the shipped damping and friction, so it settles
+     instead of drifting away. -->
+<sdf version="1.9">
+  <world name="pad_minimal_moving">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="restocker_pad_spring_system" name="restocker_gazebo::PadSpringSystem"/>
+
+    <physics name="pad_minimal_physics" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <dart>
+        <collision_detector>bullet</collision_detector>
+      </dart>
+    </physics>
+
+    <gravity>0 0 -9.80665</gravity>
+
+    <model name="spring_probe">
+      <link name="base">
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>0.001</ixx><iyy>0.001</iyy><izz>0.001</izz>
+          </inertia>
+        </inertial>
+      </link>
+      <joint name="base_world_joint" type="fixed">
+        <parent>world</parent>
+        <child>base</child>
+      </joint>
+
+      <!-- The moving parent: the shipped finger joint (0.18 kg, damping 2, friction 0.5, effort
+           40, velocity 0.12), free to move so the spring's reaction has somewhere to go. -->
+      <link name="finger">
+        <pose relative_to="base">0 0 0 0 0 0</pose>
+        <inertial>
+          <mass>0.18</mass>
+          <inertia>
+            <ixx>0.0003</ixx><iyy>0.0003</iyy><izz>2.324e-05</izz>
+          </inertia>
+        </inertial>
+      </link>
+      <joint name="finger_joint" type="prismatic">
+        <pose relative_to="base">0 0 0 0 0 0</pose>
+        <parent>base</parent>
+        <child>finger</child>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit><lower>-0.01</lower><upper>0.035</upper><effort>40</effort><velocity>0.12</velocity></limit>
+          <dynamics><damping>2</damping><friction>0.5</friction></dynamics>
+        </axis>
+      </joint>
+
+      <link name="test_pad_row_0">
+        <pose relative_to="finger">0 0 0 0 0 0</pose>
+        <inertial>
+          <mass>0.0049</mass>
+          <inertia>
+            <ixx>8.008e-06</ixx><iyy>8.035e-06</iyy><izz>3.571e-08</izz>
+          </inertia>
+        </inertial>
+      </link>
+      <joint name="test_pad_row_0_joint" type="prismatic">
+        <pose relative_to="finger">0 0 0 0 0 0</pose>
+        <parent>finger</parent>
+        <child>test_pad_row_0</child>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit><lower>-0.002</lower><upper>0.002</upper><effort>500</effort><velocity>-1</velocity></limit>
+          <dynamics><damping>11.5</damping><friction>0</friction><spring_reference>0.001</spring_reference><spring_stiffness>111000</spring_stiffness></dynamics>
+        </axis>
+      </joint>
+    </model>
+  </world>
+</sdf>

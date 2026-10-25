@@ -1,0 +1,50 @@
+{
+  "card": "CMB-112",
+  "round": 2,
+  "declared_on": "2026-10-19",
+  "declared_before_any_fresh_held_out_data_was_read": true,
+  "supersedes_for_new_decisions": "config/identity_acceptance_bounds.json (round 1, spent: both error bounds failed on 14 held-out objects)",
+  "bounds": {
+    "false_identity_rate_known_max": 0.01,
+    "unknown_named_as_sku_max": 0.05,
+    "latency_p95_ms_max": 2000
+  },
+  "required_sample": {
+    "known_objects_min": 150,
+    "unknown_objects_min": 60,
+    "note": "decision unit = one object with up to max_views close views; counted on the fresh held-out seeds of the version-2 split file only"
+  },
+  "pass_rule": "a bounded error rate passes only if the UPPER limit of its 95 % Wilson interval is at or below its bound, and only if the required sample size is met; latency passes if the p95 is at or below its bound; anything else is reported as fail (point estimate over the bound), or inconclusive (point estimate under the bound, upper limit over it, or sample too small). Report whatever comes out; no re-tuning, one run.",
+  "definitions": {
+    "false_identity_rate_known": "decisions that name a SKU that is not the true one, over all decisions on objects whose product is registered (abstain and unknown count in the denominator, never in the numerator)",
+    "unknown_named_as_sku": "decisions that name any registered SKU, over all decisions on objects whose product is not registered (held-out products); abstain and unknown are the wanted outcomes",
+    "latency_p95_ms": "95th percentile wall-clock of IdentityEngine.identify per decision on this box, CPU, crops already cut; no duty budget exists in the repository, 2 s per decision is declared here"
+  },
+  "calibration_ceilings": {
+    "false_identity_rate_known_max": 0.005,
+    "unknown_named_as_sku_max": 0.025,
+    "note": "half of each bound; the unknown-twin subset is held to the unknown ceiling too"
+  },
+  "options_fixed_a_priori": {
+    "embedding": "SigLIP 2 base, google/siglip2-base-patch16-224 at a pinned revision, CPU",
+    "whitening": "PCA 64 components fit on unlabeled registry exemplars plus unlabeled calibration crops",
+    "views": "up to 5 close views of one object, voted",
+    "scoring": "max",
+    "independent_channel_rule": "OCR or barcode may name a product the embedding ranks first or second; contradicting channels abstain",
+    "calibrated_numbers_only": "embedding-alone thresholds (score, margin, vote), per-product floors from wrong wins plus a floor margin chosen among 0.01, 0.03, 0.05, 0.08 on out-of-fold error, unknown floor",
+    "ocr": "RapidOCR on at most 2 crops per object, rotations 0 and 45 degrees tried per crop (first rotation that names a product wins); naming rule: every word no other registered product has was read (fuzzy 0.8) and at least two words in all",
+    "barcode": "aimed close-up viewpoints (perception_barcode_views, 0.22 m, camera at the barcode azimuth, +-20 degrees); zxing-cpp EAN-13 on the unrolled barrel and on the raw crop; valid check digit and exact GTIN lookup"
+  },
+  "calibration_data": "train and validation seeds of the version-2 split file; registry = train + validation products; unknown products by leave-products-out in three folds that put look-alike twins in different folds; out-of-fold (5 folds by scene seed) error of the whole fitting procedure is reported next to the in-sample numbers",
+  "held_out_data": "fresh held-out seeds of the version-2 split file, read once, after the calibration file is committed; the version-1 held-out (burned) seeds are reported as a secondary number only",
+  "reported_without_bound": [
+    "abstention rate on known products",
+    "rate at which unknown products are called unknown",
+    "look-alike twin confusion and unknown-twin named rate",
+    "correct-identification rate",
+    "per-channel answer rate and precision (embedding, OCR, barcode)",
+    "latency p50",
+    "all of the above per range band and lighting condition"
+  ],
+  "training": "none; AGENT_BRIEF section 3.3 holds"
+}

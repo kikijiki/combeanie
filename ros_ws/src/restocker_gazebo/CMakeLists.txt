@@ -138,6 +138,14 @@ target_link_libraries(
 )
 target_compile_options(restocker_attachment_system PRIVATE -Wall -Wextra -Wpedantic)
 
+# The pad-row spring-damper of spec M10 section 11 D10 item 3: the description carries
+# spring_stiffness/spring_reference/damping and the engine does not act on them (Card 057 run B),
+# so this system commands the force itself. Built beside restocker_attachment_system so the same
+# plugin path finds it, and installed with it because worlds/restocking.sdf loads it in production.
+add_library(restocker_pad_spring_system SHARED src/pad_spring_system.cpp)
+target_link_libraries(restocker_pad_spring_system PRIVATE gz-sim8::gz-sim8)
+target_compile_options(restocker_pad_spring_system PRIVATE -Wall -Wextra -Wpedantic)
+
 add_library(ground_truth_conversion src/ground_truth_conversion.cpp)
 add_library(restocker_gazebo::ground_truth_conversion ALIAS ground_truth_conversion)
 target_include_directories(
@@ -195,13 +203,17 @@ target_link_libraries(
 target_compile_options(attachment_adapter_node PRIVATE -Wall -Wextra -Wpedantic)
 
 install(
-  DIRECTORY config launch materials urdf worlds
+  DIRECTORY config launch materials meshes urdf worlds
   DESTINATION share/${PROJECT_NAME}
   PATTERN "__pycache__" EXCLUDE
   PATTERN "*.pyc" EXCLUDE
 )
 install(
-  TARGETS attachment_adapter_node ground_truth_adapter restocker_attachment_system
+  TARGETS
+    attachment_adapter_node
+    ground_truth_adapter
+    restocker_attachment_system
+    restocker_pad_spring_system
   RUNTIME DESTINATION lib/${PROJECT_NAME}
   LIBRARY DESTINATION lib
 )
@@ -226,6 +238,30 @@ if(BUILD_TESTING)
       RESTOCKER_TASK_EXECUTOR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_task_executor
       RESTOCKER_WORLD_STATE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_world_state
     TIMEOUT 60
+  )
+  ament_add_pytest_test(
+    test_label_textures
+    test/test_label_textures.py
+    ENV
+      RESTOCKER_CONTROL_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_control
+      RESTOCKER_DESCRIPTION_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description
+      RESTOCKER_GAZEBO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+      RESTOCKER_MOVEIT_CONFIG_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_moveit_config
+      RESTOCKER_TASK_EXECUTOR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_task_executor
+      RESTOCKER_WORLD_STATE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_world_state
+    TIMEOUT 60
+  )
+  ament_add_pytest_test(
+    test_label_factory
+    test/test_label_factory.py
+    ENV
+      RESTOCKER_CONTROL_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_control
+      RESTOCKER_DESCRIPTION_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description
+      RESTOCKER_GAZEBO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+      RESTOCKER_MOVEIT_CONFIG_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_moveit_config
+      RESTOCKER_TASK_EXECUTOR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_task_executor
+      RESTOCKER_WORLD_STATE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_world_state
+    TIMEOUT 120
   )
   ament_add_pytest_test(
     test_scenario_config
@@ -254,6 +290,34 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_lane_columns
     test/test_lane_columns.py
+    ENV
+      RESTOCKER_CONTROL_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_control
+      RESTOCKER_DESCRIPTION_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description
+      RESTOCKER_GAZEBO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+      RESTOCKER_MOVEIT_CONFIG_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_moveit_config
+      RESTOCKER_TASK_EXECUTOR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_task_executor
+      RESTOCKER_WORLD_STATE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_world_state
+      RESTOCKER_TEST_WORKCELL_GEOMETRY=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description/config/workcell_geometry.yaml
+      RESTOCKER_TEST_PRODUCT_CATALOG=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description/config/product_collision_catalog.yaml
+    TIMEOUT 60
+  )
+  ament_add_pytest_test(
+    test_showcase
+    test/test_showcase.py
+    ENV
+      RESTOCKER_CONTROL_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_control
+      RESTOCKER_DESCRIPTION_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description
+      RESTOCKER_GAZEBO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+      RESTOCKER_MOVEIT_CONFIG_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_moveit_config
+      RESTOCKER_TASK_EXECUTOR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_task_executor
+      RESTOCKER_WORLD_STATE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_world_state
+      RESTOCKER_TEST_WORKCELL_GEOMETRY=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description/config/workcell_geometry.yaml
+      RESTOCKER_TEST_PRODUCT_CATALOG=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description/config/product_collision_catalog.yaml
+    TIMEOUT 60
+  )
+  ament_add_pytest_test(
+    test_world_bundle
+    test/test_world_bundle.py
     ENV
       RESTOCKER_CONTROL_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_control
       RESTOCKER_DESCRIPTION_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description
@@ -372,6 +436,25 @@ if(BUILD_TESTING)
       gz-transport13::gz-transport13
   )
   target_compile_options(product_contact_probe PRIVATE -Wall -Wextra -Wpedantic)
+  # Test-only gz system: logs the grip's measured squeeze (joint and contact forces) from the
+  # grasp fixtures. Built beside restocker_attachment_system so the same plugin path finds it.
+  add_library(grip_force_probe_system SHARED test/grip_force_probe_system.cpp)
+  target_link_libraries(
+    grip_force_probe_system PRIVATE gz-sim8::gz-sim8 gz-transport13::gz-transport13)
+  target_compile_options(grip_force_probe_system PRIVATE -Wall -Wextra -Wpedantic)
+  # Test-only gz system: the arm's time-parameterized insert as a trapezoidal carry profile.
+  add_library(trapezoidal_carry_system SHARED test/trapezoidal_carry_system.cpp)
+  target_link_libraries(
+    trapezoidal_carry_system PRIVATE gz-sim8::gz-sim8 gz-transport13::gz-transport13)
+  target_compile_options(trapezoidal_carry_system PRIVATE -Wall -Wextra -Wpedantic)
+
+  # Test-only gz system: the pad-spring bench — one finger, one loaded pad row, a fixed block and
+  # three known constant efforts, so the pad's deflection and the contact wrench can be compared
+  # against the rubber spec M10 section 11 D10 item 3 claims (Card 057).
+  add_library(pad_spring_probe_system SHARED test/pad_spring_probe_system.cpp)
+  target_link_libraries(pad_spring_probe_system PRIVATE gz-sim8::gz-sim8)
+  target_compile_options(pad_spring_probe_system PRIVATE -Wall -Wextra -Wpedantic)
+
   add_executable(release_contact_probe test/release_contact_probe.cpp)
   target_link_libraries(
     release_contact_probe
@@ -446,6 +529,30 @@ if(BUILD_TESTING)
       RESTOCKER_TEST_GRIPPER_GEOMETRY=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description/config/gripper_geometry.yaml
       RESTOCKER_TEST_PRODUCT_CATALOG=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description/config/product_collision_catalog.yaml
       RESTOCKER_TEST_SCENARIO=${CMAKE_CURRENT_SOURCE_DIR}/config/baseline_products.yaml
+  )
+
+  add_launch_test(
+    test/test_physical_grasp_runtime.py
+    TARGET test_physical_grasp_runtime
+    TIMEOUT 150
+    ENV
+      GZ_PARTITION=restocker_physical_grasp_test
+      RESTOCKER_RELEASE_CONTACT_PROBE=$<TARGET_FILE:release_contact_probe>
+      RESTOCKER_RELEASE_CONTACT_TEST_WORLD=${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures/physical_grasp.sdf
+      RESTOCKER_ATTACHMENT_PLUGIN_DIR=$<TARGET_FILE_DIR:restocker_attachment_system>
+      RESTOCKER_TEST_ATTACHMENT_BOUNDARY=${CMAKE_CURRENT_SOURCE_DIR}/config/attachment_boundary.yaml
+      RESTOCKER_TEST_GRIPPER_GEOMETRY=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description/config/gripper_geometry.yaml
+      RESTOCKER_TEST_PRODUCT_CATALOG=${CMAKE_CURRENT_SOURCE_DIR}/../restocker_description/config/product_collision_catalog.yaml
+      RESTOCKER_TEST_SCENARIO=${CMAKE_CURRENT_SOURCE_DIR}/config/baseline_products.yaml
+  )
+  add_launch_test(
+    test/test_pad_spring_runtime.py
+    TARGET test_pad_spring_runtime
+    TIMEOUT 60
+    ENV
+      GZ_PARTITION=restocker_pad_spring_test
+      RESTOCKER_ATTACHMENT_PLUGIN_DIR=$<TARGET_FILE_DIR:restocker_attachment_system>
+      RESTOCKER_PAD_SPRING_TEST_WORLD=${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures/pad_spring.sdf
   )
   # `restocking.sdf` carries the sensors system, so these need a working OpenGL stack and
   # cannot run in the Nix build sandbox; see the same label in restocker_bringup for the detail.

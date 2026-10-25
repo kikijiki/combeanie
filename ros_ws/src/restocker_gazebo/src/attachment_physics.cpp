@@ -10,6 +10,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <sstream>
 #include <string>
 #include <utility>
 
@@ -21,6 +22,15 @@ namespace
 [[nodiscard]] AttachmentStatus status(AttachmentStatusCode code, std::string detail)
 {
   return AttachmentStatus{code, std::move(detail)};
+}
+
+// A refusal that names its own measurement: the bounds alone cannot say whether the gate tripped
+// on a hair over the limit or on an order of magnitude of contact jitter.
+[[nodiscard]] std::string measurement(double value)
+{
+  std::ostringstream stream;
+  stream << value;
+  return stream.str();
 }
 
 [[nodiscard]] bool finite_positive(double value)
@@ -182,7 +192,8 @@ double fidelity_translation_ceiling(
   // less the per-side hold clearance, because the hold target is where the faces sit one hold
   // clearance off the product surface. Holding back minimum_inner_clearance_m as well leaves this
   // ceiling a hold clearance plus an inner clearance inside the bare geometric bound.
-  return gripper.open_target_m - product.hold_joint_target_m - gripper.minimum_inner_clearance_m;
+  return gripper.open_target_m - (product.hold_joint_target_m + gripper.hold_target_offset_m) -
+         gripper.minimum_inner_clearance_m;
 }
 
 AttachmentStatus validate_attachment_geometry(
@@ -200,6 +211,8 @@ AttachmentStatus validate_attachment_geometry(
     gripper.joint_lower_m >= gripper.joint_upper_m ||
     !finite_positive(gripper.minimum_inner_clearance_m) ||
     !finite_positive(gripper.minimum_contact_overlap_m) ||
+    !finite_nonnegative(gripper.maximum_penetration_m) ||
+    !finite_nonnegative(gripper.contact_tolerance_m) ||
     !finite_positive(product.radius_m) || !finite_positive(product.height_m) ||
     !std::isfinite(gripper.open_target_m) ||
     !std::isfinite(product.hold_joint_target_m))
@@ -239,7 +252,8 @@ AttachValidationResult validate_physical_attach(
   const ParallelJawAttachmentGeometry & gripper,
   const CylinderAttachmentGeometry & product,
   const AttachmentPhysicalTolerances & tolerances,
-  const AttachPhysicalObservation & observation)
+  const AttachPhysicalObservation & observation,
+  AttachmentHoldMode hold_mode)
 {
   const auto geometry_status = validate_attachment_geometry(gripper, product, tolerances);
   if (geometry_status.code != AttachmentStatusCode::kPending) {
@@ -270,25 +284,61 @@ AttachValidationResult validate_physical_attach(
       AttachmentStatusCode::kOutOfTolerance,
       "attachment pose or relative velocity is non-finite");
   }
-  if (observation.relative_linear_velocity_in_parent.norm() >
-    tolerances.relative_linear_velocity_mps ||
-    observation.relative_angular_velocity_in_parent.norm() >
-    tolerances.relative_angular_velocity_radps)
+  const double linear_speed = observation.relative_linear_velocity_in_parent.norm();
+  const double angular_speed = observation.relative_angular_velocity_in_parent.norm();
+  if (linear_speed > tolerances.relative_linear_velocity_mps ||
+    angular_speed > tolerances.relative_angular_velocity_radps)
   {
     return rejected(
       AttachmentStatusCode::kOutOfTolerance,
-      "attachment relative velocity exceeds the pre-attach limit");
+      "attachment relative velocity exceeds the pre-attach limit: linear " +
+      measurement(linear_speed) + " of " + measurement(tolerances.relative_linear_velocity_mps) +
+      " m/s, angular " + measurement(angular_speed) + " of " +
+      measurement(tolerances.relative_angular_velocity_radps) + " rad/s");
   }
-  if (!joint_near(
-      observation.left_finger_position_m, product.hold_joint_target_m,
-      tolerances.joint_position_m) ||
-    !joint_near(
-      observation.right_finger_position_m, product.hold_joint_target_m,
-      tolerances.joint_position_m))
-  {
-    return rejected(
-      AttachmentStatusCode::kGripperNotReady,
-      "both fingers must be at the product-specific hold target");
+  if (hold_mode == AttachmentHoldMode::kWeld) {
+    if (!joint_near(
+        observation.left_finger_position_m, product.hold_joint_target_m,
+        tolerances.joint_position_m) ||
+      !joint_near(
+        observation.right_finger_position_m, product.hold_joint_target_m,
+        tolerances.joint_position_m))
+    {
+      return rejected(
+        AttachmentStatusCode::kGripperNotReady,
+        "both fingers must be at the product-specific hold target");
+    }
+  } else {
+    // Physical mode: the jaws were commanded past the surface, so they rest *short* of that
+    // command, stopped by the product, while the servo keeps pressing. Two pieces of evidence
+    // say so — the stall below, and the contact band this file checks on the clearance — and
+    // neither exists in weld mode. A finger still travelling has not taken the load yet; one
+    // sitting at the joint limit or at the open target is not on the product at all.
+    if (!std::isfinite(observation.left_finger_velocity_mps) ||
+      !std::isfinite(observation.right_finger_velocity_mps) ||
+      std::abs(observation.left_finger_velocity_mps) >
+      tolerances.relative_linear_velocity_mps ||
+      std::abs(observation.right_finger_velocity_mps) >
+      tolerances.relative_linear_velocity_mps)
+    {
+      return rejected(
+        AttachmentStatusCode::kGripperNotReady,
+        "both fingers must be stalled against the product before a physical attach: left " +
+        measurement(observation.left_finger_velocity_mps) + ", right " +
+        measurement(observation.right_finger_velocity_mps) + " of " +
+        measurement(tolerances.relative_linear_velocity_mps) + " m/s");
+    }
+    if (observation.left_finger_position_m < product.hold_joint_target_m -
+      tolerances.joint_position_m ||
+      observation.right_finger_position_m < product.hold_joint_target_m -
+      tolerances.joint_position_m)
+    {
+      // Past the interference command: either the product is smaller than catalogued or the
+      // jaw closed on nothing, and neither is a grip this boundary will certify.
+      return rejected(
+        AttachmentStatusCode::kGripperNotReady,
+        "a finger closed past the interference command, so it is not holding the product");
+    }
   }
 
   const auto canonical_expected = canonicalize_pose(
@@ -352,12 +402,26 @@ AttachValidationResult validate_physical_attach(
   const double right_clearance = product_min.y() - right_inner_face;
   evidence.left_inner_clearance_m = left_clearance;
   evidence.right_inner_clearance_m = right_clearance;
-  if (left_clearance < gripper.minimum_inner_clearance_m ||
-    right_clearance < gripper.minimum_inner_clearance_m)
-  {
+  const bool outside_contact_band =
+    left_clearance > gripper.contact_tolerance_m ||
+    right_clearance > gripper.contact_tolerance_m ||
+    left_clearance < -gripper.maximum_penetration_m ||
+    right_clearance < -gripper.maximum_penetration_m;
+  if (hold_mode == AttachmentHoldMode::kWeld) {
+    if (left_clearance < gripper.minimum_inner_clearance_m ||
+      right_clearance < gripper.minimum_inner_clearance_m)
+    {
+      return rejected(
+        AttachmentStatusCode::kOutOfTolerance,
+        "product does not have positive clearance from both finger inner faces", evidence);
+    }
+  } else if (outside_contact_band) {
+    // The contact band (spec 11.4): each face is on the surface or pressed a bounded amount
+    // into it. A positive gap beyond the tolerance means that jaw is not touching the product,
+    // which is the whole difference between holding it and standing next to it.
     return rejected(
       AttachmentStatusCode::kOutOfTolerance,
-      "product does not have positive clearance from both finger inner faces", evidence);
+      "both finger inner faces must sit in the product contact band", evidence);
   }
   if (!separated_with_clearance(
       product_bounds, gripper.palm_bounds_in_grasp_center,
@@ -389,7 +453,8 @@ AttachValidationResult validate_physical_attach(
 AttachmentStatus validate_physical_detach(
   const ParallelJawAttachmentGeometry & gripper,
   const AttachmentPhysicalTolerances & tolerances,
-  const DetachPhysicalObservation & observation)
+  const DetachPhysicalObservation & observation,
+  AttachmentHoldMode hold_mode)
 {
   if (!finite_positive(tolerances.joint_position_m) ||
     !finite_nonnegative(gripper.joint_lower_m) ||
@@ -401,11 +466,15 @@ AttachmentStatus validate_physical_detach(
   {
     return status(AttachmentStatusCode::kInvalidArgument, "detach configuration is invalid");
   }
-  if (observation.matching_owned_joint_count != 1 ||
+  const std::size_t expected_owned_joints =
+    hold_mode == AttachmentHoldMode::kPhysical ? 0U : 1U;
+  if (observation.matching_owned_joint_count != expected_owned_joints ||
     observation.other_owned_joint_count != 0)
   {
     return status(
       AttachmentStatusCode::kExternalInconsistency,
+      hold_mode == AttachmentHoldMode::kPhysical ?
+      "detach in physical mode requires no owned joint and no other owned joints" :
       "detach requires exactly one matching owned joint and no other owned joints");
   }
   if (!finite_transform(observation.parent_from_child) ||
@@ -426,6 +495,22 @@ AttachmentStatus validate_physical_detach(
       "both fingers must be at the open target before detachment");
   }
   return status(AttachmentStatusCode::kPending, "physical detach preconditions satisfied");
+}
+
+std::optional<WorldTwist> finite_difference_world_twist(
+  const Eigen::Isometry3d & previous, const Eigen::Isometry3d & current, double dt_s)
+{
+  if (!std::isfinite(dt_s) || dt_s <= 0.0 || !previous.matrix().allFinite() ||
+    !current.matrix().allFinite())
+  {
+    return std::nullopt;
+  }
+  WorldTwist result;
+  result.linear = (current.translation() - previous.translation()) / dt_s;
+  // The world-frame rotation increment R_current * R_previous^T as a rotation vector.
+  const Eigen::AngleAxisd increment(current.linear() * previous.linear().transpose());
+  result.angular = increment.axis() * (increment.angle() / dt_s);
+  return result;
 }
 
 }  // namespace restocker_gazebo

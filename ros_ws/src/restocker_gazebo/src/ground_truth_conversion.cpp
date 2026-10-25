@@ -32,6 +32,9 @@ using Observation = restocker_interfaces::msg::ObjectObservation;
   if (value == "large_bottle") {
     return Observation::PRODUCT_CLASS_LARGE_BOTTLE;
   }
+  if (value == "box") {
+    return Observation::PRODUCT_CLASS_BOX;
+  }
   throw std::invalid_argument("unknown product_class: " + value);
 }
 

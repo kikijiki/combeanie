@@ -102,6 +102,8 @@ public:
       declare_parameter<std::int64_t>("minimum_accepted_returns", 200));
     config_.minimum_obstruction_returns = static_cast<std::size_t>(
       declare_parameter<std::int64_t>("minimum_obstruction_returns", 40));
+    config_.floor_noise_sigma_factor = declare_parameter<double>("floor_noise_sigma_factor", 0.0);
+    config_.edge_bias_sigma_factor = declare_parameter<double>("edge_bias_sigma_factor", 0.0);
     if (!std::isfinite(transform_timeout_sec_) || transform_timeout_sec_ < 0.0 ||
       !std::isfinite(default_acquisition_timeout_sec_) ||
       default_acquisition_timeout_sec_ <= 0.0 || !std::isfinite(minimum_coverage_) ||

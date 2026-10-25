@@ -41,7 +41,7 @@ std::vector<ControllerObservation> healthy_controllers()
     {"gripper_controller",
       "joint_trajectory_controller/JointTrajectoryController",
       "active",
-      {"left_finger_joint/position", "right_finger_joint/position"}},
+      {"left_finger_joint/effort", "right_finger_joint/effort"}},
   };
 }
 

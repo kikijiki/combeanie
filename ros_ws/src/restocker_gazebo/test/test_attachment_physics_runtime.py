@@ -5,6 +5,8 @@
 """Exercise Gazebo fixed-joint attachment and detachment acknowledgement."""
 
 import os
+from pathlib import Path
+import tempfile
 import unittest
 
 import launch
@@ -16,6 +18,16 @@ import launch_testing
 import launch_testing.actions
 import launch_testing.asserts
 import pytest
+
+
+def _physical_gripper_geometry() -> str:
+    """Opt this fixture into hold_mode: physical, which is no longer the shipped mode."""
+    source = Path(os.environ["RESTOCKER_TEST_GRIPPER_GEOMETRY"]).read_text(encoding="utf-8")
+    if "hold_mode: weld" not in source and "hold_mode: physical" not in source:
+        raise AssertionError("gripper_geometry.yaml carries no hold_mode")
+    target = Path(tempfile.gettempdir()) / f"restocker_{Path(__file__).stem}_gripper_physical.yaml"
+    target.write_text(source.replace("hold_mode: weld", "hold_mode: physical"), encoding="utf-8")
+    return str(target)
 
 
 @pytest.mark.launch_test
@@ -54,7 +66,7 @@ def generate_test_description():
                 ),
                 SetEnvironmentVariable(
                     "RESTOCKER_GRIPPER_GEOMETRY_CONFIG",
-                    os.environ["RESTOCKER_TEST_GRIPPER_GEOMETRY"],
+                    _physical_gripper_geometry(),
                 ),
                 SetEnvironmentVariable(
                     "RESTOCKER_PRODUCT_CATALOG_CONFIG",

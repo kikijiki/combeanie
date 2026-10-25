@@ -1,0 +1,410 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- The restocking world dressed for the showcase demo: the same physics and plugins as
+     restocking.sdf, so nothing about the simulation differs, inside a cold-room store back with a
+     lit floor, wall panels and a key/fill light pair, and a Gazebo GUI that opens framed on the
+     `wide` view of website/scripts/showcase_views.py. Only `just demo` selects it (world:=).
+     Every visual here is collision-free except the floor, which is the restocking world's. -->
+<!-- SPDX-License-Identifier: MIT -->
+<sdf version="1.9">
+  <world name="restocking">
+    <physics name="restocking_physics" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <!-- Every product is a cylinder, and DART's default narrowphase is ODE's, which has no
+           cylinder/cylinder collider: products report no contacts with each other and
+           interpenetrate, while still colliding with every box (floor, tray walls, lane bed,
+           front rail). A product spawned above another fell through it and settled at the same
+           pose.
+           `bullet` selects DART's Bullet *collision detector*, not a different physics engine;
+           dartsim remains the engine. Measured alternatives: `fcl` also produces the contact but
+           drifts a free-standing cylinder 0.12 rad in yaw and 2.6 mm into its neighbour over
+           three seconds; `dart` sends every body through the floor. Do not remove this without
+           re-measuring product stacking. `test_product_contact_runtime` fails when it is gone. -->
+      <dart>
+        <collision_detector>bullet</collision_detector>
+      </dart>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <!-- Nothing renders a camera sensor without this, so it is unconditional. With no display it
+         falls back to headless ogre2. -->
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="restocker_attachment_system" name="restocker_gazebo::AttachmentSystem"/>
+    <!-- The pad rubber (spec M10 §11 D10 item 3): the engine does not act on the joint
+         spring_stiffness/spring_reference/damping the description carries, so this system
+         commands F = -k(x - x_ref) - c·ẋ itself. Without it the pad rows are free sliders. -->
+    <plugin filename="restocker_pad_spring_system" name="restocker_gazebo::PadSpringSystem"/>
+
+    <gravity>0 0 -9.80665</gravity>
+    <scene>
+      <ambient>0.36 0.38 0.42 1</ambient>
+      <background>0.86 0.88 0.90 1</background>
+      <shadows>true</shadows>
+    </scene>
+
+    <!-- Key: a spot, not a directional light. A directional light's shadow map is spread over
+         everything the camera can see, walls and floor to the far plane, and its texels show as
+         steps along every shadow edge; a spot's map covers only its cone, which is the cell.
+         Cool white from the shelf-front side, high enough to keep shadows short and leave every
+         lane's front label lit. -->
+    <light name="key" type="spot">
+      <cast_shadows>true</cast_shadows>
+      <pose>-1.6 3.0 4.8 0 0 0</pose>
+      <diffuse>0.82 0.81 0.78 1</diffuse>
+      <specular>0.45 0.45 0.45 1</specular>
+      <direction>0.307 -0.46 -0.846</direction>
+      <attenuation>
+        <range>25</range>
+        <constant>1.0</constant>
+        <linear>0.0</linear>
+        <quadratic>0.0</quadratic>
+      </attenuation>
+      <spot>
+        <inner_angle>0.35</inner_angle>
+        <outer_angle>0.72</outer_angle>
+        <falloff>1.0</falloff>
+      </spot>
+    </light>
+    <!-- Fill: a cooler, weaker light from the opposite side, so shadowed faces stay readable. -->
+    <light name="fill" type="directional">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 6 0 0 0</pose>
+      <diffuse>0.30 0.34 0.40 1</diffuse>
+      <specular>0.0 0.0 0.0 1</specular>
+      <direction>-0.5 0.45 -0.6</direction>
+    </light>
+
+    <model name="floor">
+      <static>true</static>
+      <link name="floor_link">
+        <collision name="floor_collision">
+          <pose>0 0 -0.05 0 0 0</pose>
+          <geometry><box><size>8 5 0.1</size></box></geometry>
+          <surface>
+            <friction>
+              <ode><mu>0.9</mu><mu2>0.9</mu2></ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="floor_visual">
+          <pose>0 0.1 -0.05 0 0 0</pose>
+          <geometry><box><size>7.2 7.4 0.1</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.30 0.30 0.30 1</specular>
+            <!-- @GAZEBO_SHARE@ is the installed restocker_gazebo share directory; the launch
+                 file's bundling step fills it in, because a texture path is resolved against
+                 the working directory, not against this file. Generated by
+                 tools/generate_showcase_floor.py. -->
+            <pbr>
+              <metal>
+                <albedo_map>@GAZEBO_SHARE@/materials/textures/showcase_floor.png</albedo_map>
+                <roughness>0.38</roughness>
+                <metalness>0.0</metalness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      <visual name="line_front">
+        <pose>0 2.0 0.0015 0 0 0</pose>
+        <geometry><box><size>3.4 0.06 0.003</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.93 0.74 0.12 1</ambient>
+          <diffuse>0.93 0.74 0.12 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.7</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="line_back">
+        <pose>0 -1.9 0.0015 0 0 0</pose>
+        <geometry><box><size>3.4 0.06 0.003</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.93 0.74 0.12 1</ambient>
+          <diffuse>0.93 0.74 0.12 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.7</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="line_left">
+        <pose>-1.7 0.05 0.0015 0 0 0</pose>
+        <geometry><box><size>0.06 3.96 0.003</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.93 0.74 0.12 1</ambient>
+          <diffuse>0.93 0.74 0.12 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.7</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="line_right">
+        <pose>1.7 0.05 0.0015 0 0 0</pose>
+        <geometry><box><size>0.06 3.96 0.003</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.93 0.74 0.12 1</ambient>
+          <diffuse>0.93 0.74 0.12 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.7</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="back_plinth">
+        <pose>0 -3.65 0.55 0 0 0</pose>
+        <geometry><box><size>7.4 0.1 1.1</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.20 0.34 0.40 1</ambient>
+          <diffuse>0.20 0.34 0.40 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.6</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="back_panel">
+        <pose>0 -3.65 2.15 0 0 0</pose>
+        <geometry><box><size>7.4 0.1 2.10</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.88 0.90 0.91 1</ambient>
+          <diffuse>0.88 0.90 0.91 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.6</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="back_rail">
+        <pose>0 -3.65 1.1 0 0 0</pose>
+        <geometry><box><size>7.4 0.12 0.05</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.62 0.66 0.68 1</ambient>
+          <diffuse>0.62 0.66 0.68 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.4</roughness><metalness>0.6</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="front_plinth">
+        <pose>0 3.85 0.55 0 0 0</pose>
+        <geometry><box><size>7.4 0.1 1.1</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.20 0.34 0.40 1</ambient>
+          <diffuse>0.20 0.34 0.40 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.6</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="front_panel">
+        <pose>0 3.85 2.15 0 0 0</pose>
+        <geometry><box><size>7.4 0.1 2.10</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.88 0.90 0.91 1</ambient>
+          <diffuse>0.88 0.90 0.91 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.6</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="front_rail">
+        <pose>0 3.85 1.1 0 0 0</pose>
+        <geometry><box><size>7.4 0.12 0.05</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.62 0.66 0.68 1</ambient>
+          <diffuse>0.62 0.66 0.68 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.4</roughness><metalness>0.6</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="left_plinth">
+        <pose>-3.65 0.1 0.55 0 0 0</pose>
+        <geometry><box><size>0.1 7.4 1.1</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.20 0.34 0.40 1</ambient>
+          <diffuse>0.20 0.34 0.40 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.6</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="left_panel">
+        <pose>-3.65 0.1 2.15 0 0 0</pose>
+        <geometry><box><size>0.1 7.4 2.10</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.88 0.90 0.91 1</ambient>
+          <diffuse>0.88 0.90 0.91 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.6</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="left_rail">
+        <pose>-3.65 0.1 1.1 0 0 0</pose>
+        <geometry><box><size>0.12 7.4 0.05</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.62 0.66 0.68 1</ambient>
+          <diffuse>0.62 0.66 0.68 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.4</roughness><metalness>0.6</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="right_plinth">
+        <pose>3.65 0.1 0.55 0 0 0</pose>
+        <geometry><box><size>0.1 7.4 1.1</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.20 0.34 0.40 1</ambient>
+          <diffuse>0.20 0.34 0.40 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.6</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="right_panel">
+        <pose>3.65 0.1 2.15 0 0 0</pose>
+        <geometry><box><size>0.1 7.4 2.10</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.88 0.90 0.91 1</ambient>
+          <diffuse>0.88 0.90 0.91 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.6</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="right_rail">
+        <pose>3.65 0.1 1.1 0 0 0</pose>
+        <geometry><box><size>0.12 7.4 0.05</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.62 0.66 0.68 1</ambient>
+          <diffuse>0.62 0.66 0.68 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.4</roughness><metalness>0.6</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="back_seam_0">
+        <pose>-2.4 -3.595 2.15 0 0 0</pose>
+        <geometry><box><size>0.012 0.01 2.10</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.66 0.70 0.72 1</ambient>
+          <diffuse>0.66 0.70 0.72 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.5</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="back_seam_1">
+        <pose>-1.2 -3.595 2.15 0 0 0</pose>
+        <geometry><box><size>0.012 0.01 2.10</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.66 0.70 0.72 1</ambient>
+          <diffuse>0.66 0.70 0.72 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.5</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="back_seam_2">
+        <pose>0.0 -3.595 2.15 0 0 0</pose>
+        <geometry><box><size>0.012 0.01 2.10</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.66 0.70 0.72 1</ambient>
+          <diffuse>0.66 0.70 0.72 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.5</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="back_seam_3">
+        <pose>1.2 -3.595 2.15 0 0 0</pose>
+        <geometry><box><size>0.012 0.01 2.10</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.66 0.70 0.72 1</ambient>
+          <diffuse>0.66 0.70 0.72 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.5</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="back_seam_4">
+        <pose>2.4 -3.595 2.15 0 0 0</pose>
+        <geometry><box><size>0.012 0.01 2.10</size></box></geometry>
+        <cast_shadows>false</cast_shadows>
+        <material>
+          <ambient>0.66 0.70 0.72 1</ambient>
+          <diffuse>0.66 0.70 0.72 1</diffuse>
+          <specular>0.15 0.15 0.15 1</specular>
+          <pbr><metal><roughness>0.5</roughness><metalness>0.0</metalness></metal></pbr>
+        </material>
+      </visual>
+      </link>
+    </model>
+
+    <gui fullscreen="0">
+      <plugin filename="MinimalScene" name="3D View">
+        <gz-gui>
+          <title>3D View</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="string" key="state">docked</property>
+        </gz-gui>
+        <engine>ogre2</engine>
+        <scene>scene</scene>
+        <ambient_light>0.36 0.38 0.42</ambient_light>
+        <background_color>0.86 0.88 0.90</background_color>
+        <camera_pose>3.2000 2.5000 2.3000 0.0000 0.3753 -2.4784</camera_pose>
+        <camera_clip><near>0.1</near><far>14</far></camera_clip>
+      </plugin>
+      <plugin filename="GzSceneManager" name="Scene Manager">
+        <gz-gui>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+      <plugin filename="InteractiveViewControl" name="Interactive view control">
+        <gz-gui>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+      <plugin filename="CameraTracking" name="Camera Tracking">
+        <gz-gui>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+      <plugin filename="WorldStats" name="World stats">
+        <gz-gui>
+          <title>World stats</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="bool" key="resizable">false</property>
+          <property type="double" key="height">110</property>
+          <property type="double" key="width">290</property>
+          <property type="double" key="z">1</property>
+          <property type="string" key="state">floating</property>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="bottom" target="bottom"/>
+          </anchors>
+        </gz-gui>
+        <sim_time>false</sim_time>
+        <real_time>false</real_time>
+        <real_time_factor>true</real_time_factor>
+        <iterations>false</iterations>
+      </plugin>
+    </gui>
+  </world>
+</sdf>

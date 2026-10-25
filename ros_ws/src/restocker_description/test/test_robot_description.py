@@ -550,11 +550,25 @@ def test_gripper_geometry_config_is_the_emitted_urdf_source(robot: ET.Element) -
             finger[side]["origin_xyz_m"]
         )
         assert _vector(joint.find("axis").attrib["xyz"]) == pytest.approx(finger[side]["axis"])
-        assert _vector(link.find("collision/origin").attrib["xyz"]) == pytest.approx(
-            finger["center_xyz_m"]
-        )
-        assert _vector(link.find("collision/geometry/box").attrib["size"]) == pytest.approx(
-            finger["size_xyz_m"]
+        # Spec M10 §11 D9: the collision is the finger box tiled into pad_rows rows along x, and
+        # the rows' union is exactly the box (the visual stays one box).
+        rows = finger["pad_rows"]
+        height = finger["size_xyz_m"][0]
+        collisions = link.findall("collision")
+        assert len(collisions) == rows
+        lower_edges = []
+        for collision in collisions:
+            origin = _vector(collision.find("origin").attrib["xyz"])
+            assert _vector(collision.find("geometry/box").attrib["size"]) == pytest.approx(
+                [height / rows, *finger["size_xyz_m"][1:]]
+            )
+            assert origin[1:] == pytest.approx(finger["center_xyz_m"][1:])
+            lower_edges.append(origin[0] - 0.5 * height / rows)
+        assert sorted(lower_edges) == pytest.approx(
+            [
+                finger["center_xyz_m"][0] - 0.5 * height + index * height / rows
+                for index in range(rows)
+            ]
         )
         assert float(link.find("inertial/mass").attrib["value"]) == pytest.approx(
             finger["mass_kg"]
@@ -588,20 +602,38 @@ def test_gripper_clearance_policy_fits_every_catalog_product() -> None:
     clearance = float(policy["minimum_inner_clearance_m"])
     hold_clearance = float(policy["hold_clearance_per_side_m"])
     open_clearance = float(policy["open_clearance_per_side_m"])
+    # The jaw-hold policy both the simulator boundary and the task executor read (spec 11.3).
+    hold_mode = str(policy["hold_mode"])
+    interference = float(policy["hold_interference_m"])
 
     assert 0.0 < zero_gap < maximum_gap
     assert clearance > 0.0
     assert clearance <= hold_clearance < open_clearance
+    assert hold_mode in {"weld", "physical"}
+    if hold_mode == "physical":
+        assert 0.0 < interference < open_clearance
+    assert float(policy["maximum_penetration_m"]) > 0.0
+    assert float(policy["contact_tolerance_m"]) > 0.0
     assert float(policy["minimum_contact_overlap_m"]) > 0.0
     # Strictly inside the stroke: parking the jaws on the joint limit through a full arm traverse
     # pushed them past it, the world state rejected the telemetry and the next gripper trajectory
     # aborted on its path tolerance.
     assert float(policy["open_target_m"]) < float(limits["upper_m"])
     for product in catalog["geometries"]:
+        if product["shape"]["type"] == "box":
+            # Boxes are not attachable yet (CMB-119 stage 1): no jaw aperture is derived for them.
+            continue
         diameter = 2.0 * float(product["shape"]["radius_m"])
-        required_gap = diameter + 2.0 * hold_clearance
+        required_gap = (
+            diameter - 2.0 * interference
+            if hold_mode == "physical"
+            else diameter + 2.0 * hold_clearance
+        )
         hold_target = 0.5 * (required_gap - zero_gap)
         assert required_gap <= maximum_gap
+        # The commanded aperture must stay wider than the closed jaws, or the hold target would
+        # be at or past joint zero where no finger can go.
+        assert required_gap > zero_gap
         assert float(limits["lower_m"]) <= hold_target <= float(limits["upper_m"])
 
 

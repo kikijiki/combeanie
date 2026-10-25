@@ -18,12 +18,14 @@ _The simulated workcell: a UR10e arm on a rail between the stock tray (left) and
 
 ## What you can do with it
 
-- **Watch the robot restock a shelf by itself.** `just demo` surveys the shelf lanes, works out
-  which are below their target count, finds a matching product on the tray with the wrist camera,
-  and moves it into a lane until every lane is full.
-- **Run it on camera evidence.** Product positions and lane contents come from the arm's wrist
-  camera by default; simulator ground truth is available only as a labelled opt-in
-  (`just demo gt:=true`).
+- **Watch the robot restock a shelf by itself.** `just demo` opens a stocked shelf of labelled cans
+  and bottles and a back room of packed one-product blocks, surveys the shelf lanes, works out
+  which are below their target count, and moves a matching product from the tray into each lane
+  until every lane is at target.
+- **Run it on camera evidence.** The shipped configuration takes product positions and lane
+  contents from the arm's wrist camera: `just demo sensor:=true` runs it on a three-product
+  fixture. The default demo scene stocks several products per class, which the camera identity
+  path cannot tell apart yet, so it runs on simulator ground truth and says so when it starts.
 - **Ask for one transfer.** The `RestockProduct` ROS action moves one product; the autonomous loop
   is built on top of it.
 - **Replay scenarios exactly.** Seeded product layouts are byte-for-byte reproducible, so a
@@ -70,14 +72,15 @@ Harmonic and MoveIt 2. The demo opens a Gazebo window, so it needs a graphical s
 nix develop        # or: direnv allow
 just doctor        # checks the environment
 just build         # builds the ROS workspace under ros_ws/ (first build is long)
-just demo          # autonomous restocking: Gazebo, MoveIt, RViz and the coordinator
+just demo          # autonomous restocking of the textured showcase scene (ground-truth evidence)
 ```
 
 Useful variations (`just help` lists every command):
 
 ```bash
 just demo 3                 # stop after three cycles
-just demo gt:=true          # labelled ground-truth demo on the larger dense tray
+just demo sensor:=true      # the shipped sensor-driven path (wrist-camera evidence), three-product fixture
+just demo gt:=true          # the dense plain-coloured fixture, ground-truth evidence
 just launch-baseline        # the same workcell without the autonomous goal, to drive it yourself
 just launch-baseline scenario_seed:=42   # replay a seeded scenario
 just test-package restocker_bringup      # acceptance tests, headless (slow)

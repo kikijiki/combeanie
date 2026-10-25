@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="520" viewBox="0 0 1000 520" role="img" aria-labelledby="title">
+  <title id="title">Identity ladder schematic</title>
+  <rect width="100%" height="100%" fill="#fbfcfd"/>
+  <text x="24.00" y="22.00" fill="#1a1f24" font-size="16" font-weight="700" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">Identity ladder: cheapest evidence first, never a guess</text>
+  <text x="24.00" y="42.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">Per object: the first look plus up to max_relooks more (default 3).</text>
+  <rect x="14.00" y="62.00" width="226.00" height="290.00" rx="8.00" fill="none" stroke="#5a6570" stroke-width="1" opacity="1.0" stroke-dasharray="4 3"/>
+  <text x="24.00" y="80.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">evidence from the looks so far</text>
+  <rect x="24.00" y="92.00" width="206.00" height="70.00" rx="6.00" fill="#f4f6f8" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="127.00" y="112.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">Barcode close-ups</text>
+  <text x="127.00" y="130.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">decoded to a GTIN</text>
+  <text x="127.00" y="145.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">check digit verified</text>
+  <rect x="24.00" y="172.00" width="206.00" height="70.00" rx="6.00" fill="#f4f6f8" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="127.00" y="192.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">Label text</text>
+  <text x="127.00" y="210.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">read from the object's</text>
+  <text x="127.00" y="225.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">own columns</text>
+  <rect x="24.00" y="252.00" width="206.00" height="70.00" rx="6.00" fill="#f4f6f8" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="127.00" y="272.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">Embedding</text>
+  <text x="127.00" y="290.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">ranks registered products,</text>
+  <text x="127.00" y="305.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">a shortlist only</text>
+  <rect x="330.00" y="92.00" width="270.00" height="70.00" rx="6.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="1.6" opacity="1.0"/>
+  <text x="465.00" y="112.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">1  Barcode</text>
+  <text x="465.00" y="130.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">a registered GTIN: exact match</text>
+  <rect x="330.00" y="182.00" width="270.00" height="70.00" rx="6.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="1.6" opacity="1.0"/>
+  <text x="465.00" y="202.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">2  Label text, second reader if open</text>
+  <text x="465.00" y="220.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">one product, clear margin over</text>
+  <text x="465.00" y="235.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">the runner-up; in the embedding's top 3</text>
+  <line x1="465.00" y1="162.00" x2="465.00" y2="182.00" stroke="#2c3640" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <polygon points="465.00,182.00 461.88,174.63 468.12,174.63" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <text x="473.00" y="176.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">not decided</text>
+  <rect x="330.00" y="272.00" width="270.00" height="70.00" rx="6.00" fill="#c5ddd7" stroke="#1f6b5c" stroke-width="1.6" opacity="1.0"/>
+  <text x="465.00" y="292.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">3  Not yet</text>
+  <text x="465.00" y="310.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">facing estimate, suggested turn</text>
+  <text x="465.00" y="325.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">or a new view; look again</text>
+  <line x1="465.00" y1="252.00" x2="465.00" y2="272.00" stroke="#2c3640" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <polygon points="465.00,272.00 461.88,264.63 468.12,264.63" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <text x="473.00" y="266.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">not decided</text>
+  <rect x="330.00" y="362.00" width="270.00" height="70.00" rx="6.00" fill="#dfe5ea" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="465.00" y="382.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">4  Needs human</text>
+  <text x="465.00" y="400.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">the look budget is spent</text>
+  <text x="465.00" y="415.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">nothing is named</text>
+  <line x1="465.00" y1="342.00" x2="465.00" y2="362.00" stroke="#2c3640" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <polygon points="465.00,362.00 461.88,354.63 468.12,354.63" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <text x="473.00" y="356.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">budget spent</text>
+  <line x1="230.00" y1="127.00" x2="330.00" y2="127.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="330.00,127.00 322.63,130.12 322.63,123.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="230.00" y1="207.00" x2="330.00" y2="217.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="330.00,217.00 322.36,219.37 322.98,213.17" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="230.00" y1="287.00" x2="330.00" y2="237.00" stroke="#2c3640" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <polygon points="330.00,237.00 324.80,243.08 322.02,237.51" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <rect x="700.00" y="92.00" width="270.00" height="70.00" rx="6.00" fill="#d7ebe6" stroke="#1f6b5c" stroke-width="1.6" opacity="1.0"/>
+  <text x="835.00" y="112.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">IDENTIFIED</text>
+  <text x="835.00" y="130.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">SKU and GTIN</text>
+  <text x="835.00" y="145.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">rung: barcode or text</text>
+  <rect x="700.00" y="272.00" width="270.00" height="70.00" rx="6.00" fill="#c5ddd7" stroke="#1f6b5c" stroke-width="1.6" opacity="1.0"/>
+  <text x="835.00" y="292.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">NOT_YET</text>
+  <text x="835.00" y="310.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">guidance: turn by suggested_turn_deg</text>
+  <text x="835.00" y="325.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">or look from another side</text>
+  <rect x="700.00" y="362.00" width="270.00" height="70.00" rx="6.00" fill="#dfe5ea" stroke="#2c3640" stroke-width="1.6" opacity="1.0"/>
+  <text x="835.00" y="382.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">NEEDS_HUMAN</text>
+  <text x="835.00" y="400.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">unregistered look-alikes</text>
+  <text x="835.00" y="415.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">end here</text>
+  <line x1="600.00" y1="127.00" x2="700.00" y2="127.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="700.00,127.00 692.63,130.12 692.63,123.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="600.00" y1="217.00" x2="700.00" y2="150.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="700.00,150.00 695.61,156.69 692.14,151.51" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="600.00" y1="307.00" x2="700.00" y2="307.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="700.00,307.00 692.63,310.12 692.63,303.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <line x1="600.00" y1="397.00" x2="700.00" y2="397.00" stroke="#2c3640" stroke-width="1.6"/>
+  <polygon points="700.00,397.00 692.63,400.12 692.63,393.88" fill="#2c3640" stroke="#2c3640" stroke-width="1"/>
+  <rect x="700.00" y="452.00" width="270.00" height="56.00" rx="6.00" fill="#dfe5ea" stroke="#2c3640" stroke-width="1.6" opacity="1.0" stroke-dasharray="5 4"/>
+  <text x="835.00" y="472.00" fill="#1a1f24" font-size="12.5" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">UNKNOWN</text>
+  <text x="835.00" y="490.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="middle" font-family="IBM Plex Sans, Segoe UI, sans-serif">valid GTIN nobody registered, or no sidecar</text>
+  <text x="24.00" y="500.00" fill="#5a6570" font-size="11" font-weight="500" text-anchor="start" font-family="IBM Plex Sans, Segoe UI, sans-serif">After NOT_YET the caller turns the product (a rotation oracle in simulation) and calls again with the same object_key.</text>
+</svg>

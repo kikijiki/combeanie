@@ -70,6 +70,10 @@ def test_physical_state_is_token_free_and_default_unknown() -> None:
         state.MOTION_GATE_VALID,
     } == {0, 1, 2}
     assert state.motion_gate == state.MOTION_GATE_UNKNOWN
+    # The publisher always sets this ("weld" or "physical"): it is how a caller, a log and a test
+    # tell which hold physics produced the state, so the field itself is pinned here and its
+    # value is pinned where the state is built.
+    assert state.get_fields_and_field_types()["hold_mode"] == "string"
     assert state.status.code == SimulationAttachmentOperationStatus.UNSET
     assert "token" not in " ".join(state.get_fields_and_field_types())
 

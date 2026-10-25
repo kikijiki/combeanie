@@ -65,6 +65,9 @@ enum class ProductClass : std::uint8_t
   Can,
   SmallBottle,
   LargeBottle,
+  // A rectangular carton or pouch (CMB-119). Observable and storable; the executor does not
+  // plan grasps or placements for it yet.
+  Box,
 };
 
 enum class ObjectOrientation : std::uint8_t

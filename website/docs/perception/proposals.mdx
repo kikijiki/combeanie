@@ -1,0 +1,56 @@
+---
+id: proposals
+title: Proposals
+sidebar_position: 3
+---
+
+# Proposals
+
+`restocker_perception.proposals` answers "where does something stand that could be a product". It
+reads depth only: no colour, no class, no SKU. It therefore works on label-textured products, which
+the colour stage of the classical backend cannot find (a white-based can has no chromaticity). It is
+offline Python (numpy, plus OpenCV when a proposal is made); no node publishes proposals.
+
+## Geometry proposer
+
+One z-depth image and the camera pose go in; a `ProposalSet` comes out: a per-pixel label image and
+one `Proposal` per shape.
+
+1. Depth is back-projected to world points and kept above a known support surface inside its
+   region: the stock tray, or one lane's 4-degree roller bed with the front retainer rail masked as
+   known structure.
+2. The points go into a 4 mm top-down height map. Each connected component is split by repeatedly
+   taking the tallest flat plateau (a 4 mm band) and asking which shape it is.
+3. A plateau that a circle explains is a **`disc`**: the top of an upright cylinder. A plateau that
+   fills its oriented rectangle (second-moment fit, 0.86 overlap), has no deep concavity and has a
+   cliff for an outline (not a slope) is a **`rect`**: a carton standing or a box lying on a face,
+   with `size_m` and `yaw_rad`. The rectangle wins when it beats the circle by 0.06.
+4. Two flat tops of equal height that touch have a waist. The plateau is cut there and each piece
+   is judged again, kept only if a piece is a rectangle; touching discs are separated by
+   distance-transform peeling.
+5. Each shape gets its footprint, is removed, and the loop repeats. What nothing explains (a lying
+   cylinder, a contoured bottle, a foreign object) is a **`blob`** that reaches one product radius
+   around its plateau, except where a flat surface lower than the blob lies, which is another
+   product's top.
+
+A lying cylinder's ridge falls a few millimetres per cell, so it is a slope and is classified as a blob.
+A `disc` carries a `catalogue_class` when its radius and height match a catalogued cylinder; a
+`rect` never does, so a carton's top is not called a can. All tolerances are in `ProposalConfig`,
+set from the catalogue and committed in `config/proposal_config_cmb120.json` before any held-out
+scene is recorded.
+
+## Unknown product
+
+`resolve_identity(proposal, identity_result)` says what the rest of the system may be told about a
+proposal. It returns `IDENTIFIED` only when the identity channel named a registered SKU and the
+proposal's fitted disc does not contradict that product's registered radius and height. Every other
+case is `UNKNOWN_PRODUCT`: the channel said unknown, abstained, was unavailable or absent, or its
+name was contradicted by the geometry. An unknown product never carries a SKU; its `reason` says
+which case, and its evidence lists each channel's score plus a `geometry` entry.
+
+`ObjectObservation` carries the result in `identity_state`, `identity_evidence_kinds`,
+`identity_evidence_scores` and `identity_reason`; `IDENTITY_NOT_ASSESSED` marks every producer that
+does not assess identity. World state refuses an observation that pairs `UNKNOWN_PRODUCT` with a SKU
+or `IDENTIFIED` without one. An unknown product is not a claim that the product is foreign, only
+that nothing may name it. A single proposal crop is not enough to act on an `IDENTIFIED` state; see
+[Results](./results#proposals).

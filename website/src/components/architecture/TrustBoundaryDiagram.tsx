@@ -28,7 +28,7 @@ const LAYERS: Layer[] = [
   {
     id: 'adv',
     label: 'Advisory / untrusted inputs',
-    sublabel: 'perception backends · reasoner · early GT as observation source',
+    sublabel: 'perception backends · identity channel · reasoner · ground truth when opted in',
     href: '/docs/architecture/perception-and-models',
     color: 'ir',
   },

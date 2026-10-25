@@ -18,7 +18,7 @@ they measure the same public surface an operator drives.
 | `restocker_control` | Controllers, health, joint → telemetry adapter | Planning or task semantics |
 | `restocker_moveit_config` | SRDF, OMPL, kinematics, `move_group` | World-state authority |
 | `restocker_world_state` | Persistent semantic truth and snapshots | Learned inference |
-| `restocker_perception` | Observations and backend adapters | Motion commands |
+| `restocker_perception` | Observations, backend adapters, product registry and identity, lane stock and inventory | Motion commands, authoritative state |
 | `restocker_task_executor` | Task machine, candidates, coordinator, ports, projector | Joint-level control |
 | `restocker_reasoner` | Optional constrained recovery recommendations | Safety authority |
 | `restocker_recovery` | Bounded deterministic recovery primitives | Arbitrary model actions |

@@ -41,3 +41,161 @@ geometries:
       type: cylinder
       radius_m: 0.045
       height_m: 0.290
+# BEGIN generated products (tools/label_factory.py; do not edit between the markers)
+  - geometry_key: can.gen001
+    product_class: can
+    sku: GEN-001
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.033
+      height_m: 0.122
+  - geometry_key: can.gen002
+    product_class: can
+    sku: GEN-002
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.033
+      height_m: 0.122
+  - geometry_key: can.gen003
+    product_class: can
+    sku: GEN-003
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.033
+      height_m: 0.122
+  - geometry_key: can.gen004
+    product_class: can
+    sku: GEN-004
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.033
+      height_m: 0.122
+  - geometry_key: small.bottle.gen005
+    product_class: small_bottle
+    sku: GEN-005
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.034
+      height_m: 0.2
+  - geometry_key: small.bottle.gen006
+    product_class: small_bottle
+    sku: GEN-006
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.034
+      height_m: 0.2
+  - geometry_key: small.bottle.gen007
+    product_class: small_bottle
+    sku: GEN-007
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.034
+      height_m: 0.2
+  - geometry_key: small.bottle.gen008
+    product_class: small_bottle
+    sku: GEN-008
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.034
+      height_m: 0.2
+  - geometry_key: large.bottle.gen009
+    product_class: large_bottle
+    sku: GEN-009
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.045
+      height_m: 0.29
+  - geometry_key: large.bottle.gen010
+    product_class: large_bottle
+    sku: GEN-010
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.045
+      height_m: 0.29
+  - geometry_key: large.bottle.gen011
+    product_class: large_bottle
+    sku: GEN-011
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.045
+      height_m: 0.29
+  - geometry_key: large.bottle.gen012
+    product_class: large_bottle
+    sku: GEN-012
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.045
+      height_m: 0.29
+  - geometry_key: contour.bottle.gen013
+    product_class: contour_bottle
+    sku: GEN-013
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.036
+      height_m: 0.23
+  - geometry_key: contour.bottle.gen014
+    product_class: contour_bottle
+    sku: GEN-014
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.036
+      height_m: 0.23
+  - geometry_key: contour.bottle.gen015
+    product_class: contour_bottle
+    sku: GEN-015
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.036
+      height_m: 0.23
+  - geometry_key: contour.bottle.gen016
+    product_class: contour_bottle
+    sku: GEN-016
+    class_fallback: false
+    shape:
+      type: cylinder
+      radius_m: 0.036
+      height_m: 0.23
+  - geometry_key: box.gen017
+    product_class: box
+    sku: GEN-017
+    class_fallback: false
+    shape:
+      type: box
+      size_xyz_m: [0.065, 0.04, 0.105]
+  - geometry_key: box.gen018
+    product_class: box
+    sku: GEN-018
+    class_fallback: false
+    shape:
+      type: box
+      size_xyz_m: [0.065, 0.04, 0.105]
+  - geometry_key: box.gen019
+    product_class: box
+    sku: GEN-019
+    class_fallback: false
+    shape:
+      type: box
+      size_xyz_m: [0.095, 0.06, 0.165]
+  - geometry_key: box.gen020
+    product_class: box
+    sku: GEN-020
+    class_fallback: false
+    shape:
+      type: box
+      size_xyz_m: [0.055, 0.025, 0.15]
+# END generated products

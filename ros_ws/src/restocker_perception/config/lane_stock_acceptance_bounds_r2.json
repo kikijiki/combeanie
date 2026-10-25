@@ -1,0 +1,253 @@
+{
+  "card": "CMB-114",
+  "round": 2,
+  "declared_on": "2026-10-19",
+  "declared_before_any_round_2_held_out_lane_frame_was_recorded_or_read": true,
+  "supersedes_for_new_decisions": "config/lane_stock_acceptance_bounds.json (round 1, spent: passed its bounds; its held-out seeds are development data from here on)",
+  "why_a_new_round": "round 1 found two hazards outside its bounds (partial blinding that leaves coverage high can hide the rear product's top and give a wrong class, count and misplaced flag; an empty lane read as one product at 0.5 % range noise, and every lane a cannot-tell at 1 % because the survey producer's floor margin is fixed). The estimator and the depth measurement were changed on development data only; this round measures the changed code once on seeds nobody has read.",
+  "decision_unit": "one lane survey frame, scored on the lane it was taken for",
+  "held_out_population": {
+    "rule": "held_out_generations.fresh of config/perception_splits.json, ascending, the second, fourth... seed (75 of 150; benchmark_perception stock-seeds --round 2); round 1 read the first, third... ones, which with the 6 burned version-1 seeds and the train and validation seeds are now development data",
+    "development_data": "train and validation seeds (40 recorded) and the round 1 held-out seeds (75 recorded): 690 lanes on which the changes below were chosen"
+  },
+  "noise_model": {
+    "description": "synthetic perturbation of the recorded depth frame, stock/benchmark.py perturb_depth: every pixel's range is multiplied by (1 + e), e Gaussian with standard deviation equal to the arm's fraction (0.5 %, 1 %, 2 % of range), then 2 % of pixels are dropped to no-return; seeded by SHA-256 of the frame id; the simulator's depth camera is ideal, so this is not a sensor model and says nothing about a real camera's error structure (no flying pixels, no range-dependent bias, no temporal correlation)",
+    "arms": [
+      "noise0.005",
+      "noise0.01",
+      "noise0.02"
+    ]
+  },
+  "arms": {
+    "abstain": "ideal depth, no identity channel",
+    "oracle": "ablation: perfect identity for whatever face is framed",
+    "abstain+degrade": "stock/benchmark.py degrade_mask: half the frames lose a band of 30-70 % of the depth image rows",
+    "noise0.005 / noise0.01 / noise0.02": "abstain with the noise model above and 2 % dropout",
+    "not_run": "channel and channel_embedding arms: the identity channel, registry and calibration are unchanged since round 1 and nothing in this round touches identity"
+  },
+  "bounds": [
+    {
+      "id": "count_within_one",
+      "arms": [
+        "abstain"
+      ],
+      "metric": "within_one_on_sufficient",
+      "direction": "min",
+      "value": 0.9,
+      "required_n": 150,
+      "meaning": "regression from round 1: ideal depth, sufficient-coverage lanes within one product, a cannot-tell is a miss"
+    },
+    {
+      "id": "misplaced_false_alarm",
+      "arms": [
+        "abstain",
+        "oracle"
+      ],
+      "metric": "misplaced_false_alarm",
+      "direction": "max",
+      "value": 0.05,
+      "required_n": 100,
+      "meaning": "regression from round 1: answered clean lanes flagged misplaced"
+    },
+    {
+      "id": "misplaced_recall_rear_given_a_perfect_channel",
+      "arms": [
+        "oracle"
+      ],
+      "metric": "misplaced_recall_rear",
+      "direction": "min",
+      "value": 0.85,
+      "required_n": 30,
+      "meaning": "regression from round 1"
+    },
+    {
+      "id": "low_coverage_refused",
+      "arms": [
+        "abstain+degrade"
+      ],
+      "metric": "low_coverage_refused",
+      "direction": "min",
+      "value": 0.9,
+      "required_n": 60,
+      "meaning": "regression from round 1: blinded lanes with coverage below 0.90 are refused"
+    },
+    {
+      "id": "hazard_a_degrade_answered_wrong",
+      "arms": [
+        "abstain+degrade"
+      ],
+      "metric": "answered_wrong",
+      "direction": "max",
+      "value": 0.03,
+      "required_n": 100,
+      "meaning": "hazard A: of the lanes answered under partial blinding (any coverage), the share more than one product off or with a product read in an empty lane"
+    },
+    {
+      "id": "hazard_a_degrade_false_alarm",
+      "arms": [
+        "abstain+degrade"
+      ],
+      "metric": "misplaced_false_alarm",
+      "direction": "max",
+      "value": 0.05,
+      "required_n": 100,
+      "meaning": "hazard A: answered clean lanes flagged misplaced under partial blinding"
+    },
+    {
+      "id": "hazard_b_noise0.005_answered",
+      "arms": [
+        "noise0.005"
+      ],
+      "metric": "within_one_on_sufficient",
+      "direction": "min",
+      "value": 0.9,
+      "required_n": 150,
+      "meaning": "hazard B: share of lanes answered within one product under this range noise (a cannot-tell is a miss)"
+    },
+    {
+      "id": "hazard_b_noise0.005_answered_wrong",
+      "arms": [
+        "noise0.005"
+      ],
+      "metric": "answered_wrong",
+      "direction": "max",
+      "value": 0.03,
+      "required_n": 100,
+      "meaning": "hazard B: share of answered lanes more than one off, or a phantom product in an empty lane"
+    },
+    {
+      "id": "hazard_b_noise0.005_empty_read_empty",
+      "arms": [
+        "noise0.005"
+      ],
+      "metric": "empty_lane_read_empty",
+      "direction": "min",
+      "value": 0.9,
+      "required_n": 40,
+      "meaning": "hazard B: empty lanes read as empty (a refusal is a miss)"
+    },
+    {
+      "id": "hazard_b_noise0.005_false_alarm",
+      "arms": [
+        "noise0.005"
+      ],
+      "metric": "misplaced_false_alarm",
+      "direction": "max",
+      "value": 0.05,
+      "required_n": 100,
+      "meaning": "hazard B: answered clean lanes flagged misplaced"
+    },
+    {
+      "id": "hazard_b_noise0.01_answered",
+      "arms": [
+        "noise0.01"
+      ],
+      "metric": "within_one_on_sufficient",
+      "direction": "min",
+      "value": 0.9,
+      "required_n": 150,
+      "meaning": "hazard B: share of lanes answered within one product under this range noise (a cannot-tell is a miss)"
+    },
+    {
+      "id": "hazard_b_noise0.01_answered_wrong",
+      "arms": [
+        "noise0.01"
+      ],
+      "metric": "answered_wrong",
+      "direction": "max",
+      "value": 0.03,
+      "required_n": 100,
+      "meaning": "hazard B: share of answered lanes more than one off, or a phantom product in an empty lane"
+    },
+    {
+      "id": "hazard_b_noise0.01_empty_read_empty",
+      "arms": [
+        "noise0.01"
+      ],
+      "metric": "empty_lane_read_empty",
+      "direction": "min",
+      "value": 0.9,
+      "required_n": 40,
+      "meaning": "hazard B: empty lanes read as empty (a refusal is a miss)"
+    },
+    {
+      "id": "hazard_b_noise0.01_false_alarm",
+      "arms": [
+        "noise0.01"
+      ],
+      "metric": "misplaced_false_alarm",
+      "direction": "max",
+      "value": 0.05,
+      "required_n": 100,
+      "meaning": "hazard B: answered clean lanes flagged misplaced"
+    },
+    {
+      "id": "hazard_b_noise0.02_answered",
+      "arms": [
+        "noise0.02"
+      ],
+      "metric": "within_one_on_sufficient",
+      "direction": "min",
+      "value": 0.85,
+      "required_n": 150,
+      "meaning": "hazard B: share of lanes answered within one product under this range noise (a cannot-tell is a miss)"
+    },
+    {
+      "id": "hazard_b_noise0.02_answered_wrong",
+      "arms": [
+        "noise0.02"
+      ],
+      "metric": "answered_wrong",
+      "direction": "max",
+      "value": 0.03,
+      "required_n": 100,
+      "meaning": "hazard B: share of answered lanes more than one off, or a phantom product in an empty lane"
+    },
+    {
+      "id": "hazard_b_noise0.02_empty_read_empty",
+      "arms": [
+        "noise0.02"
+      ],
+      "metric": "empty_lane_read_empty",
+      "direction": "min",
+      "value": 0.9,
+      "required_n": 40,
+      "meaning": "hazard B: empty lanes read as empty (a refusal is a miss)"
+    },
+    {
+      "id": "hazard_b_noise0.02_false_alarm",
+      "arms": [
+        "noise0.02"
+      ],
+      "metric": "misplaced_false_alarm",
+      "direction": "max",
+      "value": 0.05,
+      "required_n": 100,
+      "meaning": "hazard B: answered clean lanes flagged misplaced"
+    }
+  ],
+  "pass_rule": "a 'min' bound passes only if the LOWER limit of the 95 % Wilson interval is at or above the value, a 'max' bound only if the UPPER limit is at or below it, and only with required_n met; otherwise fail (point estimate on the wrong side) or inconclusive. 'answered_wrong' counts answered lanes more than one product off, and any product read in a lane that is empty (so a phantom is wrong even though it is within one). One run per arm; no re-tuning.",
+  "frozen_options_chosen_on_development_data": {
+    "floor_noise_sigma_factor": 4.0,
+    "edge_bias_sigma_factor": 4.0,
+    "max_sigma_for_class_m": 0.008,
+    "min_footprint_share": 0.7,
+    "front_inset_follows_noise": "max(10 mm, 2 * floor_noise_sigma_factor * sigma)",
+    "refusals_added": [
+      "top surface supports a number of products that disagrees with the depth count by more than 1.2 (was: widen the range)",
+      "nearest surface supported by fewer bins than 0.7 of the smallest pitch",
+      "a step in the top height shorter than that",
+      "no class claim when the frame's bed sigma exceeds max_sigma_for_class_m"
+    ],
+    "where": "restocker_perception/stock/{depth_profile,estimator,pipeline}.py, config/lane_stock.yaml, and the same margin, inset and edge bias in lane_depth_measurement.cpp (config/lane_survey.yaml)",
+    "unchanged_from_round_1": "minimum_coverage 0.90, empty_margin 0.02 m, max_pitch_residual 0.35, exact_pitch_residual 0.20, height_step_tolerance 0.03 m, safe naming policy"
+  },
+  "reported_without_bound": [
+    "misplaced recall (all and rear-visible) for abstain and noise arms",
+    "cannot-tell reasons",
+    "count error distribution",
+    "per lighting condition, class and fill",
+    "development-data numbers before and after the changes"
+  ],
+  "training": "none; AGENT_BRIEF section 3.3 holds"
+}

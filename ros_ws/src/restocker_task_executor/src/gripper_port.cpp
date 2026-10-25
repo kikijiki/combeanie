@@ -31,6 +31,9 @@ bool valid_gripper_goal(const GripperGoal & goal) noexcept
   if (goal.position_tolerance_m <= 0.0) {
     return false;
   }
+  if (!std::isfinite(goal.stall_band_m) || goal.stall_band_m < 0.0) {
+    return false;
+  }
   if (goal.move_duration.count() <= 0 || goal.deadline.count() <= 0) {
     return false;
   }
@@ -50,6 +53,29 @@ bool fingers_at_target(
   }
   return joint_near(measured.left_position_m, target_position_m, position_tolerance_m) &&
          joint_near(measured.right_position_m, target_position_m, position_tolerance_m);
+}
+
+bool fingers_stalled_in_band(
+  const GripperFingerState & measured, const GripperFingerState & previous,
+  double target_position_m, double position_tolerance_m, double stall_band_m,
+  double rest_m) noexcept
+{
+  if (!std::isfinite(target_position_m) || !std::isfinite(position_tolerance_m) ||
+    position_tolerance_m <= 0.0 || !std::isfinite(stall_band_m) || stall_band_m <= 0.0 ||
+    !std::isfinite(rest_m) || rest_m <= 0.0)
+  {
+    return false;
+  }
+  const auto in_band = [&](double position) {
+    return std::isfinite(position) && position >= target_position_m - position_tolerance_m &&
+           position <= target_position_m + stall_band_m;
+  };
+  const auto at_rest = [&](double now, double before) {
+    return std::isfinite(before) && std::abs(now - before) <= rest_m;
+  };
+  return in_band(measured.left_position_m) && in_band(measured.right_position_m) &&
+         at_rest(measured.left_position_m, previous.left_position_m) &&
+         at_rest(measured.right_position_m, previous.right_position_m);
 }
 
 bool gripper_definitely_not_started(GripperOutcome outcome) noexcept

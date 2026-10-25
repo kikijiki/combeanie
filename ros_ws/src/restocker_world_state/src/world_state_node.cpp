@@ -545,6 +545,8 @@ private:
         return ProductClass::SmallBottle;
       case restocker_interfaces::msg::ShelfLane::PRODUCT_CLASS_LARGE_BOTTLE:
         return ProductClass::LargeBottle;
+      case restocker_interfaces::msg::ShelfLane::PRODUCT_CLASS_BOX:
+        return ProductClass::Box;
       default:
         return std::nullopt;
     }

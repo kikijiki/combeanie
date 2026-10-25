@@ -127,6 +127,8 @@ template<typename Value>
       return ProductClass::SmallBottle;
     case ObservationMessage::PRODUCT_CLASS_LARGE_BOTTLE:
       return ProductClass::LargeBottle;
+    case ObservationMessage::PRODUCT_CLASS_BOX:
+      return ProductClass::Box;
     default:
       return std::nullopt;
   }
@@ -379,6 +381,26 @@ Result<ObjectObservation> object_observation_from_message(
   }
   if (message.has_sku && message.sku.empty()) {
     return invalid_observation("has_sku is true but SKU is empty");
+  }
+  // An unknown product is never given a SKU, and an identified one must have it.
+  switch (message.identity_state) {
+    case ObservationMessage::IDENTITY_NOT_ASSESSED:
+      break;
+    case ObservationMessage::IDENTITY_IDENTIFIED:
+      if (!message.has_sku) {
+        return invalid_observation("identity is identified but has_sku is false");
+      }
+      break;
+    case ObservationMessage::IDENTITY_UNKNOWN_PRODUCT:
+      if (message.has_sku) {
+        return invalid_observation("unknown product must not carry a SKU");
+      }
+      break;
+    default:
+      return invalid_observation("observation contains an unknown identity state");
+  }
+  if (message.identity_evidence_kinds.size() != message.identity_evidence_scores.size()) {
+    return invalid_observation("identity evidence arrays differ in length");
   }
 
   const auto & position = message.pose.pose.position;

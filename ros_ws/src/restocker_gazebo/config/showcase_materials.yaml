@@ -1,0 +1,54 @@
+# Materials the showcase scene gives the workcell's visuals (restocker_gazebo.world_bundle). The
+# workcell description keeps its flat colours for every test and benchmark; only a world that
+# names this file through scene_materials restyles them. Each rule matches the visuals whose name
+# contains `match`, first rule first. Colours are RGBA; roughness and metalness are the PBR metal
+# workflow's.
+workcell:
+  # Dividers and side frames are clear acrylic: transparent enough that a product behind one keeps
+  # its own colours instead of being veiled by a pale pane.
+  - match: divider
+    ambient: [0.55, 0.66, 0.72, 0.14]
+    diffuse: [0.62, 0.74, 0.80, 0.14]
+    specular: [0.9, 0.9, 0.9, 1.0]
+    roughness: 0.05
+    metalness: 0.0
+  - match: _frame_
+    ambient: [0.55, 0.66, 0.72, 0.14]
+    diffuse: [0.62, 0.74, 0.80, 0.14]
+    specular: [0.9, 0.9, 0.9, 1.0]
+    roughness: 0.05
+    metalness: 0.0
+  # The front retainer is the bright satin steel lip every product leans on. Metalness stays low
+  # because no environment map is lit, and a metal with nothing to reflect renders black.
+  - match: front_retainer
+    ambient: [0.66, 0.69, 0.72, 1.0]
+    diffuse: [0.78, 0.81, 0.85, 1.0]
+    specular: [0.8, 0.8, 0.8, 1.0]
+    roughness: 0.3
+    metalness: 0.3
+  # The stock tray is a powder-coated deep teal slab, which makes the labels stand out.
+  - match: stock_tray
+    ambient: [0.10, 0.22, 0.27, 1.0]
+    diffuse: [0.12, 0.27, 0.33, 1.0]
+    specular: [0.35, 0.35, 0.35, 1.0]
+    roughness: 0.55
+    metalness: 0.1
+  - match: camera_visual
+    ambient: [0.03, 0.03, 0.035, 1.0]
+    diffuse: [0.04, 0.04, 0.05, 1.0]
+    specular: [0.5, 0.5, 0.5, 1.0]
+    roughness: 0.3
+    metalness: 0.4
+  # The lane bed is blue-grey anodised aluminium with bright steel rollers across it.
+  - match: roller_bed
+    ambient: [0.40, 0.45, 0.52, 1.0]
+    diffuse: [0.46, 0.52, 0.60, 1.0]
+    specular: [0.4, 0.4, 0.4, 1.0]
+    roughness: 0.5
+    metalness: 0.35
+  - match: roller_
+    ambient: [0.66, 0.68, 0.71, 1.0]
+    diffuse: [0.80, 0.82, 0.85, 1.0]
+    specular: [0.9, 0.9, 0.9, 1.0]
+    roughness: 0.25
+    metalness: 0.35

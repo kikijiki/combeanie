@@ -22,7 +22,8 @@ def test_semantic_enums_match_the_world_state_domain() -> None:
         ObjectObservation.PRODUCT_CLASS_CAN,
         ObjectObservation.PRODUCT_CLASS_SMALL_BOTTLE,
         ObjectObservation.PRODUCT_CLASS_LARGE_BOTTLE,
-    } == {0, 1, 2, 3}
+        ObjectObservation.PRODUCT_CLASS_BOX,
+    } == {0, 1, 2, 3, 4}
     assert {
         ObjectObservation.ORIENTATION_UNKNOWN,
         ObjectObservation.ORIENTATION_UPRIGHT,

@@ -1,6 +1,13 @@
 controller_manager:
   ros__parameters:
-    update_rate: 100
+    # Spec M10 §11 D10 item 5: the effort-driven fingers need a force command held for one
+    # physics step, not ten. A force command is zero-order until the next controller update, so a
+    # sampled position loop on a 0.18 kg finger is stable only while p*T^2/m < 2; at the old
+    # 100 Hz that product is 34.7 for the grip gain below, at 1000 Hz it is 0.35. 1000 Hz is the
+    # world's <max_step_size>, so the loop runs once per physics step. The arm and rail keep
+    # their joints, limits, gains and velocity interface; their loop is first-order, so only the
+    # sampling instant changes.
+    update_rate: 1000
     use_sim_time: true
     # MoveIt time-parameterises inside the official UR10e URDF limits and each trajectory
     # controller checks its bounded goal. Gazebo's joint constraints remain the physical bounds.
@@ -18,12 +25,25 @@ controller_manager:
     gripper_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
+joint_state_broadcaster:
+  ros__parameters:
+    # Held at the pre-D10 100 Hz while only the finger loop runs at the manager's 1000 Hz: a
+    # 1000 Hz arm/rail/joint-state publisher made the telemetry adapter reject ~180 samples as
+    # non-monotonic and failed pre-grasp planning in the acceptance run.
+    update_rate: 100
+
 # The arm and rail use velocity commands with planned velocity fed forward; p closes residual
-# tracking error. The rail uses the same gain, and the gripper remains position-commanded for
-# attachment accuracy. These gains preserve the existing Gazebo integration; dynamic retuning of
-# transfer trajectories is intentionally outside the arm-model swap.
+# tracking error. The rail uses the same gain. The gripper is effort-commanded (spec M10 §11 D10
+# item 5): a force-mode position controller whose output is clamped at effort_n, so free motion
+# moves the jaw and a jaw blocked by the product pushes with exactly the clamp. These gains
+# preserve the existing Gazebo integration; dynamic retuning of transfer trajectories is
+# intentionally outside the arm-model swap.
 arm_controller:
   ros__parameters:
+    # Held at the pre-D10 100 Hz while only the finger loop runs at the manager's 1000 Hz: a
+    # 1000 Hz arm/rail/joint-state publisher made the telemetry adapter reject ~180 samples as
+    # non-monotonic and failed pre-grasp planning in the acceptance run.
+    update_rate: 100
     joints: [shoulder_pan_joint, shoulder_lift_joint, elbow_joint, wrist_1_joint, wrist_2_joint, wrist_3_joint]
     command_interfaces: [velocity]
     state_interfaces: [position, velocity]
@@ -60,6 +80,10 @@ arm_controller:
 
 rail_controller:
   ros__parameters:
+    # Held at the pre-D10 100 Hz while only the finger loop runs at the manager's 1000 Hz: a
+    # 1000 Hz arm/rail/joint-state publisher made the telemetry adapter reject ~180 samples as
+    # non-monotonic and failed pre-grasp planning in the acceptance run.
+    update_rate: 100
     joints: [rail_joint]
     command_interfaces: [velocity]
     state_interfaces: [position, velocity]
@@ -75,10 +99,23 @@ rail_controller:
 gripper_controller:
   ros__parameters:
     joints: [left_finger_joint, right_finger_joint]
-    command_interfaces: [position]
+    command_interfaces: [effort]
     state_interfaces: [position, velocity]
     allow_partial_joints_goal: false
     action_monitor_rate: 20.0
+    # Spec M10 §11 D10 item 5, every number derived and none tuned:
+    #   p = effort_n / (hold_interference_m - effort_n / pad_row_stiffness)
+    #     = 40 / (0.001 - 40/111000) = 62535 N/m, so the loop reaches the 40 N grip force at the
+    #     design interference even when one pad row carries the whole load (its own 0.36 mm of
+    #     compression is what it consumes of the 1 mm);
+    #   d = effort_n / velocity_mps - finger joint damping = 40/0.12 - 2 = 331 N*s/m, so with the
+    #     force clamped the controller's own damping caps the free-run jaw speed at the joint's
+    #     shipped 0.12 m/s (a force path has no velocity clip to do it for us);
+    #   u_clamp = +-effort_n, belt and braces with the joint effort limit DART clips to (F14).
+    # i = 0: the press force comes from p, an integrator would wind up during the free run.
+    gains:
+      left_finger_joint: {p: 62535.0, i: 0.0, d: 331.0, i_clamp: 0.0, u_clamp_max: 40.0, u_clamp_min: -40.0}
+      right_finger_joint: {p: 62535.0, i: 0.0, d: 331.0, i_clamp: 0.0, u_clamp_max: 40.0, u_clamp_min: -40.0}
     constraints:
       goal_time: 1.0
       stopped_velocity_tolerance: 0.01

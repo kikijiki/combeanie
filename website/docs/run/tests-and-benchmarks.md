@@ -150,6 +150,19 @@ about **122 minutes** for 24 attempts once its runs reached full transfers. The 
 `summary.txt` and `report.md`; the harness exits 0 when it records failures, because recording
 them is the job.
 
+## Perception tests and benchmarks
+
+```bash
+just test-package restocker_perception
+python3 -m pytest ros_ws/src/restocker_perception/test/test_product_registry.py   # no build needed
+```
+
+The perception benchmarks are separate from the restock harness: they record labelled frames from
+seeded scenes, score proposals, lane stock, the identity ladder and the inventory against bounds
+committed before the held-out data is read, and use the machine-wide simulator slot. The method,
+the split chain and every result with its bounds are on [Perception: Benchmarks](/docs/perception/benchmarks)
+and [Perception: Results](/docs/perception/results).
+
 ## Diagnose a stopped or blocked run
 
 Use the domain printed by the launch or demo in every inspection terminal. Source the built
@@ -195,16 +208,16 @@ reservations require reconciliation before treating an existing run as ready.
 
 ## Interpret reliability evidence
 
-A test pass applies to its revision, scenario, hold mode and effective configuration. A historical
-weld-grasp measurement is not a physical-grip result. Keep startup failures in the run population,
+A test pass applies to its revision, scenario, hold mode and effective configuration. A weld-grasp
+measurement is not a physical-grip result. Keep startup failures in the run population,
 and distinguish dispatched transfer attempts from planned goals. Retain complete console output
 for passing and failing attempts; a short ctest success summary proves the terminal verdict but
 cannot establish that intermediate refusals or retries were absent.
 
-The 2026-09-29 sensor acceptance population passed 14/24 (Wilson 95% 38.8–75.5%). A later
-24-attempt weld population, measured at the time of the release, passed 19/24 (79.2%, Wilson 95% 59.5–90.8%). A two-sided
-Fisher comparison gives p=0.2124, so these populations do not establish an improvement. All 19
-passing logs in the later population are ctest summaries, so overall intermediate-refusal
+The 2026-09-29 sensor acceptance population passed 14/24 (Wilson 95% 38.8–75.5%). A 24-attempt weld
+population passed 19/24 (79.2%, Wilson 95% 59.5–90.8%). A two-sided Fisher comparison gives p=0.2124,
+so the populations are not statistically separated. All 19 passing logs in the weld population are
+ctest summaries, so overall intermediate-refusal
 incidence cannot be compared. The raw run logs are not published; this summary is not
 an independently reproducible raw dataset or a claim about the current revision. Neither
 population establishes a dense sensor-driven or physical-grip success rate.

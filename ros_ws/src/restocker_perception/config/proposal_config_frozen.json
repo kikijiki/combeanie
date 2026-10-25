@@ -1,0 +1,25 @@
+{
+ "card": "CMB-113",
+ "config": {
+  "blob_reach_m": 0.028,
+  "catalogue_height_tol_m": 0.03,
+  "catalogue_radius_tol_m": 0.009,
+  "disc_min_cells": 12,
+  "disc_radius_m": [
+   0.024,
+   0.052
+  ],
+  "disc_rms_m": 0.006,
+  "footprint_margin_m": 0.006,
+  "max_products_per_blob": 30,
+  "min_area_m2": 0.0006,
+  "min_height_m": 0.02,
+  "peel_min_radius_ratio": 1.0,
+  "plateau_band_m": 0.004
+ },
+ "config_sha256": "338e922042531540a73ab97b825cfa1d8f2a2a3d17709f0836bfa6155d930645",
+ "frozen_before_any_held_out_frame_was_read": true,
+ "frozen_on": "2026-10-19",
+ "geometry_source_sha_note": "restocker_perception/proposals/geometry.py at the commit that adds this file",
+ "tuned_on": "development seeds 1001..1024 only (24 scenes, 412 recallable products): blob reach, flat-top band, retainer rail; dev strict recall 0.69 -> 0.944"
+}

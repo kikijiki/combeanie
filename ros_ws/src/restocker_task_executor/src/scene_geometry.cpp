@@ -40,12 +40,30 @@ template<typename T>
   if (value == "large_bottle") {
     return CatalogProductClass::LargeBottle;
   }
+  if (value == "box") {
+    return CatalogProductClass::Box;
+  }
   return std::nullopt;
 }
 
 [[nodiscard]] bool finite_positive(double value)
 {
   return std::isfinite(value) && value > 0.0;
+}
+
+// A product primitive is an upright cylinder (height, radius) or, for a box product, a BOX of
+// three positive extents.
+[[nodiscard]] bool valid_product_primitive(const shape_msgs::msg::SolidPrimitive & primitive)
+{
+  const bool cylinder = primitive.type == shape_msgs::msg::SolidPrimitive::CYLINDER &&
+    primitive.dimensions.size() == 2U;
+  const bool box = primitive.type == shape_msgs::msg::SolidPrimitive::BOX &&
+    primitive.dimensions.size() == 3U;
+  if (!cylinder && !box) {
+    return false;
+  }
+  return std::ranges::all_of(
+    primitive.dimensions, [](double value) {return finite_positive(value);});
 }
 
 [[nodiscard]] bool finite_transform(const Eigen::Isometry3d & transform)
@@ -186,6 +204,11 @@ SceneGeometryResult<ProductCollisionCatalog> ProductCollisionCatalog::load(
     std::set<std::string> skus;
     for (const YAML::Node & node : geometries) {
       ProductCollisionGeometry entry;
+      // Contoured bottles are perception-only (Card 110): the executor refuses them, so the
+      // planning scene has no collision geometry for them.
+      if (node["product_class"].as<std::string>() == "contour_bottle") {
+        continue;
+      }
       entry.geometry_key = node["geometry_key"].as<std::string>();
       const auto product_class = parse_product_class(node["product_class"].as<std::string>());
       if (entry.geometry_key.empty() || !product_class) {
@@ -204,6 +227,39 @@ SceneGeometryResult<ProductCollisionCatalog> ProductCollisionCatalog::load(
         }
       }
       entry.class_fallback = node["class_fallback"].as<bool>(false);
+      const YAML::Node box_shape = node["shape"];
+      if (entry.product_class == CatalogProductClass::Box) {
+        // A box has no class fallback (no dimensions stand for "a box"), so it is exempt from the
+        // one-fallback-per-class rule below. It enters the planning scene as a BOX primitive.
+        represented_classes.erase(entry.product_class);
+        if (entry.class_fallback || !box_shape || box_shape["type"].as<std::string>("") != "box") {
+          return failure<ProductCollisionCatalog>(
+            SceneGeometryErrorCode::UnsupportedGeometry,
+            "catalog geometry " + entry.geometry_key + " must be a box without a class fallback");
+        }
+        const YAML::Node size = box_shape["size_xyz_m"];
+        if (!size.IsSequence() || size.size() != 3U) {
+          return failure<ProductCollisionCatalog>(
+            SceneGeometryErrorCode::InvalidConfiguration,
+            "catalog geometry " + entry.geometry_key + " box needs three size_xyz_m values");
+        }
+        entry.primitive.type = shape_msgs::msg::SolidPrimitive::BOX;
+        for (std::size_t index = 0; index < 3U; ++index) {
+          const double extent = size[index].as<double>();
+          if (!finite_positive(extent)) {
+            return failure<ProductCollisionCatalog>(
+              SceneGeometryErrorCode::InvalidConfiguration,
+              "catalog geometry " + entry.geometry_key + " has invalid dimensions");
+          }
+          entry.primitive.dimensions.push_back(extent);
+        }
+        if (!catalog.entries_.emplace(entry.geometry_key, std::move(entry)).second) {
+          return failure<ProductCollisionCatalog>(
+            SceneGeometryErrorCode::InvalidConfiguration,
+            "catalog contains duplicate geometry_key");
+        }
+        continue;
+      }
       if (entry.class_fallback && !fallback_classes.insert(entry.product_class).second) {
         return failure<ProductCollisionCatalog>(
           SceneGeometryErrorCode::InvalidConfiguration,
@@ -278,14 +334,10 @@ SceneGeometryResult<moveit_msgs::msg::CollisionObject> make_product_collision_ob
       SceneGeometryErrorCode::InvalidPose,
       "product collision object requires a nonzero ID, frame, and rigid finite pose");
   }
-  if (geometry.primitive.type != shape_msgs::msg::SolidPrimitive::CYLINDER ||
-    geometry.primitive.dimensions.size() != 2 ||
-    !finite_positive(geometry.primitive.dimensions[0]) ||
-    !finite_positive(geometry.primitive.dimensions[1]))
-  {
+  if (!valid_product_primitive(geometry.primitive)) {
     return failure<moveit_msgs::msg::CollisionObject>(
       SceneGeometryErrorCode::InvalidConfiguration,
-      "product collision geometry is not a valid cylinder");
+      "product collision geometry is not a valid cylinder or box");
   }
 
   moveit_msgs::msg::CollisionObject object;
@@ -311,14 +363,10 @@ SceneGeometryResult<moveit_msgs::msg::CollisionObject> make_declared_product_col
       SceneGeometryErrorCode::InvalidPose,
       "declared product collision object requires a source ID, frame, and rigid finite pose");
   }
-  if (geometry.primitive.type != shape_msgs::msg::SolidPrimitive::CYLINDER ||
-    geometry.primitive.dimensions.size() != 2 ||
-    !finite_positive(geometry.primitive.dimensions[0]) ||
-    !finite_positive(geometry.primitive.dimensions[1]))
-  {
+  if (!valid_product_primitive(geometry.primitive)) {
     return failure<moveit_msgs::msg::CollisionObject>(
       SceneGeometryErrorCode::InvalidConfiguration,
-      "declared product collision geometry is not a valid cylinder");
+      "declared product collision geometry is not a valid cylinder or box");
   }
 
   moveit_msgs::msg::CollisionObject object;

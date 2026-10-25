@@ -2,16 +2,24 @@
 <!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
 <!-- SPDX-License-Identifier: MIT -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <!-- Both command interfaces are exported for every joint; each controller claims one, decided
-       in controllers.yaml. The arm and rail use velocity feedforward, the gripper uses position.
-       The controller-manager post-limiter that rewrote velocity commands is disabled there. -->
-  <xacro:macro name="restocker_controlled_joint" params="name lower upper initial_position:=0.0">
+  <!-- Command interfaces are exported for every joint; each controller claims its own in
+       controllers.yaml. The arm and rail use velocity feedforward. The two finger joints also
+       export `effort`, which is the one their controller claims: spec M10 §11 D10 drives them as a
+       force-limited position controller (the position and velocity exports stay so the hardware
+       keeps the same state bookkeeping and hold_joints fallback). The controller-manager
+       post-limiter that rewrote velocity commands is disabled there. -->
+  <xacro:macro
+    name="restocker_controlled_joint"
+    params="name lower upper initial_position:=0.0 effort_command:=false">
     <joint name="${name}">
       <command_interface name="position">
         <param name="min">${lower}</param>
         <param name="max">${upper}</param>
       </command_interface>
       <command_interface name="velocity"/>
+      <xacro:if value="${effort_command}">
+        <command_interface name="effort"/>
+      </xacro:if>
       <state_interface name="position">
         <param name="initial_value">${initial_position}</param>
       </state_interface>
@@ -32,17 +40,21 @@
       <xacro:restocker_controlled_joint name="${prefix}wrist_1_joint" lower="${-2.0 * pi}" upper="${2.0 * pi}" initial_position="-1.57"/>
       <xacro:restocker_controlled_joint name="${prefix}wrist_2_joint" lower="${-2.0 * pi}" upper="${2.0 * pi}" initial_position="0.0"/>
       <xacro:restocker_controlled_joint name="${prefix}wrist_3_joint" lower="${-2.0 * pi}" upper="${2.0 * pi}" initial_position="0.0"/>
-      <xacro:restocker_controlled_joint name="${prefix}left_finger_joint" lower="${restocker_gripper_lower}" upper="${restocker_gripper_upper}" initial_position="0.005"/>
-      <xacro:restocker_controlled_joint name="${prefix}right_finger_joint" lower="${restocker_gripper_lower}" upper="${restocker_gripper_upper}" initial_position="0.005"/>
+      <xacro:restocker_controlled_joint name="${prefix}left_finger_joint" lower="${restocker_gripper_lower}" upper="${restocker_gripper_upper}" initial_position="0.005" effort_command="true"/>
+      <xacro:restocker_controlled_joint name="${prefix}right_finger_joint" lower="${restocker_gripper_lower}" upper="${restocker_gripper_upper}" initial_position="0.005" effort_command="true"/>
     </ros2_control>
 
     <gazebo>
       <plugin filename="libgz_ros2_control-system.so" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
         <parameters>${controller_config}</parameters>
         <hold_joints>true</hold_joints>
-        <!-- Position-commanded gripper only. At gain 1.0, post-release traverses repeatedly drove the
-             parked-open fingers past their hard bounds, and the impulses coincided with arm wrist
-             velocity-limit excursions. Gain 0.5 keeps short-stroke attachment accuracy without
+        <!-- Only ever applies to a *position*-claimed joint: gz_ros2_control turns that command
+             into v = -position_proportional_gain * (pos - cmd) * update_rate. No controller claims
+             one since the fingers moved to `effort` (spec M10 §11 D10 item 5), so this is inert
+             until something does — and note the slope is this gain times `update_rate`, which is
+             1000 Hz now, so it must be re-derived rather than reused if a position claim returns.
+             Its history: at gain 1.0 post-release traverses repeatedly drove the parked-open
+             fingers past their hard bounds; 0.5 kept short-stroke attachment accuracy without
              hammering those stops. -->
         <position_proportional_gain>0.5</position_proportional_gain>
       </plugin>

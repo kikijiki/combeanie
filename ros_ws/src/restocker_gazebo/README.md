@@ -27,6 +27,40 @@ allowlist come from the description catalog and selected scenario. The loader re
 before transport services are advertised. Gazebo update callbacks will be the only layer allowed to
 resolve entities or create and remove detachable-joint components.
 
+The same file names the **hold mode**, which decides how a verified grasp is carried. `weld`
+creates the `restocker_attachment_joint` DetachableJoint, so a rigid link holds the product and
+the fingers never touch it; `physical` creates nothing and holds the product with finger contact
+and friction (Milestone 10 spec 11.3). The key is required and restricted to those two spellings
+because everything downstream — whether an entity is created, what a receipt means, and which
+evidence a run may be cited for — follows from it. Whichever is configured, the process prints a
+`hold_mode=...` line at startup and carries the value on every attachment reply and on
+`/simulation_attachment/state`, so a log can never be mistaken for evidence about the other mode.
+The shipped default is **`weld`**. `physical` is complete (contact predicates, interference close,
+per-pad slip watchdog) but passes the end-to-end acceptance run only about 40 % of the time, so it
+is opt-in until the release/insert events below are understood.
+
+What the physical hold stands on, each measured rather than assumed:
+
+- **Pad rows are flat boxes, one row high and one row deep, in front of an inset finger body.**
+  Rounded rows (spheres, rods, twin ribs) look kinder to a cylinder but are not: Bullet's
+  sphere-to-cylinder-side test reports no contact until the overlap is about 2 mm and then throws the
+  product out, so a can was touched at its rim only and the fingers closed on nothing; a single
+  rounded rib also pushes an off-centre product further off. Flat boxes give a contact on every row
+  with the normal along the pad normal (`|n.x| > 0.9995`) and carry 40 N a side. The 13-second
+  fixture `test_physical_grasp_runtime` reproduces either geometry.
+- **The watchdog's slip is the net excursion of a pad's contact point in the pad plane.** The pad
+  normal is excluded (a compliant row compresses 0.36 mm at 40 N), a turn about the product's own
+  axis is excluded (an upright cylinder, no torsional friction), and the path length of wobble is
+  kept as a receipt, not a bound.
+- **The free axis is the jaw axis** (the pads' common normal), not the line through the two contact
+  centroids: the centroids sit wherever the load falls among the rows and read 0.07 rad off, which
+  made a 0.4 rad pendulum swing look like 0.03 rad of tilt. Slip, swing and tilt are bounded by
+  `held_slip_allowance_m`, `held_swing_allowance_m` and `held_tilt_allowance_rad` in
+  `attachment_boundary.yaml`; a weld keeps `post_attach_translation_drift_m`.
+- **Release disarms the watchdog only when the pads let go** (aperture grown past the contact
+  tolerance *and* pad force under a quarter of the hold's), so a loaded pair of pads that merely
+  parts by a fraction of a millimetre stays watched.
+
 ## Product labels, and two products that share a shape
 
 A scenario product may name a `label_texture`. It is a bare filename resolved against
@@ -37,13 +71,106 @@ an image is all a label needs and no mesh is involved. Products without the fiel
 why a textured product declares white; a coloured base tints the label and takes its contrast with
 it.
 
+### Generated catalogue and the contoured bottle
+
+`tools/label_factory.py` generates the fictional beverage catalogue (Card 110): 16 SKUs, two
+look-alike families per shape (can, small bottle, large bottle, contour bottle), every label a
+full unwrapped strip with a front panel (brand, flavour, a logo of random shapes) and a back panel
+(ingredients, nutrition table, disclaimers, a valid EAN-13 whose `2000000...` prefix is GS1's
+restricted-circulation range, so no real product is ever matched). Output is deterministic per
+seed: `materials/textures/gen-NNN.png`, `config/generated_product_labels.yaml`, and a marked block
+in `restocker_description/config/product_collision_catalog.yaml` (each SKU gets its own
+`geometry_key`, as `can.citrus` does). `--check` fails when the checked-in output is stale;
+`test_label_factory` runs it. The names and brands are invented.
+
+**Strips are upright on disk, the cylinder half-turn is config.** Every `gen-NNN.png` is readable as
+stored. Gazebo unwraps a cylinder primitive with the strip rotated by half a turn (upside down,
+back panel first), while the contour mesh's own UVs show it upright, so each manifest row carries
+`texture_rotation_deg` (180 for `can`, `small_bottle` and `large_bottle`, 0 for `contour_bottle`).
+The launch file installs the texture through `restocker_gazebo/label_textures.py`, the only place
+the turn is applied: a rotation of 180 loads a pixel-exact rotated copy cached under the system
+temp directory (`restocker_label_cache/`), 0 or a texture the manifest does not list (the
+hand-made `can_*_label.png`) is loaded unchanged. The registry's reference-view renderer
+(`restocker_perception/registry/render.py`) maps u/v the way the strip is stored and applies no
+rotation. Until 2026-10-20 the cylinder strips were stored pre-rotated instead; the rendered
+result in Gazebo is the same.
+
+The `contour_bottle` class has a waisted, ribbed visual (`meshes/contour_bottle.obj`, generated by
+`tools/generate_bottle_meshes.py`, u around the barrel, v along the axis) while its **collision
+stays the plain cylinder**: grasping, friction and the lane geometry are those of a cylinder of
+radius 0.036 m, so perception sees a real bottle shape and physics is unchanged. A scenario names
+the mesh with `visual_mesh`, a bare filename under `meshes/` (the same rule as `label_texture`).
+`config/generated_catalogue_products.yaml` lays all 16 on a tray, which is the scene for looking
+at labels, not a restocking scenario.
+
+**Box products (CMB-119).** The catalogue also holds four fictional boxes, `GEN-017`..`GEN-020`,
+`product_class: box`, `shape: {type: box, size_xyz_m: [x, y, z]}` (x width, y depth, z height; the
+front face looks along -y): a look-alike pair of 200 mL cartons (65 x 40 x 105 mm), a 1 L carton
+(95 x 60 x 165 mm) and a slim 330 mL box (55 x 25 x 150 mm) whose back panel carries **no barcode**
+(`gtin` is absent from its manifest row and `barcode: false`). A box has no class fallback. Its
+texture is a **face atlas**, the unfolded net at 8000 px/m (front, right, back, left in one row,
+top and bottom below); the manifest row carries `faces` (pixel rectangle, outward normal, and the
+product-frame directions of the image's right and up edges, always right-handed so no face is
+mirrored), `box_variant`, `visual_mesh`, `size_xyz_m`, `mass_kg`, `atlas_px`. Atlases are stored
+upright, `texture_rotation_deg` is 0. `tools/generate_box_meshes.py` writes one OBJ per variant
+(`meshes/box_<variant>.obj`, 24 vertices, hard edges, per-face UVs into the atlas, from the same
+layout function the atlas uses), and the product xacro takes `box_size` for a box collision and
+box inertia. The scenario validator and the catalogue loaders accept `shape.type: box`; the lane
+builder (`lane_columns.BOX_CATALOGUE`) packs a box column by its depth, a box lies on its back
+(front face up) with roll -90 degrees. Measured: Gazebo shows every panel upright and unmirrored
+(front, back and sides; see the benchmark note in the project notes).
+
+Where a box is not supported yet, it is refused, not treated as a cylinder: the gripper pad table
+has a stated-proxy `cardboard` material but the attachment system registers no attachable product
+for a box (an attach request is refused as an unknown source id), the executor refuses to grasp or
+place one (`ProductClass::Box` is neither graspable nor placeable) and the lane placement profiles
+skip it. A box *is* observed (ground truth, lane evidence, object manifest, world state) and enters
+the planning scene as a `BOX` primitive.
+
 The visual is named `product_body_visual` on purpose. sdformat merges a `<gazebo reference>`
 material extension only into a visual whose generated SDF name contains `<link>_visual`, and under
-any other name the extension is dropped with no diagnostic and the product renders untextured.
-The same rule is why the `mu1`, `mu2`, `kp` and `kd` entries next to it have never reached Gazebo:
-the collision is named `product_collision`, the parser looks for `product_body_collision`, and the
-friction has been silently discarded since the file was written. It is left that way deliberately (every grasp, tolerance and benchmark here was measured against the contact behaviour Gazebo
-actually used), and `urdf/product.urdf.xacro` carries the note and the one-word fix.
+any other name the extension is dropped with no diagnostic and the product renders untextured. The
+same rule governs friction: the collision must be named `product_body_collision` or the `mu1`,
+`mu2`, `kp` and `kd` entries next to the material are discarded with the same silence. It was
+named `product_collision` from the day the file was written until 2026-09-29, so **the catalogued
+friction never reached the physics engine** — every product contact ran on the engine's own
+default of 1.0. The collision now carries the merging name and
+`test/test_simulation_description.py` asserts the *converted* SDF (via `gz sdf -p`), not the URDF
+the extension lives in, because the URDF was always the one that looked right.
+
+Only `mu1`/`mu2` do any work. DART's contact solver combines the two bodies' coefficients by
+taking the **smaller** of the two, so a product held by fingers at 1.0 grips at the catalogued
+value (0.65 for the can, 0.72 and 0.76 for the bottles), product-to-shelf runs at the smaller of
+the shelf's 0.8 and the product's, and product-to-product at the smaller of the two products'.
+`kp` and `kd` are emitted into `surface/contact/ode` and then **ignored**: the DART backend does
+not read them (its contact ERP/CFM are compiled in), so they are not a stiffness tuning surface
+and nothing here should be tuned through them.
+
+Because the combination is a minimum, a coefficient on the finger face alone would do nothing, so
+the attachment system sets the **pair** instead: for a contact between a finger pad and a product
+it overrides both friction directions with the pad's own figure — 0.8 for the aluminium can, 0.3
+for the PET bottles (a stated proxy: silicone on acrylic at the load our pads carry) — through
+gz-sim's contact-surface customization, which only the dartsim backend implements. Every other
+pair keeps the rule above untouched: product-to-shelf, product-to-tray and product-to-product are
+still the minimum of their two catalogued values. The coefficient each product class grips at is
+printed once at startup as `AttachmentSystem pad-to-product friction ...`, so a run's log states
+which physics it measured.
+
+The fingers that produce that grip are **effort-driven**: `gripper_controller` claims the
+`effort` command interface of both finger joints and runs a force-mode position controller whose
+output is clamped at `gripper_geometry.yaml`'s `effort_n` (40 N). Free motion moves the jaw; a jaw
+blocked by the product pushes with exactly the clamp, which is what a force-limited parallel
+gripper does. The arm and the rail keep their velocity interface and their gains unchanged; the
+only other thing that moves with it is the controller-manager rate, which is now 1 kHz (the
+physics step) because a force command is held until the next controller update and a 10 ms hold
+on a 0.18 kg jaw is unstable for any gain that reaches 40 N inside the 1 mm interference. Each pad
+is also modelled as four small links on spring-damper joints along the jaw normal in the simulated
+description only — MoveIt plans against the plain tiled geometry it has always seen.
+
+Delivering the friction invalidated the evidence that was gathered without it. Every grasp,
+attachment, gravity-feed, contact and transfer tolerance measured before 2026-09-29 was measured
+at engine-default friction and is **historical**: it may not be cited as evidence for the current
+contact behaviour, and Card 024's remeasurement replaces it.
 
 That is a friction defect and nothing else. Products also had no product-to-product *contact*, and
 the two are unrelated: a cylinder pair carrying the whole `<surface>` block this rename would
@@ -77,6 +204,34 @@ write works; an absent file just starts from the named `lane_semantics`.
 The label images are generated by `tools/generate_product_labels.py`, which needs nothing but the
 standard library and rewrites them in place. They are original flat-colour artwork with a
 hand-coded block font, so they carry no third-party licence and depict no real branding.
+
+## The showcase scene
+
+`config/showcase_products.yaml` is the scene `just demo` opens: the generated catalogue's
+straight-cylinder SKUs (labelled, textured) as a stocked shelf and a packed back room. Six lanes
+each hold one SKU's column (five SKUs across the three shapes; the large bottle holds two lanes),
+pinned at the computed lane poses, some at the lane target and some short. The stock tray holds one
+two-column block per SKU, rows 12 mm apart and columns on the gripper's approach-corridor pitch,
+with reserve stock for every SKU. Every shelf label faces the shelf front (+Y); each tray product
+has its own seeded random yaw (`showcase.tray_yaw_rad`), as stock set down in a back room is. The scene is paired with
+`restocker_world_state/config/showcase_lanes.yaml` and the dressed world
+`worlds/restocking_showcase.sdf` (same physics and plugins as `restocking.sdf`, a cold-room store
+back with a spot key light and a fill, and a Gazebo window that opens on the `wide` view of
+`website/scripts/showcase_views.py`).
+
+The launch argument `bundle_scenario:=true` writes the workcell and every scenario product into the
+world file (`restocker_gazebo/world_bundle.py`, one `gz sdf -p` conversion per distinct product
+description) so they stand there from the first frame instead of being spawned by one `create`
+process each; `scene_materials:=<yaml>` restyles the bundled workcell's visuals by name
+(`config/showcase_materials.yaml`), leaving the description every test shares untouched. The floor
+texture is generated by `tools/generate_showcase_floor.py`.
+
+The scenario is generated, not edited: `restocker_gazebo/showcase.py` holds the arithmetic and the
+lists that decide what stands where, `tools/generate_showcase_scenario.py` writes both documents
+(`--check` reports a stale pair), and `test/test_showcase.py` pins determinism, non-overlap, the
+corridor pitch, the tray bounds and the agreement between scenario, label manifest, collision
+catalogue and lane policy. The contoured bottles and boxes are not placed: the grasp and
+placement stack handles straight cylinders only.
 
 ## Repeatable randomized scenarios
 

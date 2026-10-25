@@ -224,6 +224,8 @@ namespace
       return "small bottle";
     case TrayObservation::PRODUCT_CLASS_LARGE_BOTTLE:
       return "large bottle";
+    case TrayObservation::PRODUCT_CLASS_BOX:
+      return "box";
     default:
       return "product";
   }

@@ -1,0 +1,29 @@
+{
+  "card": "CMB-112",
+  "declared_on": "2026-10-19",
+  "declared_before_any_held_out_run": true,
+  "bounds": {
+    "false_identity_rate_known_max": 0.01,
+    "unknown_named_as_sku_max": 0.05,
+    "latency_p95_ms_max": 2000
+  },
+  "definitions": {
+    "false_identity_rate_known": "decisions that name a SKU that is not the true one, over all decisions on objects whose product is registered (abstain and unknown count in the denominator, never in the numerator)",
+    "unknown_named_as_sku": "decisions that name any registered SKU, over all decisions on objects whose product is not registered (held-out products); abstain and unknown are the wanted outcomes",
+    "latency_p95_ms": "95th percentile wall-clock of IdentityEngine.identify (embedding, OCR, barcode; crop already cut) per decision on this box, CPU; no duty budget is written anywhere in the repository, so 2 s per decision is declared here as the budget"
+  },
+  "reported_without_bound": [
+    "abstention rate on known products",
+    "rate at which unknown products are explicitly called unknown",
+    "look-alike twin confusion (a wrong SKU that is the true SKU's look-alike partner)",
+    "correct-identification rate (coverage)",
+    "latency p50",
+    "all of the above per range band and per lighting condition, with Wilson intervals"
+  ],
+  "protocol": {
+    "calibration_data": "train and validation seeds only; registry products train + validation; unknown-product samples come from leaving registered products out of the index in turn (3 folds over the 9 calibration products); thresholds fitted at half of each bound (calibration ceilings 0.005 and 0.025)",
+    "held_out_run": "exactly once, after the calibration file is written and committed; the registry is train + validation products, held-out products are unknown; whatever comes out is reported, pass or fail, and thresholds are not re-tuned afterwards",
+    "pass_rule": "the point estimate of each bounded rate is at or below its bound; the Wilson interval is reported next to it and a pass whose interval crosses the bound is labelled inconclusive rather than demonstrated",
+    "training": "none; AGENT_BRIEF section 3.3 holds; whitening is fit on unlabeled calibration crops only"
+  }
+}

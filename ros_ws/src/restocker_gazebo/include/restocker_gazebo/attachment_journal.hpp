@@ -156,6 +156,44 @@ struct AttachmentOperationRecord
   bool operator==(const AttachmentOperationRecord &) const = default;
 };
 
+// How a verified grasp is held (spec 11.3 D1). kWeld is the historical DetachableJoint weld;
+// kPhysical holds the product with finger contact and friction and creates no entity. Defined
+// here, at the bottom of the dependency chain, so the predicate library, the config loaders on
+// both the simulator and the executor side, and the wire codec all name the same two modes.
+enum class AttachmentHoldMode
+{
+  kWeld,
+  kPhysical,
+};
+
+// Spelling of the two hold modes, shared by every layer that parses, publishes or validates one,
+// so a receipt can never drift from the value it reports.
+inline constexpr const char * kHoldModeWeld = "weld";
+inline constexpr const char * kHoldModePhysical = "physical";
+
+// The wire/config spelling of the mode, used verbatim in receipts and on the attachment state.
+[[nodiscard]] inline constexpr std::string_view hold_mode_name(AttachmentHoldMode mode) noexcept
+{
+  switch (mode) {
+    case AttachmentHoldMode::kWeld:
+      return kHoldModeWeld;
+    case AttachmentHoldMode::kPhysical:
+      return kHoldModePhysical;
+  }
+  return "unknown";
+}
+
+[[nodiscard]] inline constexpr bool known_hold_mode(std::string_view mode) noexcept
+{
+  return mode == kHoldModeWeld || mode == kHoldModePhysical;
+}
+
+// The mode the journal publishes when its caller does not state one. Tracks the shipped default
+// in description/config/gripper_geometry.yaml, which both the simulator boundary and the task
+// executor read; AttachmentSystem always passes the configured value, so production never depends
+// on this.
+inline constexpr const char * kDefaultHoldMode = kHoldModePhysical;
+
 struct AttachmentPhysicalState
 {
   std::string simulator_epoch;
@@ -168,6 +206,10 @@ struct AttachmentPhysicalState
   // Fidelity of the most recent attach that reached the comparison, published on rejection as
   // well as acceptance.
   std::optional<AttachmentFidelity> fidelity;
+  // The configured hold mode, carried on every reply so a run is receipted for which physics it
+  // ran under (spec 11.3 D1). "weld" creates the DetachableJoint; "physical" creates nothing and
+  // holds the product with finger contact and friction.
+  std::string hold_mode{kDefaultHoldMode};
 
   bool operator==(const AttachmentPhysicalState &) const = default;
 };
@@ -214,7 +256,8 @@ public:
   explicit AttachmentJournal(
     std::string simulator_epoch, std::size_t capacity,
     std::optional<AttachmentIdentity> recovered_attachment = std::nullopt,
-    std::size_t detach_attempt_reserve = 2);
+    std::size_t detach_attempt_reserve = 2,
+    std::string hold_mode = kDefaultHoldMode);
 
   [[nodiscard]] AttachmentJournalReply submit(
     std::string operation_id,
@@ -260,6 +303,7 @@ private:
 
   std::size_t capacity_;
   std::size_t detach_attempt_reserve_;
+  std::string hold_mode_{kDefaultHoldMode};
   std::size_t reserved_detach_slots_{0};
   std::uint64_t sequence_{0};
   std::unordered_map<std::string, AttachmentOperationRecord> records_;

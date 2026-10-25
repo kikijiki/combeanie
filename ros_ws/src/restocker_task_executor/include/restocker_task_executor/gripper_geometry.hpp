@@ -68,6 +68,13 @@ struct GripperStagingGeometry
   double hold_clearance_per_side_m{0.0};
   double open_clearance_per_side_m{0.0};
   double maximum_open_target_m{0.0};
+  // attachment.hold_mode and attachment.hold_interference_m from gripper_geometry.yaml, the same
+  // file the simulator boundary reads: the aperture this side commands and the aperture that
+  // side verifies must come from one key (Milestone 10 spec 11.3 D3). physical_hold selects the
+  // interference command that lets the jaws stop against the product instead of one clearance
+  // short of it.
+  bool physical_hold{false};
+  double hold_interference_per_side_m{0.0};
 };
 
 // Loads the description-owned datum used by both Xacro and deterministic grasp staging. The

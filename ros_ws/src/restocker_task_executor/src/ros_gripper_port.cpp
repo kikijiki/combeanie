@@ -223,10 +223,17 @@ std::optional<RosGripperPort::JointSample> RosGripperPort::await_fresh_sample(
 
 RosGripperPort::SettleObservation RosGripperPort::await_settled_sample(
   std::uint64_t baseline_sequence, double target_position_m, double position_tolerance_m,
-  std::chrono::steady_clock::time_point deadline)
+  double stall_band_m, std::chrono::steady_clock::time_point deadline)
 {
+  // Fingers stopped by the product are accepted after this many consecutive samples at rest
+  // (about 30 ms of joint-state stream), so a finger passing through the band mid-travel, which
+  // moves millimetres per sample, never is.
+  constexpr int kRestSamplesRequired = 3;
+  constexpr double kRestM = 5.0e-5;
   SettleObservation observation;
   std::uint64_t observed = baseline_sequence;
+  std::optional<GripperFingerState> previous;
+  int rest_samples = 0;
   while (!stopping_.load(std::memory_order_acquire) &&
     !cancel_requested_.load(std::memory_order_acquire))
   {
@@ -242,6 +249,19 @@ RosGripperPort::SettleObservation RosGripperPort::await_settled_sample(
       observation.settled = true;
       break;
     }
+    if (stall_band_m > 0.0 && previous &&
+      fingers_stalled_in_band(
+        sample->fingers, *previous, target_position_m, position_tolerance_m, stall_band_m,
+        kRestM))
+    {
+      if (++rest_samples >= kRestSamplesRequired) {
+        observation.settled = true;
+        break;
+      }
+    } else {
+      rest_samples = 0;
+    }
+    previous = sample->fingers;
   }
   return observation;
 }
@@ -383,7 +403,7 @@ GripperCompletion RosGripperPort::execute_goal(const PendingGoal & pending) noex
       std::min(deadline, std::chrono::steady_clock::now() + config_.verification_wait);
     const auto settled = await_settled_sample(
       baseline_sequence, pending.goal.target_position_m, pending.goal.position_tolerance_m,
-      verification_deadline);
+      pending.goal.stall_band_m, verification_deadline);
     if (!settled.measured) {
       return fail(
         GripperOutcome::kPositionNotVerified,

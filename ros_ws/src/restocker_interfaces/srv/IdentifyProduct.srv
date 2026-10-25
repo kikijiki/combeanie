@@ -1,0 +1,45 @@
+# Copyright 2026 Matteo Bernacchia <dev@kikijiki.com>
+# SPDX-License-Identifier: MIT
+
+# Name the product in one object's crops (the identity channel, CMB-112).
+# crops: one to max_views RGB8 or BGR8 crops of the SAME object, ideally from different
+# viewpoints; they are voted. barcode_images: optional close-range images of the barcode panel.
+# The reply never forces a guess: STATUS_ABSTAIN says the channels cannot name one product,
+# STATUS_UNKNOWN says there is positive evidence it is not a registered product, and it is also
+# what a node without a loaded sidecar answers (sidecar_available = false).
+# The SKU is the registry's internal product id: the GTIN for a product that has one (so every
+# SKU exposed before product ids existed is unchanged), "prod-<hex>" for a product with no
+# barcode. gtin/has_gtin give the product's GTIN when it has one; an empty gtin never means a
+# GTIN. Barcode-less products are named by embedding and OCR only. The barcode channel can be
+# disabled on the node (parameter barcode_enabled); barcode_enabled in the reply says whether it
+# was, and channels_used lists the channels that ran. This service only reports; SKU write-once
+# semantics stay in world state, which decides whether to accept it.
+
+sensor_msgs/Image[] crops
+sensor_msgs/Image[] barcode_images
+---
+uint8 STATUS_IDENTIFIED=0
+uint8 STATUS_ABSTAIN=1
+uint8 STATUS_UNKNOWN=2
+
+uint8 status
+bool sidecar_available
+bool has_sku
+string sku
+bool has_gtin
+string gtin
+string reason
+# One entry per piece of evidence, in parallel arrays: kind is embedding, ocr or barcode.
+# evidence_product_ids is the product the evidence points at (what sku is compared with);
+# evidence_gtins is that product's GTIN, "" when it has none.
+string[] evidence_kinds
+string[] evidence_product_ids
+string[] evidence_gtins
+float32[] evidence_scores
+string[] channels_used
+bool barcode_enabled
+string backend_name
+string backend_version
+string registry_sha256
+string calibration_sha256
+float32 latency_ms

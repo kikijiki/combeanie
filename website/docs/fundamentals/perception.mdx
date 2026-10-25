@@ -18,14 +18,14 @@ what becomes inventory evidence versus what becomes a collision box.
 Two cameras exist in the description: **overhead** (obstacle detection) and **wrist**
 (tray / lane survey). The shipped baseline is **sensor-driven**: the wrist confirm duty feeds
 the world state's object ingest topic and the wrist lane survey its lane topic, while **Gazebo
-ground truth is demoted** to `/perception/ground_truth/*`, which only the error evaluators read.
+ground truth is published** to `/perception/ground_truth/*`, which only the error evaluators read.
 Ground-truth-path launches pin GT back onto the ingest topic and turn the tray duties off (one
 producer per topic).
 
-**The overhead camera stays, and it is obstacles-only on the default path.** Its depth stream
+**The overhead camera is obstacles-only on the default path.** Its depth stream
 feeds `depth_obstacle_node` (`obstacle_perception`, on by default), which turns unmodelled
 geometry into AABB boxes projected into MoveIt. Its *object* perception — `perception:=true`,
-the `perception` node running `ColourDepthBackend` — stays **off** by default, so no product pose
+the `perception` node running `ColourDepthBackend` — is **off** by default, so no product pose
 on the default path comes from the overhead camera; that classical pipeline is optional and
 **not a neural net** (chromaticity + cylinder depth fit).
 
@@ -66,16 +66,34 @@ ground-truth-path caller pins its topics explicitly (see [How to run](/docs/run/
 | Confirmation viewpoint solver | `…/src/survey_stations.cpp` |
 | Depth → boxes | `…/src/depth_obstacle_node.cpp` |
 | Lane evidence | `…/src/lane_observation_node.cpp` |
+| Lane stock (count, composition, cannot-tell) | `…/restocker_perception/stock/` (`lane_stock_node`, off by default: `lane_stock:=true`) |
+| Inventory (per-SKU totals, per-lane contents, age, discrepancy) | `…/restocker_perception/inventory/` (`inventory_node`, `inventory_tool`; off by default: `inventory:=true`) |
+| Product registry and identity | `…/restocker_perception/registry/`, `…/identity/` (`product_registry`, `identify_product_node`, `identify_object_node`) |
+| Depth proposals | `…/restocker_perception/proposals/` (offline Python) |
 | Coordinated tray survey | `restocker_task_executor/src/tray_survey_node.cpp` |
-| Config | `…/config/overhead_rgbd_perception.yaml`, `lane_survey.yaml` |
-| Topics | wrist duties → `/perception/tray_candidates` and `/perception/object_observations`; lane survey → `/perception/lane_observations`; overhead → `/perception/obstacle_observations` (obstacles, always) and `/perception/object_observations` only with `perception:=true` (off by default) |
-| Future ML | Same observation contracts; still advisory, never task authority |
+| Config | `…/config/overhead_rgbd_perception.yaml`, `lane_survey.yaml`, `lane_stock.yaml` |
+| Topics | wrist duties → `/perception/tray_candidates` and `/perception/object_observations`; lane survey → `/perception/lane_observations`; lane stock estimator → `/perception/lane_stock` (`LaneStock`); inventory → `/perception/inventory` (`Inventory`) and the `/query_inventory` service; overhead → `/perception/obstacle_observations` (obstacles, always) and `/perception/object_observations` only with `perception:=true` (off by default) |
+| Learned backends | Same observation contracts; advisory, never task authority |
 
 Every spatial observation carries frame, acquisition stamp, backend provenance, confidence,
 and covariance. Category ≠ SKU. A `LaneObservation` never rewrites `ShelfLane.contents`
 directly: when the world state accepts one, it reconciles the measured column against the
 FIFO ledger itself — popping front entries as sales or marking the ledger unreliable — see
-[World state](/docs/architecture/world-state).
+[World state](/docs/architecture/world-state). A `LaneStock` is an estimate beside it: a count from the
+occupied depth, a composition against the lane policy and an explicit cannot-tell, with identity named
+only when label text or the barcode confirms it. The wrist survey frame shows only the rear product of a
+lane, so an unflagged lane is not a verified-clean lane.
+
+The inventory answers "how many of this SKU are in stock" from the lane stock estimates and the tray
+(`inventory_tool query --sku <SKU>`). Each total is split into products an identity channel named,
+products counted in a lane whose policy lists the SKU, and products only the world state reports; it
+says when a lane could not be read or is older than the declared horizon, and it compares every lane
+with the world state's ledger. With no identity channel running, every lane's SKU is the policy's: the
+counts are exact, the SKU is an assumption, and a wrong product hidden behind the rear one is not seen.
+
+Naming a product is a separate question from locating it. The registry and identity ladder, the
+catalogue the simulator generates, and the measured results are in the
+[Perception section](/docs/perception).
 
 ## References
 
@@ -84,4 +102,4 @@ FIFO ledger itself — popping front entries as sales or marking the ledger unre
 - **Literature:** [FoundationPose](https://arxiv.org/abs/2312.08344) (optional future pose sidecar)
 - **Official docs:** [sensor_msgs conventions](https://docs.ros.org/en/jazzy/p/sensor_msgs/)
 - **Official docs:** [Gazebo ↔ ROS 2 interop](https://gazebosim.org/docs/harmonic/ros2_interop/)
-- **This project:** [Perception and models](/docs/architecture/perception-and-models) · [Manipulators and frames](./manipulators-and-frames)
+- **This project:** [Perception section](/docs/perception) · [Perception and models](/docs/architecture/perception-and-models) · [Manipulators and frames](./manipulators-and-frames)

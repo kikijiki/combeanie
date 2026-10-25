@@ -119,7 +119,7 @@ private:
   // still short of the commanded width.
   [[nodiscard]] SettleObservation await_settled_sample(
     std::uint64_t baseline_sequence, double target_position_m, double position_tolerance_m,
-    std::chrono::steady_clock::time_point deadline);
+    double stall_band_m, std::chrono::steady_clock::time_point deadline);
   [[nodiscard]] std::uint64_t latest_sequence() const noexcept;
   void on_joint_state(const sensor_msgs::msg::JointState & message);
   // Best-effort cancellation of whatever goal handle is currently outstanding.

@@ -61,6 +61,8 @@ def pitch_by_sku():
     cosine = math.cos(math.radians(incline_deg))
     pitches = {}
     for geometry in geometries:
+        if geometry["shape"]["type"] != "cylinder":
+            continue  # a box has no lane pitch yet (CMB-119 stage 1)
         pitches.setdefault(geometry["sku"], 2.0 * geometry["shape"]["radius_m"] * cosine)
     return pitches
 

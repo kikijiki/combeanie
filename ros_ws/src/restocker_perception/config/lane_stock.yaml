@@ -1,0 +1,61 @@
+# Copyright 2026 Matteo Bernacchia <dev@kikijiki.com>
+# SPDX-License-Identifier: MIT
+
+# Lane stock estimator (CMB-114): the numbers the estimator, the node and the benchmark adapter
+# share (the node's own topics and timeouts are its parameter defaults, in stock/node.py).
+# Workcell and product numbers restate workcell_geometry.yaml and restocker_gazebo's catalogue
+# (test_lane_stock.py checks them against both); the measurement block restates lane_survey.yaml
+# so the numpy port of the lane depth histogram reads the same lane as the C++ one.
+
+workcell:
+  # shelf frame in the world, axes aligned. Lane frame: x across the lane from its centre line,
+  # y into the lane from the rear edge (toward the retainer), z up from the retainer-face datum.
+  pose_world: [0.0, 0.55, 0.75]
+  lane_center_x_m: {lane_01: -1.0, lane_02: -0.6, lane_03: -0.2, lane_04: 0.2, lane_05: 0.6, lane_06: 1.0}
+  bed_datum_depth_m: 0.84
+  incline_deg: 4.0
+  rear_clearance_m: 0.01
+  usable_depth_m: 0.85
+  usable_height_m: 0.40
+  usable_width_m: 0.365
+  side_clearance_m: 0.005
+
+# One entry per catalogued product class; generated SKUs share their base shape's dimensions.
+# product_class is the LaneObservation/ShelfLane enum value.
+products:
+  can: {product_class: 1, radius_m: 0.033, height_m: 0.122}
+  small_bottle: {product_class: 2, radius_m: 0.034, height_m: 0.200}
+  large_bottle: {product_class: 3, radius_m: 0.045, height_m: 0.290}
+  # Boxes (CMB-119/120) stand with their depth side along the lane: size_xyz_m is (across, along,
+  # up), the dimensions of restocker_gazebo BOX_CATALOGUE. Class 4 names every box shape, so a
+  # box lane's shape comes from its SKU (sku_products) and a column's from its top height.
+  carton_200: {product_class: 4, size_xyz_m: [0.065, 0.040, 0.105]}
+  carton_1000: {product_class: 4, size_xyz_m: [0.095, 0.060, 0.165]}
+  slim_box: {product_class: 4, size_xyz_m: [0.055, 0.025, 0.150]}
+
+# The registered box SKUs and the shape each one has (the generated catalogue's box_variant).
+sku_products:
+  GEN-017: carton_200
+  GEN-018: carton_200
+  GEN-019: carton_1000
+  GEN-020: slim_box
+
+measurement:
+  floor_margin_m: 0.010
+  front_inset_m: 0.010
+  obstruction_reach_m: 0.060
+  minimum_depth_m: 0.10
+  maximum_depth_m: 2.40
+  pixel_stride: 2
+  bin_width_m: 0.020
+  minimum_surface_bin_returns: 12
+  minimum_accepted_returns: 200
+  minimum_obstruction_returns: 40
+  # Floor margin = max(fixed, offset + this many robust sigmas of the bed residuals in the frame).
+  floor_noise_sigma_factor: 4.0
+  # Nearest surface moved back by this many bed sigmas (bias of a minimum of noisy returns).
+  edge_bias_sigma_factor: 4.0
+
+estimator:
+  # The producer's own refusal floor (lane_survey.yaml minimum_coverage).
+  minimum_coverage: 0.90

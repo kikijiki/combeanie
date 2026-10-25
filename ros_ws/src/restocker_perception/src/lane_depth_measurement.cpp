@@ -133,9 +133,59 @@ DepthObstacleResult<LaneDepthMeasurement> measure_lane_depth(
         DepthObstacleErrorCode::InvalidTransform, "lane <- optical transform is not finite"});
   }
 
+  // Frame noise. Heights above the bed of the returns that are close to the bed plane are the
+  // bed's own residuals; their robust spread widens the floor margin and the front inset when the
+  // configuration asks for it. This pass uses the same filters as the main one.
+  double floor_margin_m = window.floor_margin_m;
+  double front_inset_m = window.front_inset_m;
+  double bed_sigma_m = 0.0;
+  if (config.floor_noise_sigma_factor > 0.0) {
+    constexpr double kBedBandM = 0.04;
+    std::vector<double> residuals;
+    for (std::uint32_t row = 0U; row < intrinsics.height; row += config.pixel_stride) {
+      const std::size_t row_offset = static_cast<std::size_t>(row) * row_step_pixels;
+      for (std::uint32_t column = 0U; column < intrinsics.width; column += config.pixel_stride) {
+        const float sample = depth[row_offset + column];
+        if (!std::isfinite(sample) || sample <= 0.0F) {
+          continue;
+        }
+        const double range = static_cast<double>(sample);
+        if (range < config.minimum_depth_m || range > config.maximum_depth_m) {
+          continue;
+        }
+        const Eigen::Vector3d in_lane = lane_from_optical *
+          Eigen::Vector3d(
+          (static_cast<double>(column) - intrinsics.cx) * range / intrinsics.fx,
+          (static_cast<double>(row) - intrinsics.cy) * range / intrinsics.fy, range);
+        if (std::abs(in_lane.x()) > window.half_width_m) {
+          continue;
+        }
+        const double height = in_lane.z() - window.bed_height_at(in_lane.y());
+        if (std::abs(height) < kBedBandM) {
+          residuals.push_back(height);
+        }
+      }
+    }
+    if (residuals.size() >= config.minimum_accepted_returns) {
+      const auto median_of = [](std::vector<double> & values) {
+        const auto middle = values.begin() + static_cast<std::ptrdiff_t>(values.size() / 2U);
+        std::nth_element(values.begin(), middle, values.end());
+        return *middle;
+      };
+      const double centre = median_of(residuals);
+      for (double & value : residuals) {
+        value = std::abs(value - centre);
+      }
+      bed_sigma_m = 1.4826 * median_of(residuals);
+      floor_margin_m = std::max(
+        floor_margin_m, std::abs(centre) + config.floor_noise_sigma_factor * bed_sigma_m);
+      front_inset_m = std::max(front_inset_m, 2.0 * config.floor_noise_sigma_factor * bed_sigma_m);
+    }
+  }
+
   // The histogram runs from the rear entrance plane to just short of the retainer face.
   // Everything at or past that face belongs to the retainer, not to the lane's contents.
-  const double window_front_m = window.window_front_depth_m();
+  const double window_front_m = window.bed_datum_depth_m - front_inset_m;
   const double histogram_span_m = window_front_m - window.rear_clearance_m;
   const std::size_t bin_count = std::max<std::size_t>(
     1U, static_cast<std::size_t>(std::ceil(histogram_span_m / config.bin_width_m)));
@@ -146,6 +196,8 @@ DepthObstacleResult<LaneDepthMeasurement> measure_lane_depth(
 
   LaneDepthMeasurement measurement;
   measurement.total_bins = bin_count;
+  measurement.floor_margin_m = floor_margin_m;
+  measurement.bed_sigma_m = bed_sigma_m;
 
   const double obstruction_rear_m = window.rear_clearance_m - window.obstruction_reach_m;
 
@@ -175,11 +227,11 @@ DepthObstacleResult<LaneDepthMeasurement> measure_lane_depth(
       // floor either, so counting it as coverage would credit the measurement for seeing
       // something that is not the lane.
       if (height_above_bed > window.usable_height_m ||
-        height_above_bed < -window.floor_margin_m)
+        height_above_bed < -floor_margin_m)
       {
         continue;
       }
-      const bool above_floor_band = height_above_bed >= window.floor_margin_m;
+      const bool above_floor_band = height_above_bed >= floor_margin_m;
 
       if (in_lane.y() >= window.rear_clearance_m && in_lane.y() <= window_front_m) {
         const std::size_t bin = std::min(
@@ -208,6 +260,9 @@ DepthObstacleResult<LaneDepthMeasurement> measure_lane_depth(
     if (product_returns_per_bin[bin] >= config.minimum_surface_bin_returns) {
       measurement.nearest_surface_found = true;
       measurement.nearest_surface_depth_m = minimum_depth_per_bin[bin];
+      if (bed_sigma_m > 0.0) {
+        measurement.nearest_surface_depth_m += config.edge_bias_sigma_factor * bed_sigma_m;
+      }
       break;
     }
   }

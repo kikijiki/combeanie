@@ -129,8 +129,10 @@ std::optional<CanonicalPose> canonicalize_pose(
 AttachmentJournal::AttachmentJournal(
   std::string simulator_epoch, std::size_t capacity,
   std::optional<AttachmentIdentity> recovered_attachment,
-  std::size_t detach_attempt_reserve)
-: capacity_(capacity), detach_attempt_reserve_(detach_attempt_reserve)
+  std::size_t detach_attempt_reserve,
+  std::string hold_mode)
+: capacity_(capacity), detach_attempt_reserve_(detach_attempt_reserve),
+  hold_mode_(std::move(hold_mode))
 {
   if (simulator_epoch.empty()) {
     throw std::invalid_argument("simulator epoch must not be empty");
@@ -142,8 +144,15 @@ AttachmentJournal::AttachmentJournal(
   if (recovered_attachment && !valid_identity(*recovered_attachment)) {
     throw std::invalid_argument("recovered attachment identity is incomplete");
   }
+  // The mode is published on every reply, so an unrecognised one must fail here rather than
+  // travel to a caller as a receipt nobody can interpret.
+  if (!known_hold_mode(hold_mode_)) {
+    throw std::invalid_argument(
+            "hold mode must be 'weld' or 'physical', got '" + hold_mode_ + "'");
+  }
 
   state_.simulator_epoch = std::move(simulator_epoch);
+  state_.hold_mode = hold_mode_;
   state_.sequence = next_sequence();
   if (recovered_attachment) {
     state_.phase = AttachmentPhase::kInconsistent;
@@ -362,7 +371,11 @@ AttachmentJournalReply AttachmentJournal::mark_verification_succeeded(
     return reply(
       status(AttachmentStatusCode::kStateMismatch, "verification transition is not active"));
   }
-  const bool expect_joint = record->request.command == AttachmentCommand::kAttach;
+  const bool is_attach = record->request.command == AttachmentCommand::kAttach;
+  // Physical attach creates nothing, so its evidence honestly carries joint_observed = false;
+  // only a weld attach must show the joint it created (spec 11.4). The *phase*, though, follows
+  // the command: a physical attach still ends attached, it just got there without an entity.
+  const bool expect_joint = is_attach && state_.hold_mode == kHoldModeWeld;
   const auto canonical_evidence = canonicalize_evidence(evidence);
   if (!canonical_evidence || evidence.joint_observed != expect_joint) {
     return mark_outcome_unknown(operation_id, "verification evidence is invalid or contradictory");
@@ -370,11 +383,11 @@ AttachmentJournalReply AttachmentJournal::mark_verification_succeeded(
 
   record->evidence = *canonical_evidence;
   record->sequence = next_sequence();
-  record->phase = expect_joint ? AttachmentPhase::kAttached : AttachmentPhase::kDetached;
+  record->phase = is_attach ? AttachmentPhase::kAttached : AttachmentPhase::kDetached;
   record->status =
     status(
-    expect_joint ? AttachmentStatusCode::kAttached : AttachmentStatusCode::kDetached,
-    expect_joint ? "physical attachment verified" : "physical detachment verified");
+    is_attach ? AttachmentStatusCode::kAttached : AttachmentStatusCode::kDetached,
+    is_attach ? "physical attachment verified" : "physical detachment verified");
   active_operation_id_.reset();
 
   state_.sequence = record->sequence;
@@ -382,7 +395,7 @@ AttachmentJournalReply AttachmentJournal::mark_verification_succeeded(
   state_.motion_gate = AttachmentMotionGate::kValid;
   state_.status = record->status;
   state_.evidence = *canonical_evidence;
-  if (expect_joint) {
+  if (is_attach) {
     state_.attached_identity = record->request.identity;
   } else {
     state_.attached_identity.reset();
@@ -427,7 +440,10 @@ AttachmentJournalReply AttachmentJournal::mark_external_inconsistency(
   }
   if (evidence) {
     const auto canonical_evidence = canonicalize_evidence(*evidence);
-    if (!canonical_evidence || !canonical_evidence->joint_observed) {
+    // A held weld shows its joint; a held physical grip has none, so its fault evidence must not.
+    if (!canonical_evidence ||
+      canonical_evidence->joint_observed != (hold_mode_ != kHoldModePhysical))
+    {
       return reply(
         status(
           AttachmentStatusCode::kInvalidArgument,
@@ -475,6 +491,9 @@ void AttachmentJournal::rotate_epoch(
   reserved_detach_slots_ = recovered_attachment ? detach_attempt_reserve_ : 0;
   state_ = AttachmentPhysicalState{};
   state_.simulator_epoch = std::move(simulator_epoch);
+  // The mode is a property of the process, not of the epoch: a reset must not repaint it with
+  // the struct default.
+  state_.hold_mode = hold_mode_;
   state_.sequence = next_sequence();
   state_.attached_identity = std::move(recovered_attachment);
   if (unsafe_reset || state_.attached_identity) {

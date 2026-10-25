@@ -1,0 +1,83 @@
+# Copyright 2026 Matteo Bernacchia <dev@kikijiki.com>
+# SPDX-License-Identifier: MIT
+
+# Name the product of one object across looks: the identity ladder (CMB-112 round 3).
+# The rungs, cheapest first: a barcode that decodes to a registered GTIN; the label text read from
+# the crops, scored against every registered product's label text, accepted only with a clear margin
+# over the runner-up; otherwise STATUS_NOT_YET with guidance (which side the camera saw, how far to
+# turn the product, which side to show) and, once max_relooks looks have been spent, STATUS_NEEDS_HUMAN.
+# The embedding is a shortlist and a way to place a crop on the product's turntable; it never names a
+# product by itself. The reply never guesses.
+#
+# object_key is the caller's handle for the object: the node keeps what each look measured (not the
+# images) between calls, so the next look of the same key adds to the earlier ones. reset forgets the
+# key's earlier looks (a different object under the same key, or a re-run).
+# crops: one to a handful of RGB8/BGR8 crops of the SAME object from one look. half_width_px and
+# camera_azimuth_deg run parallel to crops: half_width_px is the width of the object's body in the crop
+# (the detector's footprint; 0 = unknown, the whole crop is read, which can read a neighbour);
+# camera_azimuth_deg is the direction of the camera seen from the object in any fixed frame (NaN =
+# unknown, the crops of a look then are not aligned when the facing is pooled).
+# max_relooks: looks allowed after the first before the object is left to a human; -1 = the node's
+# configured budget.
+
+string object_key
+bool reset
+sensor_msgs/Image[] crops
+float32[] half_width_px
+float32[] camera_azimuth_deg
+sensor_msgs/Image[] barcode_images
+int8 max_relooks
+---
+uint8 STATUS_IDENTIFIED=0
+uint8 STATUS_NOT_YET=1
+uint8 STATUS_NEEDS_HUMAN=2
+uint8 STATUS_UNKNOWN=3
+
+uint8 status
+# false when the node has no sidecar (not configured, or it failed to load): the answer is then
+# STATUS_UNKNOWN and the reason says why.
+bool sidecar_available
+bool has_sku
+string sku
+bool has_gtin
+string gtin
+# barcode or text, when identified.
+string rung
+string reason
+# 0 for the first look of object_key, 1 for the next, ...
+uint8 look_index
+
+# Guidance, meaningful when status is STATUS_NOT_YET. guidance_kind is "turn" (turn the product, then
+# look again) or "new_view" (nothing to estimate a facing from: look from another side).
+# estimated_facing_deg is the registered view azimuth the camera saw (the turntable the registry holds,
+# 45 degree steps); a box's visible_face is front, left, back or right. suggested_turn_deg is counter-
+# clockwise seen from above, in (-180, 180] (a multiple of 90 for a box); turning the product by it shows
+# target_azimuth_deg / target_face, the unseen side with the most registered label text.
+string guidance_kind
+string guidance_shape
+bool has_facing
+float32 estimated_facing_deg
+string visible_face
+bool has_turn
+float32 suggested_turn_deg
+float32 target_azimuth_deg
+string target_face
+float32 facing_confidence
+bool facing_low_confidence
+string guidance_candidate_sku
+string guidance_note
+
+# Evidence. text_best_sku is the label-text leader (it need not be the answer); the shortlist is the
+# embedding's top candidates, best first; channels_used lists the rungs that ran.
+string text_best_sku
+float32 text_best_score
+float32 text_margin
+string[] text_matched
+string[] shortlist
+string[] channels_used
+bool barcode_enabled
+string backend_name
+string backend_version
+string registry_sha256
+string config_sha256
+float32 latency_ms

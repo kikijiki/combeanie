@@ -1,0 +1,221 @@
+{
+  "card": "CMB-115",
+  "declared_on": "2026-10-20",
+  "declared_before_any_held_out_inventory_replay_was_run": true,
+  "decision_unit": "one benchmark seed (a scene: six lanes and the tray) replayed as one inventory; rates are over (seed, SKU) pairs, lanes or scenes as each bound's metric says",
+  "what_is_scored": "the aggregation (restocker_perception.inventory), not the lane stock estimator. The estimator's rows are inputs; CMB-114 round 2 already scored them. Nothing in the inventory was fitted to the held-out set.",
+  "held_out_population": {
+    "rule": "the 75 round 2 held-out seeds of CMB-114 (heldout_seeds_r2.txt in evidence/cmb-114-lane-stock-r2), 450 lane survey frames, with CMB-114's frozen round-2 prediction rows (evidence/cmb-114-lane-stock-r2/held_out/pred_*.jsonl.gz, estimator at repo commit 4a3dca46)",
+    "why_reused": "every fresh held-out seed of config/perception_splits.json was consumed by CMB-114 rounds 1 and 2, so no unread seed remains. The 75 round 2 seeds were scored for the estimator only; the inventory layer, its bounds and its perturbation schedule were written and tuned on the 115 development seeds below and never run on these. Their estimator outputs are known to be: counts exact on every sufficient-coverage lane, no wrong answer, so the inventory's totals error here comes from the labels' wrong-SKU products, not from counts.",
+    "development_data": "40 train/validation seeds plus the 75 round 1 held-out seeds (690 lanes), CMB-114's round 2 development predictions (dev2res/pred_*.jsonl)",
+    "prediction_sha256": {
+      "abstain": "a381c7db65cf2aa5650ee610594d0d8044f3a10706dcfa1b170525bad16e617d",
+      "oracle": "c88b189624c41d1cd88f5063c94dc2f9e849c91d4a2cce6bc152dbd94dbc5943",
+      "abstain_degrade": "0d34bd4af252cda38bcf2bee7ad75adb71cc109fef9f14b0f019eb9a0ad08685",
+      "noise0.005": "d5db5f390ff3caef113db8ca3a00c9b1119ae99d46294b0cec4e111fac8ab942",
+      "noise0.01": "824e050b5126030e60ad20ea8e099d1c7c5d5fc0b8ed4260fb07ac0e8722a9e8",
+      "noise0.02": "c7cc7f154eb151d16276837f1f17b4137e5e3ca00cf006961f8fc06a98c388f0"
+    }
+  },
+  "arms": {
+    "abstain": "ideal depth, no identity channel (what the system does with the sidecar absent)",
+    "oracle": "ablation, never a result: a perfect identity channel for whatever face is framed",
+    "abstain_degrade": "half the frames lose a 30-70 % band of the depth rows: many lanes are refused",
+    "noise0.005 / noise0.01 / noise0.02": "seeded Gaussian range noise with 2 % dropout (a synthetic perturbation of an ideal render, see CMB-114 round 2)",
+    "not_run": "channel arms: under the safe naming policy the real identity channel named no lane product (CMB-114 round 1 and 2), so the abstain arm is what the system as built produces"
+  },
+  "protocol": {
+    "stale_horizon_s": 600,
+    "query_time_s": 100000,
+    "ages": "fresh: each lane's reading is drawn uniformly from [0, 0.9 x horizon] old; aged: from [0, 1.5 x horizon]; draws are SHA-256 of the key, restocker_perception.inventory.replay.draw",
+    "world_state_unperturbed": "the labelled truth: each lane's skus_in_order is its ledger (front to rear), the tray's labelled products are the world state's tray. This dataset has no tray reading (home wrist frames show nothing, overhead frames are black), so the tray is world-sourced and trivially right; tray perception is not measured here.",
+    "world_state_perturbed": "a third of the lanes get a ledger that differs by -2, -1, +1 or +2 products removed from or added at the front, so the rear product the survey sees is unchanged; a quarter of the lanes still holding a product get the ledger's rearmost SKU replaced by another SKU of the scene. Both seeded by (seed, lane).",
+    "totals": "per (seed, SKU) where the inventory says complete: total_estimate against the labelled count over the six lanes and the tray. SKUs the inventory calls incomplete are counted (complete_pair_share) and not scored.",
+    "not_claimed": "total_min..total_max is the count's range under the assumption that unnamed products are the lane policy's SKU; it is not claimed to contain the true SKU total, because a wrong product hidden behind the rear one is invisible to a survey frame (about one lane in four holds one in this benchmark). sku_total_exact and sku_total_contains_truth are reported without a bound; the expected values from development are 0.61 (abstain) and 0.74 (oracle).",
+    "pass_rule": "as CMB-114: a min bound passes when the lower Wilson 95 % limit is at or above the value and n reaches required_n; fails when the point estimate is below the value; otherwise inconclusive. A max bound likewise with the upper limit."
+  },
+  "bounds": [
+    {
+      "id": "total_within_one",
+      "arms": [
+        "abstain",
+        "oracle",
+        "noise0.005",
+        "noise0.01",
+        "noise0.02"
+      ],
+      "metric": "sku_total_within_one",
+      "direction": "min",
+      "value": 0.95,
+      "required_n": 300,
+      "meaning": "complete SKU totals within one product of the labels; development: 0.986 (abstain), 0.995 (oracle)"
+    },
+    {
+      "id": "total_within_one_degrade",
+      "arms": [
+        "abstain_degrade"
+      ],
+      "metric": "sku_total_within_one",
+      "direction": "min",
+      "value": 0.95,
+      "required_n": 150,
+      "meaning": "same with half the frames partly blinded (fewer complete pairs); development 0.987"
+    },
+    {
+      "id": "refused_lane_never_complete",
+      "arms": [
+        "abstain_degrade"
+      ],
+      "metric": "refused_policy_lane_claimed_complete",
+      "direction": "max",
+      "value": 0.03,
+      "required_n": 100,
+      "meaning": "a SKU with a refused policy lane is never reported complete"
+    },
+    {
+      "id": "no_false_confirmation",
+      "arms": [
+        "oracle"
+      ],
+      "metric": "confirmed_claim_contradicted",
+      "direction": "max",
+      "value": 0.02,
+      "required_n": 150,
+      "meaning": "a lane's confirmed SKUs are a sub-multiset of its labelled products; lanes with a confirmed claim"
+    },
+    {
+      "id": "stale_flagged",
+      "arms": [
+        "abstain",
+        "oracle",
+        "abstain_degrade"
+      ],
+      "metric": "stale_flagged",
+      "direction": "min",
+      "value": 0.95,
+      "required_n": 100,
+      "meaning": "lanes older than the horizon are flagged stale"
+    },
+    {
+      "id": "fresh_not_flagged",
+      "arms": [
+        "abstain",
+        "oracle",
+        "abstain_degrade"
+      ],
+      "metric": "fresh_flagged_stale",
+      "direction": "max",
+      "value": 0.02,
+      "required_n": 200,
+      "meaning": "lanes inside the horizon are not flagged stale"
+    },
+    {
+      "id": "stale_left_out",
+      "arms": [
+        "abstain",
+        "oracle",
+        "abstain_degrade"
+      ],
+      "metric": "stale_left_out_of_totals",
+      "direction": "min",
+      "value": 0.9,
+      "required_n": 50,
+      "meaning": "totals with a stale lane equal totals without its reading (scenes with a stale lane)"
+    },
+    {
+      "id": "count_discrepancy_recall",
+      "arms": [
+        "abstain",
+        "oracle",
+        "noise0.005",
+        "noise0.01",
+        "noise0.02"
+      ],
+      "metric": "count_discrepancy_recall",
+      "direction": "min",
+      "value": 0.9,
+      "required_n": 120,
+      "meaning": "answered lanes whose ledger was perturbed by 1-2 products are flagged; development 1.00 / 0.987 at 2 % noise"
+    },
+    {
+      "id": "count_discrepancy_recall_degrade",
+      "arms": [
+        "abstain_degrade"
+      ],
+      "metric": "count_discrepancy_recall",
+      "direction": "min",
+      "value": 0.9,
+      "required_n": 60,
+      "meaning": "same on the lanes the blinded arm still answered"
+    },
+    {
+      "id": "count_discrepancy_false_alarm",
+      "arms": [
+        "abstain",
+        "oracle",
+        "noise0.005",
+        "noise0.01",
+        "noise0.02"
+      ],
+      "metric": "count_discrepancy_false_alarm",
+      "direction": "max",
+      "value": 0.03,
+      "required_n": 200,
+      "meaning": "answered lanes with a truthful ledger are not flagged"
+    },
+    {
+      "id": "count_discrepancy_false_alarm_degrade",
+      "arms": [
+        "abstain_degrade"
+      ],
+      "metric": "count_discrepancy_false_alarm",
+      "direction": "max",
+      "value": 0.03,
+      "required_n": 100,
+      "meaning": "same on the blinded arm"
+    },
+    {
+      "id": "refusal_not_agreement",
+      "arms": [
+        "abstain_degrade"
+      ],
+      "metric": "refusal_not_comparable",
+      "direction": "min",
+      "value": 0.97,
+      "required_n": 100,
+      "meaning": "a refused lane is reported not comparable, never as agreeing with the ledger"
+    },
+    {
+      "id": "sku_discrepancy_recall_given_a_name",
+      "arms": [
+        "oracle"
+      ],
+      "metric": "sku_discrepancy_recall",
+      "direction": "min",
+      "value": 0.9,
+      "required_n": 60,
+      "meaning": "a ledger whose rear SKU was swapped is flagged when the identity channel named the rear product. With no channel (abstain) nothing is named and the recall is 0 by construction: the inventory cannot see a wrong SKU in the world state"
+    },
+    {
+      "id": "sku_discrepancy_false_alarm",
+      "arms": [
+        "abstain",
+        "oracle"
+      ],
+      "metric": "sku_discrepancy_false_alarm",
+      "direction": "max",
+      "value": 0.03,
+      "required_n": 250,
+      "meaning": "a truthful ledger is not contradicted by names"
+    }
+  ],
+  "reported_without_bound": [
+    "sku_total_exact",
+    "sku_total_contains_truth",
+    "complete_pair_share",
+    "lane_range_contains_truth",
+    "perturbed_lanes_unreadable",
+    "sku_swap_named_share",
+    "error_histogram"
+  ]
+}

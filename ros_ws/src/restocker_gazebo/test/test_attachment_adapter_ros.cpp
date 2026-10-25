@@ -243,6 +243,9 @@ TEST(AttachmentAdapterRosTest, SerializesTokenFreePhysicalEvidence)
   const auto message = to_ros_message(reply, "attach-1");
   EXPECT_EQ(message.simulator_epoch, "sim-epoch");
   EXPECT_EQ(message.sequence, 9U);
+  // The latched state topic carries the hold mode so a live run is receipted for the physics it
+  // used (spec 11.3 D1); physical_state() publishes the shipped default here.
+  EXPECT_EQ(message.hold_mode, "physical");
   EXPECT_EQ(message.operation_id, "attach-1");
   EXPECT_EQ(message.reservation_id, 41U);
   EXPECT_EQ(message.object_id, 7U);

@@ -89,6 +89,8 @@ def generate_launch_description() -> LaunchDescription:
             "product_catalog": product_catalog,
             "workcell_geometry": workcell_geometry,
             "spawn_scenario": spawn_scenario,
+            "bundle_scenario": LaunchConfiguration("bundle_scenario"),
+            "scene_materials": LaunchConfiguration("scene_materials"),
             "ground_truth": ground_truth,
             "cameras": cameras,
             "wrist_camera": LaunchConfiguration("wrist_camera"),
@@ -159,6 +161,35 @@ def generate_launch_description() -> LaunchDescription:
             {"use_sim_time": True, "workcell_geometry": workcell_geometry},
         ],
         condition=IfCondition(lane_survey),
+    )
+    # Lane stock estimator (CMB-114): reads the LaneObservation above plus the wrist frames and
+    # publishes LaneStock. Nothing consumes it yet, so it is off by default.
+    lane_stock = AndSubstitution(lane_survey, LaunchConfiguration("lane_stock"))
+    lane_stock_node = Node(
+        package="restocker_perception",
+        executable="lane_stock_node",
+        name="lane_stock",
+        output="screen",
+        parameters=[
+            {
+                "use_sim_time": True,
+                "config_path": PathJoinSubstitution(
+                    [FindPackageShare("restocker_perception"), "config", "lane_stock.yaml"]
+                ),
+            }
+        ],
+        condition=IfCondition(lane_stock),
+    )
+    # Inventory (CMB-115): aggregates LaneStock and the world state's tray into
+    # /perception/inventory and serves /query_inventory. Reads only; nothing consumes it yet, so it
+    # is off by default.
+    inventory_node = Node(
+        package="restocker_perception",
+        executable="inventory_node",
+        name="inventory",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+        condition=IfCondition(LaunchConfiguration("inventory")),
     )
     # Evaluation only: the sole subscriber to both lane topics, publishes nothing the execution
     # path reads.
@@ -333,6 +364,8 @@ def generate_launch_description() -> LaunchDescription:
                 ),
             ),
             DeclareLaunchArgument("spawn_scenario", default_value="true"),
+            DeclareLaunchArgument("bundle_scenario", default_value="false"),
+            DeclareLaunchArgument("scene_materials", default_value=""),
             DeclareLaunchArgument("ground_truth", default_value="true"),
             DeclareLaunchArgument("cameras", default_value="true"),
             DeclareLaunchArgument("wrist_camera", default_value="true"),
@@ -397,6 +430,26 @@ def generate_launch_description() -> LaunchDescription:
                 ),
             ),
             DeclareLaunchArgument(
+                "lane_stock",
+                default_value="false",
+                description=(
+                    "Run the lane stock estimator (CMB-114) beside the wrist lane survey: it "
+                    "publishes LaneStock on /perception/lane_stock from the survey's "
+                    "/perception/lane_observations. Needs lane_survey. Nothing consumes it yet"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "inventory",
+                default_value="false",
+                description=(
+                    "Run the inventory (CMB-115): per-SKU totals, per-lane contents, observation "
+                    "age and discrepancy against the world state, from /perception/lane_stock "
+                    "(run lane_stock:=true for it). Publishes /perception/inventory and serves "
+                    "/query_inventory (try: inventory_tool query --sku <SKU>). Nothing "
+                    "consumes it yet"
+                ),
+            ),
+            DeclareLaunchArgument(
                 "tray_overview_perception",
                 default_value="false",
                 description=(
@@ -426,6 +479,8 @@ def generate_launch_description() -> LaunchDescription:
             pose_error_evaluator,
             tray_pose_error_evaluator,
             lane_observation_node,
+            lane_stock_node,
+            inventory_node,
             lane_depth_error_evaluator,
         ]
     )

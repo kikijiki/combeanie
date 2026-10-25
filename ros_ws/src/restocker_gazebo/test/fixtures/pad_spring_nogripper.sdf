@@ -1,0 +1,119 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 Matteo Bernacchia <dev@kikijiki.com> -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
+<!-- The pad-spring bench (Milestone 10 §11 D10 item 3, Card 057): one finger presses one pad row
+     against a fixed rigid block under a KNOWN constant effort, so the pad row's prismatic
+     deflection and the contact wrench can be compared against the rubber this design claims.
+
+       * the finger is production's: body box minus the 3.3 mm pad layer, 0.18 kg, prismatic
+         joint with the shipped damping, friction, 40 N force limit and 0.12 m/s velocity limit;
+       * the four pad rows are production's: 8.75 x 3.3 x 140 mm, 4.9 g, prismatic along the pad
+         normal with spring_reference 0, spring_stiffness 111 kN/m, damping 11.5 N*s/m, the
+         shipped +/-2 mm limits and the 500 N force limit (DART clips a force command to effort,
+         spec M10 section 11.2 F14, and the spring's own bound is 111000*0.002 + 11.5*0.12 =
+         223.4 N);
+       * the block's face sits exactly on the pad rows' inner face at rest, and it spans only
+         row 0's x range, so exactly ONE row carries the load: F/(k*rows_loaded) is F/111000 and
+         any row other than 0 must read zero;
+       * gravity is along -z and every joint axis is along y, so gravity loads nothing.
+
+     Expected at 111 kN/m: 90.1 / 180.2 / 360.4 um of deflection at 10 / 20 / 40 N, with the
+     contact wrench reading the same effort. restocker_gazebo::PadSpringProbe applies the efforts
+     in three one-second phases, samples at the end of each, and prints PAD_SPRING_PASS or
+     PAD_SPRING_FAIL. The world loads no sensors system, so it runs under `nix flake check`. -->
+<sdf version="1.9">
+  <world name="pad_spring">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <!-- The rubber under test: the engine does not act on the joints' spring_stiffness /
+         spring_reference / damping, so this system commands the spring-damper force itself. -->
+    <plugin filename="restocker_pad_spring_system" name="restocker_gazebo::PadSpringSystem"/>
+
+    <physics name="pad_spring_physics" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <dart>
+        <collision_detector>bullet</collision_detector>
+      </dart>
+    </physics>
+
+    <gravity>0 0 -9.80665</gravity>
+
+    <!-- Face plane at y = -0.009, the pad rows' inner face at rest; x spans exactly row 0. -->
+    <model name="block">
+      <static>true</static>
+      <link name="block_link">
+        <collision name="block_collision">
+          <pose>-0.013125 -0.034 0.07 0 0 0</pose>
+          <geometry><box><size>0.00875 0.05 0.16</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <model name="restocker">
+      <link name="base">
+        <inertial>
+          <mass>1.2</mass>
+          <inertia>
+            <ixx>0.0017</ixx><iyy>0.0031</iyy><izz>0.0036</izz>
+          </inertia>
+        </inertial>
+      </link>
+      <joint name="base_world_joint" type="fixed">
+        <parent>world</parent>
+        <child>base</child>
+      </joint>
+      <!-- Lower limit -0.01, not the shipped 0: the finger has to be able to travel into the
+           block by the pad's deflection, and a joint declared at its limit starts there. -->
+      <link name="left_finger">
+        <pose relative_to="base">0 0 0 0 0 0</pose>
+        <inertial>
+          <pose>0 0 0.07 0 0 0</pose>
+          <mass>0.18</mass>
+          <inertia>
+            <ixx>0.0003</ixx><iyy>0.0003</iyy><izz>2.324e-05</izz>
+          </inertia>
+        </inertial>
+        <collision name="left_finger_body_collision">
+          <pose>0 0.00165 0.07 0 0 0</pose>
+          <geometry><box><size>0.035 0.0147 0.14</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="left_finger_joint" type="prismatic">
+        <pose relative_to="base">0 0 0 0 0 0</pose>
+        <parent>base</parent>
+        <child>left_finger</child>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit><lower>-0.01</lower><upper>0.035</upper><effort>40</effort><velocity>0.12</velocity></limit>
+          <dynamics><damping>2</damping><friction>0.5</friction><spring_reference>-0.005</spring_reference><spring_stiffness>50000</spring_stiffness></dynamics>
+        </axis>
+      </joint>
+      <link name="left_finger_pad_row_0">
+        <pose relative_to="left_finger">0 0 0 0 0 0</pose>
+        <inertial>
+          <pose>-0.013125 -0.00735 0.07 0 0 0</pose>
+          <mass>0.0049</mass>
+          <inertia>
+            <ixx>8.008e-06</ixx><iyy>8.035e-06</iyy><izz>3.571e-08</izz>
+          </inertia>
+        </inertial>
+        <collision name="left_finger_pad_row_0_collision">
+          <pose>-0.013125 -0.00735 0.07 0 0 0</pose>
+          <geometry><box><size>0.00875 0.0033 0.14</size></box></geometry>
+        </collision>
+      </link>
+      <joint name="left_finger_pad_row_0_joint" type="prismatic">
+        <pose relative_to="left_finger">0 0 0 0 0 0</pose>
+        <parent>left_finger</parent>
+        <child>left_finger_pad_row_0</child>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit><lower>-0.002</lower><upper>0.002</upper><effort>500</effort><velocity>-1</velocity></limit>
+          <dynamics><damping>11.5</damping><friction>0</friction><spring_reference>0</spring_reference><spring_stiffness>111000</spring_stiffness></dynamics>
+        </axis>
+      </joint>
+    </model>
+  </world>
+</sdf>

@@ -274,6 +274,56 @@ TEST(GraspCandidates, SizesTheJawsFromEachProductRadiusWithinTheStroke)
   EXPECT_LE(candidate.open_joint_position_m, gripper().joint_upper_m);
 }
 
+TEST(GraspCandidates, RetractRisesByTheLiftSoTheProductLeavesItsSupport)
+{
+  auto lifted = config();
+  lifted.retract_lift_m = 0.010;
+  const auto flat = generate_upright_cylinder_grasps(
+    can(), selection(), gripper(), tool_offset(), config());
+  const auto rising = generate_upright_cylinder_grasps(
+    can(), selection(), gripper(), tool_offset(), lifted);
+  ASSERT_TRUE(flat) << flat.error().detail;
+  ASSERT_TRUE(rising) << rising.error().detail;
+  const auto & before = flat.value().front().poses;
+  const auto & after = rising.value().front().poses;
+  EXPECT_NEAR(
+    after.world_from_retract_tool0.translation().z() -
+    before.world_from_retract_tool0.translation().z(), 0.010, 1.0e-12);
+  EXPECT_TRUE(
+    (after.world_from_retract_tool0.translation() - before.world_from_retract_tool0.translation())
+    .head<2>().norm() < 1.0e-12);
+  EXPECT_TRUE(after.world_from_grasp_tool0.isApprox(before.world_from_grasp_tool0));
+  auto invalid = config();
+  invalid.retract_lift_m = -0.001;
+  EXPECT_FALSE(
+    generate_upright_cylinder_grasps(can(), selection(), gripper(), tool_offset(), invalid));
+}
+
+TEST(GraspCandidates, PlansTheHeldPoseWithClearanceInBothHoldModes)
+{
+  // The padded planning model cannot start a continuation check from a jaw pressed into the
+  // product, so planning keeps the clearance aperture while only the command differs by mode.
+  const auto weld = generate_upright_cylinder_grasps(
+    can(), selection(), gripper(), tool_offset(), config());
+  ASSERT_TRUE(weld) << weld.error().detail;
+  EXPECT_DOUBLE_EQ(
+    weld.value().front().planning_hold_joint_position_m,
+    weld.value().front().hold_joint_position_m);
+
+  auto physical_config = config();
+  physical_config.physical_hold = true;
+  physical_config.hold_interference_per_side_m = 0.001;
+  const auto physical = generate_upright_cylinder_grasps(
+    can(), selection(), gripper(), tool_offset(), physical_config);
+  ASSERT_TRUE(physical) << physical.error().detail;
+  const auto & candidate = physical.value().front();
+  EXPECT_DOUBLE_EQ(
+    candidate.planning_hold_joint_position_m, weld.value().front().hold_joint_position_m);
+  EXPECT_NEAR(
+    candidate.planning_hold_joint_position_m - candidate.hold_joint_position_m,
+    physical_config.hold_clearance_per_side_m + 0.001, 1.0e-12);
+}
+
 TEST(GraspCandidates, RejectsAProductShorterThanTheMinimumGraspHeight)
 {
   // A grasp centre above the product's top would put the fingers on nothing; this fails instead.

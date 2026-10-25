@@ -23,8 +23,8 @@
          production code path rather than a stand-in.
 
      The carried product is `stock_can_01`: the scenario allowlist refuses any other identity.
-     It starts level on the rear pad at the pre-insert pose (release depth minus the 0.12 m
-     `preinsertion_distance_m`) and is carried in by the prismatic `carry_joint`, which stands in
+     The probe places it level on the rear pad at the pre-insert pose (release depth minus the
+     0.12 m `preinsertion_distance_m`) once the jaws are open, and it is carried in by the prismatic `carry_joint`, which stands in
      for the arm's straight-line insert.
 
      Deliberately loads physics, the scene broadcaster and the attachment system only: no sensors
@@ -248,13 +248,16 @@
       </joint>
 
       <link name="left_finger">
-        <!-- Spawn at the open aperture (joint zero is 0.03, initial_position 0.032), not at the
-             joint's zero: zero puts the faces 12 mm inside the catalogued can, and with the
-             gripper inverted those faces sit beside the product, so the first physics step
-             solved a deep product-to-finger penetration and produced a non-finite pose. The
-             joint frame stays at 0.03, so the joint reads +0.032 on the first tick exactly as
-             the controller's initial_position declares. -->
-        <pose relative_to="gripper">0 0.062 0.07 0 0 0</pose>
+        <!-- Declared at joint zero: a joint reads zero at its child's declared pose, and the
+             controller's initial_position is only its first command, so declaring the link at
+             the open aperture (0.062, as this fixture once did) put every face 32 mm outside
+             the aperture gripper_geometry.yaml assigns to the same joint reading. Under the weld
+             nothing noticed; under a friction grip the jaws closed on air (measured, Card 057:
+             joints at the 0.011 interference target unstalled, the product untouched for the
+             first 29 mm of carry). Zero puts the faces 12 mm inside a can standing here, so
+             the carried product loads parked on the floor and the probe places it once the
+             jaws have opened to initial_position. -->
+        <pose relative_to="gripper">0 0.03 0.07 0 0 0</pose>
         <inertial>
           <pose>0 0 0.07 0 0 0</pose>
           <mass>0.18</mass>
@@ -288,7 +291,7 @@
       </joint>
 
       <link name="right_finger">
-        <pose relative_to="gripper">0 -0.062 0.07 0 0 0</pose>
+        <pose relative_to="gripper">0 -0.03 0.07 0 0 0</pose>
         <inertial>
           <pose>0 0 0.07 0 0 0</pose>
           <mass>0.18</mass>
@@ -352,10 +355,12 @@
     </model>
 
     <!-- The carried product: the scenario allowlist's `stock_can_01`, upright-inverted (roll pi,
-         identical cylinder physics, and the orientation the inverted grasp frame authorises) at
-         the pre-insert pose, resting level on the rear pad. -->
+         identical cylinder physics, and the orientation the inverted grasp frame authorises).
+         It loads parked on the floor clear of the jaws, which start at joint zero; the probe
+         moves it to the pre-insert pose (0, -0.032, 0.871738522), resting level on the rear
+         pad, once the jaws are open. -->
     <model name="stock_can_01">
-      <pose>0 -0.032 0.871738522 3.141592654 0 0</pose>
+      <pose>0.4 -0.032 0.061 3.141592654 0 0</pose>
       <link name="product_body">
         <inertial>
           <mass>0.355</mass>

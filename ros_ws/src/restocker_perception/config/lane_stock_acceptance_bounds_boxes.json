@@ -1,0 +1,202 @@
+{
+ "card": "CMB-120",
+ "round": 3,
+ "declared_on": "2026-10-20",
+ "declared_before_any_held_out_lane_frame_of_this_round_was_recorded_or_read": true,
+ "question": "With per-product shapes (box dimensions, orientations) and height matching against the whole catalogue, does the lane stock estimator count box columns, keep refusing honestly, and not regress on cylinders?",
+ "decision_unit": "one lane survey frame, scored on the lane it was taken for (stock_scorer, as CMB-114)",
+ "held_out_population": {
+  "rule": "the version-3 held-out seeds from box_seed_start (235) on, none recorded or read before: benchmark_perception splits v3 held_out >= 235",
+  "seeds": [
+   242,
+   243,
+   246,
+   247,
+   257,
+   258,
+   260,
+   266,
+   267,
+   279,
+   280,
+   282,
+   283
+  ],
+  "development_data": "train and validation seeds >= 235 (37 seeds, 222 lanes, 89 box lanes) on which the estimator change was examined; no held-out seed was opened"
+ },
+ "noise_model": "as lane_stock_acceptance_bounds_r2.json (Gaussian range noise 0.5/1/2 %, 2 % dropout, synthetic)",
+ "arms": {
+  "abstain": "ideal depth, no identity channel",
+  "abstain+degrade": "half the frames lose a band of 30-70 % of rows",
+  "noise0.005 / noise0.01 / noise0.02": "abstain with noise and 2 % dropout",
+  "not_run": "oracle and channel arms: identity is untouched by this card"
+ },
+ "bounds": [
+  {
+   "id": "box_exact_on_sufficient",
+   "arms": [
+    "abstain"
+   ],
+   "metric": "exact_on_sufficient",
+   "direction": "min",
+   "value": 0.8,
+   "required_n": 20,
+   "meaning": "box lanes with sufficient coverage whose count is exactly right; a refusal is a miss (CMB-119: 0 of 3 right, 11 of 14 refused)",
+   "group": "product_class=box"
+  },
+  {
+   "id": "box_answered_wrong",
+   "arms": [
+    "abstain"
+   ],
+   "metric": "answered_wrong",
+   "direction": "max",
+   "value": 0.15,
+   "required_n": 20,
+   "meaning": "box lanes answered more than one product off, or a phantom",
+   "group": "product_class=box"
+  },
+  {
+   "id": "all_within_one",
+   "arms": [
+    "abstain"
+   ],
+   "metric": "within_one_on_sufficient",
+   "direction": "min",
+   "value": 0.9,
+   "required_n": 50,
+   "meaning": "regression: every lane, cylinders and empties included"
+  },
+  {
+   "id": "all_answered_wrong",
+   "arms": [
+    "abstain"
+   ],
+   "metric": "answered_wrong",
+   "direction": "max",
+   "value": 0.05,
+   "required_n": 50,
+   "meaning": "regression (CMB-114: 0 of 238)"
+  },
+  {
+   "id": "empty_read_empty",
+   "arms": [
+    "abstain"
+   ],
+   "metric": "empty_lane_read_empty",
+   "direction": "min",
+   "value": 0.7,
+   "required_n": 8,
+   "meaning": "regression"
+  },
+  {
+   "id": "clean_flagged_misplaced",
+   "arms": [
+    "abstain"
+   ],
+   "metric": "misplaced_false_alarm",
+   "direction": "max",
+   "value": 0.1,
+   "required_n": 40,
+   "meaning": "regression"
+  },
+  {
+   "id": "degrade_low_coverage_refused",
+   "arms": [
+    "abstain+degrade"
+   ],
+   "metric": "low_coverage_refused",
+   "direction": "min",
+   "value": 0.9,
+   "required_n": 20,
+   "meaning": "blinded low-coverage lanes are refused"
+  },
+  {
+   "id": "degrade_answered_wrong",
+   "arms": [
+    "abstain+degrade"
+   ],
+   "metric": "answered_wrong",
+   "direction": "max",
+   "value": 0.1,
+   "required_n": 30,
+   "meaning": "nothing wrong is answered under blinding"
+  },
+  {
+   "id": "degrade_box_answered_wrong",
+   "arms": [
+    "abstain+degrade"
+   ],
+   "metric": "answered_wrong",
+   "direction": "max",
+   "value": 0.25,
+   "required_n": 12,
+   "meaning": "same, box lanes",
+   "group": "product_class=box"
+  },
+  {
+   "id": "noise_answered",
+   "arms": [
+    "noise0.005",
+    "noise0.01"
+   ],
+   "metric": "answered_on_sufficient",
+   "direction": "min",
+   "value": 0.8,
+   "required_n": 50,
+   "meaning": "lanes still answered at 0.5 % and 1 % noise"
+  },
+  {
+   "id": "noise_answered_wrong",
+   "arms": [
+    "noise0.005",
+    "noise0.01",
+    "noise0.02"
+   ],
+   "metric": "answered_wrong",
+   "direction": "max",
+   "value": 0.1,
+   "required_n": 50,
+   "meaning": "false-count rate under noise"
+  },
+  {
+   "id": "noise_box_answered_wrong",
+   "arms": [
+    "noise0.005",
+    "noise0.01",
+    "noise0.02"
+   ],
+   "metric": "answered_wrong",
+   "direction": "max",
+   "value": 0.2,
+   "required_n": 20,
+   "meaning": "false-count rate, box lanes",
+   "group": "product_class=box"
+  },
+  {
+   "id": "noise_empty_read_empty",
+   "arms": [
+    "noise0.005",
+    "noise0.01"
+   ],
+   "metric": "empty_lane_read_empty",
+   "direction": "min",
+   "value": 0.7,
+   "required_n": 8,
+   "meaning": "empty lanes stay empty under noise"
+  },
+  {
+   "id": "noise2_answered",
+   "arms": [
+    "noise0.02"
+   ],
+   "metric": "answered_on_sufficient",
+   "direction": "min",
+   "value": 0.7,
+   "required_n": 50,
+   "meaning": "2 % noise"
+  }
+ ],
+ "pass_rule": "as lane_stock_acceptance_bounds_r2.json: a 'min' bound passes only if the lower 95 % Wilson limit is at or above the value, a 'max' bound only if the upper limit is at or below it, and the sample size is met; a bound with a 'group' is evaluated on that condition's block (a report with no such lane is inconclusive). Small bounds' samples reflect ~78 held-out lanes, ~30 of them box lanes; a bound that cannot be cleared by a perfect result at that n would be inconclusive, so the values were set with that in mind. A fail is recorded as a fail; nothing is re-run.",
+ "training": "none"
+}

@@ -29,8 +29,10 @@
 // `<gz/msgs/*.pb.h>` headers classify as C system here, the C++ standard headers follow, and
 // only then the other headers (the quoted project header shares no basename prefix with this
 // file, so it gets no own-header grace).
+#include <gz/msgs/boolean.pb.h>
 #include <gz/msgs/double.pb.h>
 #include <gz/msgs/model.pb.h>
+#include <gz/msgs/pose.pb.h>
 #include <gz/msgs/pose_v.pb.h>
 
 #include <algorithm>
@@ -44,8 +46,10 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <cstdlib>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <gz/transport/Node.hh>
 
@@ -60,6 +64,7 @@ using namespace std::chrono_literals;
 
 constexpr char kPoseTopic[] = "/world/restocking/pose/info";
 constexpr char kJointStateTopic[] = "/release_contact/joint_state";
+constexpr char kSetPoseService[] = "/world/restocking/set_pose";
 constexpr char kSetService[] = "/world/restocking/restocker/attachment/set";
 constexpr char kQueryService[] = "/world/restocking/restocker/attachment/query";
 constexpr char kLeftFingerTopic[] = "/release_contact/left_finger_position";
@@ -105,6 +110,10 @@ constexpr double kSpawnLeanMaxRad = 0.03;
 constexpr std::array<double, 3> kPinDepthM{0.807000000, 0.741160773, 0.675321545};
 constexpr std::array<double, 3> kPinHeightM{0.813456541, 0.818060468, 0.822664395};
 constexpr char kCarriedName[] = "stock_can_01";
+
+// Which jaw-hold policy this run is exercising, and the aperture it commands. Both default to
+// the shipped physical policy (spec 11.3 D3); the Card 019 evidence run pins weld through the
+// environment, so the same probe covers both and the attach assertion follows the mode.
 constexpr std::array<const char *, 3> kPinNames{"lane_pinned_can_01", "lane_pinned_can_02",
   "lane_pinned_can_03"};
 
@@ -298,6 +307,7 @@ public:
     for (const auto & joint : message.joint()) {
       if (joint.has_axis1()) {
         positions_[joint.name()] = joint.axis1().position();
+        velocities_[joint.name()] = joint.has_axis1() ? joint.axis1().velocity() : 0.0;
       }
     }
     seen_ = true;
@@ -312,10 +322,48 @@ public:
     return positions_;
   }
 
+  [[nodiscard]] std::optional<std::map<std::string, double>> Velocities() const
+  {
+    const std::lock_guard<std::mutex> guard(mutex_);
+    if (!seen_) {
+      return std::nullopt;
+    }
+    return velocities_;
+  }
+
 private:
   mutable std::mutex mutex_;
   std::map<std::string, double> positions_;
+  std::map<std::string, double> velocities_;
   bool seen_{false};
+};
+
+// Each finger's contact point with the carried product, published by the fixture's test-only
+// GripForceProbe: the probe's own view of the pads, independent of the attachment boundary.
+constexpr char kPadTopic[] = "/release_contact/pad_contacts";
+
+class PadWatcher
+{
+public:
+  void Ingest(const gz::msgs::Pose_V & message)
+  {
+    std::map<std::string, std::array<double, 3>> points;
+    for (const auto & pose : message.pose()) {
+      points[pose.name()] = {pose.position().x(), pose.position().y(), pose.position().z()};
+    }
+    std::scoped_lock lock(mutex_);
+    points_ = std::move(points);
+  }
+
+  [[nodiscard]] std::map<std::string, std::array<double, 3>> Snapshot() const
+  {
+    std::scoped_lock lock(mutex_);
+    return points_;
+  }
+
+private:
+  mutable std::mutex mutex_;
+  std::map<std::string, std::array<double, 3>> points_;
 };
 
 [[nodiscard]] double distance(const Sample & left, const Sample & right)
@@ -578,6 +626,102 @@ int fail(const std::string & detail)
   return 1;
 }
 
+// Joint positions and speeds for the fixture's three joints as one receipt line: the velocity
+// gate is only trustworthy next to where the jaws and the insert actually are, and a velocity
+// number with a stationary joint behind it is a phantom.
+void print_joint_state_receipt(const char * label, const JointStateWatcher & joints)
+{
+  const auto positions = joints.Snapshot();
+  if (!positions) {
+    std::cout << "release contact receipt: " << label << " joint states absent\n";
+    return;
+  }
+  const auto velocities = joints.Velocities();
+  const auto left = positions->find("left_finger_joint");
+  const auto right = positions->find("right_finger_joint");
+  const auto carry = positions->find("carry_joint");
+  std::cout << "release contact receipt: " << label << " joints left "
+            << (left != positions->end() ? std::to_string(left->second) : "absent") << " right "
+            << (right != positions->end() ? std::to_string(right->second) : "absent") << " carry "
+            << (carry != positions->end() ? std::to_string(carry->second) : "absent");
+  if (velocities) {
+    const auto & v = *velocities;
+    const auto left_v = v.find("left_finger_joint");
+    const auto right_v = v.find("right_finger_joint");
+    const auto carry_v = v.find("carry_joint");
+    std::cout << " velocities left "
+              << (left_v != v.end() ? std::to_string(left_v->second) : "absent") << " right "
+              << (right_v != v.end() ? std::to_string(right_v->second) : "absent") << " carry "
+              << (carry_v != v.end() ? std::to_string(carry_v->second) : "absent");
+  }
+  std::cout << '\n';
+}
+
+// Product pose during an attach attempt against the pre-attach sample: the refusal's velocity
+// number is only trustworthy next to how far the product actually travelled while measured.
+void print_attempt_pose_receipt(
+  int attempt, const PoseWatcher & watcher, const Sample & pre_attach)
+{
+  if (const auto snapshot = watcher.Snapshot()) {
+    const Sample & can = snapshot->at(kCarriedName);
+    std::cout << "release contact receipt: attempt " << attempt << " pose x " << can.x
+              << " y " << can.y << " z " << can.z << " (pre-attach delta "
+              << (can.x - pre_attach.x) << " " << (can.y - pre_attach.y) << " "
+              << (can.z - pre_attach.z) << ")";
+    // The close's rotation split: yaw is a spin about the can's own axis, lean is a tip. Both
+    // count against the attach rotation bound, and they have different causes.
+    const auto now = orientation_error(can);
+    const auto before = orientation_error(pre_attach);
+    std::cout << " yaw_rad " << now.yaw_rad << " (pre-attach " << before.yaw_rad << ") lean_rad "
+              << now.lean_rad << " (pre-attach " << before.lean_rad << ")\n";
+  }
+}
+
+// One line of the carry trace: the product's offset in the gripper frame beside the jaw and
+// carry positions, so a friction-grip slip shows which body moved and along which axis.
+void print_carry_trace_receipt(const PoseWatcher & watcher, const JointStateWatcher & joints)
+{
+  const auto grip = watcher.Gripper();
+  const auto snapshot = watcher.Snapshot();
+  const auto positions = joints.Snapshot();
+  if (!grip || !snapshot || !positions || snapshot->count(kCarriedName) == 0U) {
+    std::cout << "release contact receipt: carry trace sample unavailable\n";
+    return;
+  }
+  const Sample & can = snapshot->at(kCarriedName);
+  const auto in_grip = quat_rotate(
+    quat_inverse(Quat{grip->qw, grip->qx, grip->qy, grip->qz}),
+    {can.x - grip->x, can.y - grip->y, can.z - grip->z});
+  const auto joint = [&positions](const char * name) {
+    const auto found = positions->find(name);
+    return found != positions->end() ? found->second : std::numeric_limits<double>::quiet_NaN();
+  };
+  std::cout << "release contact receipt: carry trace carry " << joint(kCarryJoint) << " left "
+            << joint("left_finger_joint") << " right " << joint("right_finger_joint")
+            << " product y " << can.y << " z " << can.z << " tilt_rad "
+            << tilt_from_upright_rad(can) << " in-grip xyz " << in_grip[0] << " " << in_grip[1]
+            << " " << in_grip[2] << '\n';
+}
+
+// Which jaw-hold policy this run exercises: defaults to the shipped physical policy (spec 11.3
+// D3); the Card 019 evidence run pins weld in the environment, so one probe covers both.
+[[nodiscard]] std::string configured_hold_mode()
+{
+  const char * raw = std::getenv("RESTOCKER_RELEASE_CONTACT_HOLD_MODE");
+  return std::string(raw ? raw : "physical");
+}
+
+// The aperture the run commands: physical-mode hold target for the can is
+// 0.5 * (diameter - 2*interference - zero_gap) = 0.0093 at the shipped 0.0027 m interference; the
+// env var pins it for weld runs.
+[[nodiscard]] double configured_hold_target()
+{
+  if (const char * raw = std::getenv("RESTOCKER_RELEASE_CONTACT_HOLD_TARGET")) {
+    return std::stod(raw);
+  }
+  return 0.0093;
+}
+
 // One position command, published repeatedly the way the fixture's own probe does: a single
 // sample can be dropped while the controller is still subscribing.
 [[nodiscard]] bool command_position(
@@ -599,11 +743,334 @@ int fail(const std::string & detail)
   return true;
 }
 
+struct ReleaseSample
+{
+  std::optional<Sample> release;
+  std::optional<Sample> last_seen;
+};
+
+// The first free pose after the release is the carry proof: the product must appear where the
+// carry joint left it (stall point or target). Take the first sample inside that window rather
+// than the last: from the target the bed's feed carries the product away within a few
+// centimetres of the release instant, and a later sample would be mid-flight.
+[[nodiscard]] ReleaseSample await_release_pose(const PoseWatcher & watcher, double expected_y)
+{
+  ReleaseSample result;
+  const auto deadline = std::chrono::steady_clock::now() + 2s;
+  while (std::chrono::steady_clock::now() < deadline) {
+    if (const auto pose = watcher.Snapshot()) {
+      result.last_seen = pose->at(kCarriedName);
+      if (std::abs(result.last_seen->y - expected_y) <= 0.03) {
+        result.release = result.last_seen;
+        break;
+      }
+    }
+    std::this_thread::sleep_for(20ms);
+  }
+  return result;
+}
+
+// The pinned column must stand where lane_columns.py puts it before anything is commanded.
+[[nodiscard]] std::optional<std::string> misplaced_pin(const std::map<std::string, Sample> & spawn)
+{
+  for (std::size_t index = 0; index < kPinNames.size(); ++index) {
+    const Sample & pin = spawn.at(kPinNames[index]);
+    if (std::abs(pin.y - kPinDepthM[index]) > kPinStillAllowanceM ||
+      std::abs(pin.z - kPinHeightM[index]) > kPinStillAllowanceM)
+    {
+      return std::string("pinned product ") + kPinNames[index] +
+             " did not spawn at its column pose: y " + std::to_string(pin.y) + " z " +
+             std::to_string(pin.z);
+    }
+  }
+  return std::nullopt;
+}
+
+// Both jaws in one publish loop, as production's single gripper trajectory moves them together.
+// Commanding one topic's burst and then the other's closed the jaws 300 ms apart, and under an
+// interference target the first jaw shoved the product across the pad alone (measured, Card 057
+// run M3: the can yawed 0.50 rad before the second jaw arrived).
+[[nodiscard]] bool command_jaws(gz::transport::Node & node, double value)
+{
+  auto left = node.Advertise<gz::msgs::Double>(kLeftFingerTopic);
+  auto right = node.Advertise<gz::msgs::Double>(kRightFingerTopic);
+  if (!left.Valid() || !right.Valid()) {
+    return false;
+  }
+  gz::msgs::Double message;
+  message.set_data(value);
+  for (int attempt = 0; attempt < 15; ++attempt) {
+    if (!left.Publish(message) || !right.Publish(message)) {
+      return false;
+    }
+    std::this_thread::sleep_for(20ms);
+  }
+  return true;
+}
+
+// Where the product sits in the gripper frame: its origin and its orientation.
+struct InGripper
+{
+  std::array<double, 3> translation{};
+  Quat rotation;
+};
+
+[[nodiscard]] InGripper product_in_gripper(const Sample & grip, const Sample & can)
+{
+  const Quat inverse = quat_inverse(Quat{grip.qw, grip.qx, grip.qy, grip.qz});
+  return InGripper{
+    quat_rotate(inverse, {can.x - grip.x, can.y - grip.y, can.z - grip.z}),
+    quat_mul(inverse, Quat{can.qw, can.qx, can.qy, can.qz})};
+}
+
+[[nodiscard]] double distance3(const std::array<double, 3> & a, const std::array<double, 3> & b)
+{
+  return std::sqrt(
+    (a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) + (a[2] - b[2]) * (a[2] - b[2]));
+}
+
+// The state the held measurement is taken against, sampled after the attach and before the insert.
+struct HeldReference
+{
+  Sample grip;
+  Sample can;
+  std::array<std::array<double, 3>, 2> pads{};
+  std::array<double, 2> finger_positions{};
+};
+
+// A finger's origin in the gripper frame: gripper_geometry.yaml's joint origins (0, +-0.03, 0.07)
+// and axes (+-y), with the link declared at joint zero as physical_grasp.sdf declares it.
+[[nodiscard]] std::array<double, 3> finger_in_gripper(std::size_t index, double position)
+{
+  const double side = index == 0U ? 1.0 : -1.0;
+  return {0.0, side * (0.03 + position), 0.07};
+}
+
+[[nodiscard]] std::array<double, 3> world_to_gripper(
+  const Sample & grip, const std::array<double, 3> & point)
+{
+  return quat_rotate(
+    quat_inverse(Quat{grip.qw, grip.qx, grip.qy, grip.qz}),
+    {point[0] - grip.x, point[1] - grip.y, point[2] - grip.z});
+}
+
+[[nodiscard]] std::optional<HeldReference> capture_held_reference(
+  const PoseWatcher & watcher, const JointStateWatcher & joints, const PadWatcher & pads)
+{
+  const auto grip = watcher.Gripper();
+  const auto snapshot = watcher.Snapshot();
+  const auto positions = joints.Snapshot();
+  const auto points = pads.Snapshot();
+  if (!grip || !snapshot || !positions || points.count("left") == 0U ||
+    points.count("right") == 0U || positions->count("left_finger_joint") == 0U ||
+    positions->count("right_finger_joint") == 0U)
+  {
+    return std::nullopt;
+  }
+  return HeldReference{
+    *grip, snapshot->at(kCarriedName), {points.at("left"), points.at("right")},
+    {positions->at("left_finger_joint"), positions->at("right_finger_joint")}};
+}
+
+[[nodiscard]] std::array<double, 3> minus(
+  const std::array<double, 3> & a, const std::array<double, 3> & b)
+{
+  return {a[0] - b[0], a[1] - b[1], a[2] - b[2]};
+}
+
+[[nodiscard]] std::array<double, 3> plus(
+  const std::array<double, 3> & a, const std::array<double, 3> & b)
+{
+  return {a[0] + b[0], a[1] + b[1], a[2] + b[2]};
+}
+
+// Spec M10 section 11 D5 amendment (as corrected), the probe's own half: over 2.4 s after the
+// insert, each pad's slip -- the product's material point where the pad touched it at the
+// reference, against that pad point carried by its finger -- stays within 1 mm, and the product's
+// origin swings at most 3 mm about the pads' midpoint. The settle rule is on what load hopping
+// between pad rows cannot move: the centre (per-axis midpoint of min and max) of the product
+// origin's oscillation relative to the finger links' midpoint, which may move at most 0.1 mm
+// between the two consecutive 1.2 s windows (each over two 0.56 s swing periods). Computed from
+// the contact publisher, the pose topic and the joint states, not from the boundary; the
+// boundary's watchdog verdict is then read back as a second, separate check.
+[[nodiscard]] std::optional<std::string> assert_held_slip_and_swing(
+  gz::transport::Node & node, const std::string & epoch, const std::string & attach_id,
+  const PoseWatcher & watcher, const JointStateWatcher & joints, const HeldReference & reference)
+{
+  const InGripper pre = product_in_gripper(reference.grip, reference.can);
+  std::array<std::array<double, 3>, 2> pad_in_finger{};
+  std::array<std::array<double, 3>, 2> pad_in_child{};
+  std::array<double, 3> middle_then{};
+  for (std::size_t index = 0; index < 2; ++index) {
+    const auto point = world_to_gripper(reference.grip, reference.pads[index]);
+    pad_in_finger[index] =
+      minus(point, finger_in_gripper(index, reference.finger_positions[index]));
+    pad_in_child[index] =
+      quat_rotate(quat_inverse(pre.rotation), minus(point, pre.translation));
+    for (std::size_t axis = 0; axis < 3; ++axis) {
+      middle_then[axis] += 0.5 * point[axis];
+    }
+  }
+  std::array<double, 2> peak_slip{};
+  double peak_swing = 0.0;
+  std::string pad_rows;
+  std::array<std::array<double, 3>, 2> window_min{};
+  std::array<std::array<double, 3>, 2> window_max{};
+  std::array<std::size_t, 2> window_samples{};
+  std::size_t samples = 0U;
+  const auto started = std::chrono::steady_clock::now();
+  while (std::chrono::steady_clock::now() - started < 2400ms) {
+    std::this_thread::sleep_for(50ms);
+    const auto grip = watcher.Gripper();
+    const auto snapshot = watcher.Snapshot();
+    const auto positions = joints.Snapshot();
+    if (!grip || !snapshot || !positions || positions->count("left_finger_joint") == 0U ||
+      positions->count("right_finger_joint") == 0U)
+    {
+      continue;
+    }
+    const InGripper now = product_in_gripper(*grip, snapshot->at(kCarriedName));
+    const std::array<double, 2> fingers{
+      positions->at("left_finger_joint"), positions->at("right_finger_joint")};
+    // The compliant pad rows' own joint positions (spec M10 section 11 D10 item 3), left and
+    // right per row: that is the pad compression, and it decides whether the 40 N press reaches
+    // the product through the springs at all.
+    {
+      std::ostringstream rows;
+      for (int index = 0; index < 4; ++index) {
+        const auto left = "left_finger_pad_row_" + std::to_string(index) + "_joint";
+        const auto right = "right_finger_pad_row_" + std::to_string(index) + "_joint";
+        const auto left_position = positions->find(left);
+        const auto right_position = positions->find(right);
+        if (left_position == positions->end() || right_position == positions->end()) {
+          continue;
+        }
+        rows << " [" << left_position->second << " " << right_position->second << "]";
+      }
+      if (rows.tellp() > 0) {
+        pad_rows = rows.str();
+      }
+    }
+    std::array<double, 3> middle_now{};
+    for (std::size_t index = 0; index < 2; ++index) {
+      const auto pad = plus(finger_in_gripper(index, fingers[index]), pad_in_finger[index]);
+      const auto material = plus(now.translation, quat_rotate(now.rotation, pad_in_child[index]));
+      const auto slip = minus(material, pad);
+      peak_slip[index] = std::max(peak_slip[index], distance3(slip, {0.0, 0.0, 0.0}));
+      for (std::size_t axis = 0; axis < 3; ++axis) {
+        middle_now[axis] += 0.5 * pad[axis];
+      }
+    }
+    peak_swing = std::max(
+      peak_swing,
+      distance3(minus(now.translation, middle_now), minus(pre.translation, middle_then)));
+    // The settle quantity: the product origin against the finger links' midpoint.
+    const auto links = plus(finger_in_gripper(0U, fingers[0]), finger_in_gripper(1U, fingers[1]));
+    const std::array<double, 3> settle = minus(
+      now.translation, {0.5 * links[0], 0.5 * links[1], 0.5 * links[2]});
+    const std::size_t window =
+      std::chrono::steady_clock::now() - started < 1200ms ? 0U : 1U;
+    for (std::size_t axis = 0; axis < 3; ++axis) {
+      window_min[window][axis] = window_samples[window] == 0U ?
+        settle[axis] : std::min(window_min[window][axis], settle[axis]);
+      window_max[window][axis] = window_samples[window] == 0U ?
+        settle[axis] : std::max(window_max[window][axis], settle[axis]);
+    }
+    ++window_samples[window];
+    ++samples;
+  }
+  std::array<std::array<double, 3>, 2> centre{};
+  for (std::size_t window = 0; window < 2; ++window) {
+    for (std::size_t axis = 0; axis < 3; ++axis) {
+      centre[window][axis] = 0.5 * (window_min[window][axis] + window_max[window][axis]);
+    }
+  }
+  const double settle_drift = distance3(centre[0], centre[1]);
+  std::cout << "release contact receipt: held over 2.4 s after the insert (" << samples
+            << " samples): pad slip peak left " << peak_slip[0] << " right " << peak_slip[1]
+            << " of 0.001 m, swing peak " << peak_swing << " of 0.003 m, oscillation centre "
+            << "drift against the finger links " << settle_drift
+            << " of 0.0001 m between the two 1.2 s windows (" << window_samples[0] << " + "
+            << window_samples[1] << " samples)"
+            << "; product grip-frame y " << pre.translation[1]
+            << "; pad row joints (left right)" << pad_rows << "\n";
+  restocker_gazebo::msgs::QueryAttachmentRequest query;
+  query.set_expected_simulator_epoch(epoch);
+  query.set_operation_id(attach_id);
+  const auto state = request(node, kQueryService, query);
+  if (state) {
+    print_reply_receipt("held after the insert", *state);
+  }
+  if (samples < 20U || window_samples[0] < 10U || window_samples[1] < 10U) {
+    return std::string("held slip and swing could not be sampled after the insert");
+  }
+  if (std::max(peak_slip[0], peak_slip[1]) > 0.001) {
+    return std::string("the product slipped at a pad by more than 1 mm during carry");
+  }
+  if (peak_swing > 0.003) {
+    return std::string("the product swung more than the 3 mm allowance during carry");
+  }
+  if (settle_drift > 1.0e-4) {
+    return std::string("the product never settled against the finger links after the insert");
+  }
+  if (!state || state->state.motion_gate != AttachmentMotionGate::kValid) {
+    return std::string("the boundary's held-object watchdog did not keep the grip valid");
+  }
+  return std::nullopt;
+}
+
+// The fixture's finger links are declared at joint zero, where the faces are 12 mm inside a can
+// standing between them, so the carried product loads parked on the floor and is placed at the
+// pre-insert pose only once both jaws have opened to their initial target. Declaring the links
+// at the open pose instead would shift every joint position by that offset (a joint reads zero
+// at its declared pose; the controller's initial_position is only a command), and the aperture
+// the plugin checks against gripper_geometry.yaml would then not be the aperture in the world.
+[[nodiscard]] std::optional<std::string> place_carried_product(
+  gz::transport::Node & node, const JointStateWatcher & joints)
+{
+  const auto deadline = std::chrono::steady_clock::now() + 10s;
+  bool open = false;
+  while (!open && std::chrono::steady_clock::now() < deadline) {
+    if (const auto positions = joints.Snapshot()) {
+      const auto left = positions->find("left_finger_joint");
+      const auto right = positions->find("right_finger_joint");
+      open = left != positions->end() && right != positions->end() && left->second >= 0.031 &&
+        right->second >= 0.031;
+    }
+    if (!open) {
+      std::this_thread::sleep_for(50ms);
+    }
+  }
+  if (!open) {
+    return std::string(
+      "the jaws never opened to their initial target, so the product was not placed");
+  }
+  gz::msgs::Pose pose;
+  pose.set_name(kCarriedName);
+  pose.mutable_position()->set_x(0.0);
+  pose.mutable_position()->set_y(kStartDepthM);
+  pose.mutable_position()->set_z(kCarryHeightM);
+  // Roll pi: the inverted grasp frame's upright can, as the spawn pose on the floor.
+  pose.mutable_orientation()->set_w(0.0);
+  pose.mutable_orientation()->set_x(1.0);
+  gz::msgs::Boolean reply;
+  bool result = false;
+  if (!node.Request(kSetPoseService, pose, 5000U, reply, result) || !result || !reply.data()) {
+    return std::string("the set_pose request placing the carried product was refused");
+  }
+  std::cout << "release contact receipt: product placed between the opened jaws\n";
+  // Let pose samples from before the move age out of the settle window.
+  std::this_thread::sleep_for(500ms);
+  return std::nullopt;
+}
+
 }  // namespace
 }  // namespace restocker_gazebo
 
 int main()
 {
+  const std::string hold_mode = restocker_gazebo::configured_hold_mode();
+  const double hold_target = restocker_gazebo::configured_hold_target();
   using restocker_gazebo::AttachmentMotionGate;
   using restocker_gazebo::AttachmentPhase;
   using restocker_gazebo::AttachmentStatusCode;
@@ -621,7 +1088,6 @@ int main()
   using restocker_gazebo::kCarryTopic;
   using restocker_gazebo::kColumnPitchM;
   using restocker_gazebo::kGrowthToleranceM;
-  using restocker_gazebo::kLeftFingerTopic;
   using restocker_gazebo::kPenetrationAllowanceM;
   using restocker_gazebo::kPinDepthM;
   using restocker_gazebo::kPinHeightM;
@@ -631,7 +1097,6 @@ int main()
   using restocker_gazebo::kQueryService;
   using restocker_gazebo::kRearClearanceM;
   using restocker_gazebo::kReleaseDepthM;
-  using restocker_gazebo::kRightFingerTopic;
   using restocker_gazebo::kSetService;
   using restocker_gazebo::kStartDepthM;
   using restocker_gazebo::near;
@@ -665,6 +1130,7 @@ int main()
   // reception thread in JointStateWatcher::Ingest). Same order as product_contact_probe.
   restocker_gazebo::PoseWatcher watcher;
   restocker_gazebo::JointStateWatcher joints;
+  restocker_gazebo::PadWatcher pads;
   gz::transport::Node node;
   if (!node.Subscribe<gz::msgs::Pose_V>(
       restocker_gazebo::kPoseTopic,
@@ -678,9 +1144,18 @@ int main()
   {
     return fail(std::string("could not subscribe to ") + restocker_gazebo::kJointStateTopic);
   }
+  if (!node.Subscribe<gz::msgs::Pose_V>(
+      restocker_gazebo::kPadTopic,
+      [&pads](const gz::msgs::Pose_V & message) {pads.Ingest(message);}))
+  {
+    return fail(std::string("could not subscribe to ") + restocker_gazebo::kPadTopic);
+  }
 
   // The carried product starts level on the pad and the three pinned products are already at
   // their column poses; all four must exist and be at rest before anything is commanded.
+  if (const auto placement = restocker_gazebo::place_carried_product(node, joints)) {
+    return fail(*placement);
+  }
   const auto settle_started = std::chrono::steady_clock::now();
   const auto spawn = await_settled(watcher, 30s);
   if (!spawn) {
@@ -702,16 +1177,8 @@ int main()
       "the carried product is not at the pre-insert pose: y " +
       std::to_string(carried_spawn.y) + " z " + std::to_string(carried_spawn.z));
   }
-  for (std::size_t index = 0; index < kPinNames.size(); ++index) {
-    const Sample & pin = spawn->at(kPinNames[index]);
-    if (std::abs(pin.y - kPinDepthM[index]) > kPinStillAllowanceM ||
-      std::abs(pin.z - kPinHeightM[index]) > kPinStillAllowanceM)
-    {
-      return fail(
-        std::string("pinned product ") + kPinNames[index] +
-        " did not spawn at its column pose: y " + std::to_string(pin.y) + " z " +
-        std::to_string(pin.z));
-    }
+  if (const auto misplaced = restocker_gazebo::misplaced_pin(*spawn)) {
+    return fail(*misplaced);
   }
 
   // Authorize the attach from the settle observation (Milestone 10 §7, Card 047): the product
@@ -762,32 +1229,40 @@ int main()
     return fail("query service did not expose the simulator epoch");
   }
 
+  // SC-002: the product's position in the gripper frame, sampled immediately before the insert
+  // and compared after it, is what a friction grip has to hold still (spec 11.9, 1 mm bound).
+  std::optional<restocker_gazebo::HeldReference> held_reference;
+
   // Attach: close the jaws to the can's hold target, then let the plugin weld the product into
   // the gripper's skeleton. The journal refuses a premature attempt outright, so a retry with a
   // fresh operation id covers the fingers still settling without masking a real rejection.
-  if (!command_position(node, kLeftFingerTopic, 0.0145) ||
-    !command_position(node, kRightFingerTopic, 0.0145))
-  {
+  if (!restocker_gazebo::command_jaws(node, hold_target)) {
     return fail("finger close command publication failed");
   }
-  std::this_thread::sleep_for(800ms);
+  // How long the jaws are given to finish the close before the plugin is asked to verify it.
+  // Physical mode contacts the product, so the contact has to be settled first; the default
+  // keeps Card 019's weld-era timing, and the physical run widens it from measurements.
+  std::this_thread::sleep_for(
+    std::chrono::milliseconds(
+      [] {
+        if (const char * raw = std::getenv("RESTOCKER_RELEASE_CONTACT_SETTLE_MS")) {
+          return std::stoi(raw);
+        }
+        return 800;
+      }()));
   // Pre-attach state receipt: has the close disturbed the product, and are the jaws at the
   // hold target? This is the moment the plugin's transform assertion will sample.
-  if (const auto pre_attach = watcher.Snapshot()) {
-    const Sample & can = pre_attach->at(kCarriedName);
-    std::cout << "release contact receipt: pre-attach pose x " << can.x << " y " << can.y
-              << " z " << can.z << " tilt_rad " << tilt_from_upright_rad(can)
+  Sample pre_attach = carried_spawn;
+  if (const auto pre_attach_snapshot = watcher.Snapshot()) {
+    pre_attach = pre_attach_snapshot->at(kCarriedName);
+    std::cout << "release contact receipt: pre-attach pose x " << pre_attach.x
+              << " y " << pre_attach.y << " z " << pre_attach.z << " tilt_rad "
+              << tilt_from_upright_rad(pre_attach)
               << " (spawn tilt_rad " << tilt_from_upright_rad(carried_spawn) << ")\n";
   }
-  if (const auto finger_positions = joints.Snapshot()) {
-    const auto left = finger_positions->find("left_finger_joint");
-    const auto right = finger_positions->find("right_finger_joint");
-    std::cout << "release contact receipt: pre-attach fingers left "
-              << (left != finger_positions->end() ? std::to_string(left->second) : "absent")
-              << " right "
-              << (right != finger_positions->end() ? std::to_string(right->second) : "absent")
-              << " (hold target 0.0145)\n";
-  }
+  std::cout << "release contact receipt: pre-attach hold target " << hold_target << " mode "
+            << hold_mode << '\n';
+  restocker_gazebo::print_joint_state_receipt("pre-attach", joints);
 
   const auto attach_loop_started = std::chrono::steady_clock::now();
   std::optional<restocker_gazebo::AttachmentJournalReply> attached;
@@ -833,6 +1308,9 @@ int main()
     std::cout << "release contact receipt: attach attempt " << attempt << " terminal after "
               << terminal_ms << " ms\n";
     print_reply_receipt("attach terminal", *terminal);
+    restocker_gazebo::print_attempt_pose_receipt(attempt, watcher, pre_attach);
+    restocker_gazebo::print_joint_state_receipt(
+      ("attempt " + std::to_string(attempt)).c_str(), joints);
     if (terminal->status.code == AttachmentStatusCode::kAttached) {
       attached = terminal;
       break;
@@ -843,8 +1321,18 @@ int main()
     attached->state.phase != AttachmentPhase::kAttached ||
     attached->state.motion_gate != AttachmentMotionGate::kValid || !attached->operation ||
     !attached->operation->mutation_started || !attached->operation->evidence ||
-    !attached->operation->evidence->joint_observed ||
-    !near(attached->operation->evidence->parent_to_child.translation[2], 0.14, 1.0e-4))
+    (hold_mode == "weld" ?
+    !attached->operation->evidence->joint_observed :
+    attached->operation->evidence->joint_observed) ||
+    attached->state.hold_mode != hold_mode ||
+    // A weld pins the product at the grasp center by construction; a squeeze leaves it where
+    // contact put it, which only section 7's fidelity budget bounds (Card 057: no weld-era
+    // tolerance is evidence for the physical grip).
+    (hold_mode == "weld" ?
+    !near(attached->operation->evidence->parent_to_child.translation[2], 0.14, 1.0e-4) :
+    (!attached->operation->fidelity ||
+    attached->operation->fidelity->translation_residual_m >
+    attached->operation->fidelity->translation_budget_m)))
   {
     std::cout << "release contact receipt: attach ended unverified after "
               << ms_since(attach_loop_started) << " ms in the loop, " << ms_since(probe_started)
@@ -864,6 +1352,7 @@ int main()
   // reading to where the product actually ended up. If joint states never publish, the
   // joint's velocity bound (0.05 m/s over 0.12 m) leaves a safe fixed wait and the commanded
   // target stays the expectation.
+  held_reference = restocker_gazebo::capture_held_reference(watcher, joints, pads);
   const double carry_target = kReleaseDepthM - kStartDepthM;
   double carry_position = carry_target;
   if (!command_position(node, kCarryTopic, carry_target, 10U)) {
@@ -876,6 +1365,9 @@ int main()
     double previous = std::numeric_limits<double>::quiet_NaN();
     int quiet_ticks = 0;
     while (!arrived && std::chrono::steady_clock::now() < deadline) {
+      if (hold_mode == "physical") {
+        restocker_gazebo::print_carry_trace_receipt(watcher, joints);
+      }
       if (const auto snapshot = joints.Snapshot()) {
         states_seen = true;
         const auto found = snapshot->find(restocker_gazebo::kCarryJoint);
@@ -939,20 +1431,34 @@ int main()
     }
   }
 
-  // While the DetachableJoint holds, Gazebo stops updating the carried model's pose, so this
-  // read may still show the attach pose; either way it must not have fallen. Recorded for the
-  // receipt, asserted only for gross failure.
-  if (const auto during_carry = await_settled(watcher, 4s)) {
+  if (hold_mode == "physical") {
+    if (!held_reference) {
+      return fail("the product and pad contacts were not sampled before the insert");
+    }
+    if (const auto held = restocker_gazebo::assert_held_slip_and_swing(
+        node, *epoch, attach_id, watcher, joints, *held_reference))
+    {
+      return fail(*held);
+    }
+  } else if (const auto during_carry = await_settled(watcher, 4s)) {
+    // Under the weld Gazebo stops updating the carried model's pose, so this read may still show
+    // the attach pose; recorded for the receipt only.
     const Sample & held = during_carry->at(kCarriedName);
     std::cout << "release contact receipt: held pose during carry y " << held.y << " z " << held.z
               << '\n';
   }
 
   // Release: open the jaws to the decouple aperture, then detach through the plugin.
-  if (!command_position(node, kLeftFingerTopic, 0.032) ||
-    !command_position(node, kRightFingerTopic, 0.032))
-  {
+  if (!restocker_gazebo::command_jaws(node, 0.032)) {
     return fail("finger open command publication failed");
+  }
+  // Under a friction grip the opening jaws are the release and the bed's feed starts at once;
+  // the detach below is bookkeeping, so the release pose is sampled now. A weld holds the product
+  // until the detach, so there it is sampled after.
+  const double expected_release_y = kStartDepthM + carry_position;
+  std::optional<restocker_gazebo::ReleaseSample> physical_release;
+  if (hold_mode == "physical") {
+    physical_release = restocker_gazebo::await_release_pose(watcher, expected_release_y);
   }
   std::this_thread::sleep_for(700ms);
 
@@ -987,35 +1493,17 @@ int main()
     return fail("detach did not reach a physics-verified terminal state");
   }
 
-  // The first free pose after the joint is gone is the carry proof: right after detach the
-  // product must reappear where the carry joint left it (stall point or target). Take the
-  // first sample inside that window rather than the last: from the target the bed's feed
-  // carries the product away within a few centimetres of the release instant, and a later
-  // sample would be mid-flight rather than at release.
-  const double expected_release_y = kStartDepthM + carry_position;
-  std::optional<Sample> release_pose;
-  Sample last_seen;
-  bool saw_pose = false;
-  {
-    const auto deadline = std::chrono::steady_clock::now() + 2s;
-    while (!release_pose && std::chrono::steady_clock::now() < deadline) {
-      if (const auto pose = watcher.Snapshot()) {
-        last_seen = pose->at(kCarriedName);
-        saw_pose = true;
-        if (std::abs(last_seen.y - expected_release_y) <= 0.03) {
-          release_pose = last_seen;
-          break;
-        }
-      }
-      std::this_thread::sleep_for(20ms);
-    }
-  }
+  const auto release_sample =
+    physical_release ? *physical_release : restocker_gazebo::await_release_pose(
+    watcher,
+    expected_release_y);
+  const std::optional<Sample> & release_pose = release_sample.release;
   if (!release_pose) {
-    if (!saw_pose) {
+    if (!release_sample.last_seen) {
       return fail("no post-detach pose of the released product appeared after the joint was gone");
     }
     return fail(
-      "released at y " + std::to_string(last_seen.y) +
+      "released at y " + std::to_string(release_sample.last_seen->y) +
       " against the carry joint's "
       "own end position y " +
       std::to_string(expected_release_y) + " (attach y " +

@@ -73,8 +73,8 @@ def test_catalog_accepts_two_skus_of_one_class_with_one_fallback(tmp_path: Path)
         ([_geometry(), _geometry()], "empty or duplicated"),
         ([_geometry(product_class="crate")], "invalid product_class"),
         (
-            [_geometry(shape={"type": "box", "radius_m": 0.1, "height_m": 0.2})],
-            "supported cylinder",
+            [_geometry(shape={"type": "sphere", "radius_m": 0.1, "height_m": 0.2})],
+            "supported cylinder or box",
         ),
         (
             [_geometry(shape={"type": "cylinder", "radius_m": 0.0, "height_m": 0.2})],
@@ -167,6 +167,25 @@ def test_scenario_label_texture_is_optional_but_must_be_a_bare_filename(tmp_path
         ("..", "bare filename"),
     ):
         rejected = {**base, "products": [{"model_name": "x", "label_texture": value}]}
+        with pytest.raises(RuntimeError, match=expected):
+            load_scenario(_write_yaml(tmp_path / "rejected.yaml", rejected))
+
+
+def test_scenario_visual_mesh_is_optional_but_must_be_a_bare_filename(tmp_path: Path) -> None:
+    """A visual mesh resolves against one installed directory, exactly like a label texture."""
+    base = {"schema_version": 1, "workcell_pose": [0.0] * 6}
+    named = {**base, "products": [{"model_name": "x", "visual_mesh": "contour_bottle.obj"}]}
+    assert (
+        load_scenario(_write_yaml(tmp_path / "named.yaml", named))["products"][0]["visual_mesh"]
+        == "contour_bottle.obj"
+    )
+    for value, expected in (
+        ("", "non-empty filename"),
+        (7, "non-empty filename"),
+        ("meshes/contour_bottle.obj", "bare filename"),
+        ("..", "bare filename"),
+    ):
+        rejected = {**base, "products": [{"model_name": "x", "visual_mesh": value}]}
         with pytest.raises(RuntimeError, match=expected):
             load_scenario(_write_yaml(tmp_path / "rejected.yaml", rejected))
 
@@ -327,3 +346,20 @@ def test_stock_region_rejects_an_unusable_survey(
 ) -> None:
     with pytest.raises(RuntimeError, match=expected):
         load_stock_region(_write_yaml(tmp_path / "geometry.yaml", document))
+
+
+def test_a_box_geometry_is_accepted_and_needs_three_positive_sizes(tmp_path: Path) -> None:
+    box = _geometry(
+        geometry_key="box.one",
+        product_class="box",
+        sku="SIM-BOX",
+        class_fallback=False,
+        shape={"type": "box", "size_xyz_m": [0.065, 0.04, 0.105]},
+    )
+    path = _write_yaml(tmp_path / "ok.yaml", {"schema_version": 1, "geometries": [box]})
+    assert load_product_catalog(path)["box.one"]["shape"]["size_xyz_m"] == [0.065, 0.04, 0.105]
+    for size in ([0.1, 0.1], [0.1, 0.0, 0.1], [0.1, -0.1, 0.1]):
+        bad = {**box, "shape": {"type": "box", "size_xyz_m": size}}
+        path = _write_yaml(tmp_path / "bad.yaml", {"schema_version": 1, "geometries": [bad]})
+        with pytest.raises(RuntimeError, match="size_xyz_m"):
+            load_product_catalog(path)

@@ -17,7 +17,8 @@ def verify_just_demo_launches_the_sensor_driven_campaign():
         repository / "ros_ws" / "src" / "restocker_bringup" / "launch" / "baseline.launch.py"
     ).read_text()
 
-    assert 'demo max_cycles="0" gt="false": build' in justfile
+    assert "demo *args: build" in justfile
+    assert "scripts/demo.bash {{args}}" in justfile
     assert "scripts/demo.bash" in justfile
     assert "autonomous_campaign:=true" in demo
     # Card 086 stage 1: the campaign gates all motion on a restart acknowledgment; the demo's
@@ -32,8 +33,13 @@ def verify_just_demo_launches_the_sensor_driven_campaign():
     # a write creates the file.
     assert "demo_lane_policy_state.absent" in demo
 
-    # The demo has two labelled modes and only two: the shipped sensor-driven default, which
-    # carries no evidence pins at all, and the ground-truth opt-in, which carries every pin.
+    # The demo has two evidence paths and only two: the shipped sensor-driven configuration
+    # (sensor:=true), which carries no evidence pins at all, and the ground-truth path, which
+    # carries every pin and drives the showcase fixture (the default) or the dense fixture
+    # (gt:=true). One line picks the bare default.
+    assert "DEFAULT_MODE=showcase" in demo
+    assert "showcase:=true | gt:=true | sensor:=true)" in demo
+    assert '[[ "$mode" == "sensor" ]] || ground_truth=true' in demo
     assert 'if [[ "$ground_truth" == "true" ]]; then' in demo
     gated, after_else = demo.split('if [[ "$ground_truth" == "true" ]]; then', 1)[1].split(
         "\nelse\n", 1
@@ -44,6 +50,8 @@ def verify_just_demo_launches_the_sensor_driven_campaign():
     # evidence, wrist tray duties off, tight GT evidence ages.
     assert "dense_restock_products.yaml" in gated
     assert "dense_restock_lanes.yaml" in gated
+    assert "showcase_products.yaml" in gated
+    assert "showcase_lanes.yaml" in gated
     assert "object_observation_topic:=/perception/object_observations" in gated
     assert "lane_observation_topic:=/perception/ground_truth/lane_observations" in gated
     assert "tray_overview_perception:=false" in gated
@@ -56,11 +64,12 @@ def verify_just_demo_launches_the_sensor_driven_campaign():
     assert "maximum_observation_age_ms:=2000" in gated
     assert "placement_require_column_growth:=false" in gated
 
-    # Sensor-driven default: an empty pin list is the assertion — baseline.launch.py's own
+    # Sensor-driven path: an empty pin list is the assertion -- baseline.launch.py's own
     # defaults are the shipped configuration (ground truth demoted, wrist duties owning the
     # ingest topics, 180 s evidence ages, overhead camera obstacles-only) on the sensor
     # acceptance fixture: the dense scenario's camera identity works, but the dense scenario
-    # has not yet completed a sensor-driven run.
+    # has not yet completed a sensor-driven run, and the showcase's several SKUs per class
+    # cannot be named by the class-keyed identity assigner.
     assert "evidence_args=()" in default_path
     assert "object_observation_topic:=" not in default_path
     assert "lane_observation_topic:=" not in default_path

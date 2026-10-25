@@ -64,6 +64,43 @@ CATALOGUE: dict[str, dict[str, Any]] = {
     },
 }
 
+# Box products (CMB-119): one base geometry per box variant, the sizes tools/label_factory.py
+# BOX_VARIANTS declares (test_lane_columns.py keeps them in step). A box stands upright in a lane
+# with its depth axis (y) along the lane, so its footprint along the bed is size_y: `radius_m`
+# here is half of it, which makes every cylinder formula below (pitch 2 r cos(incline), tilted
+# extent r cos + h/2 sin) the box's own, because a box's depth-axis extent under a roll is
+# size_y/2 cos + size_z/2 sin. The `sku` is a placeholder: the dataset builder re-keys each
+# product to its generated SKU and geometry.
+_BOX_FRICTION = 0.55  # stated proxy for coated carton board on a roller bed, unmeasured
+
+
+def _box_entry(variant: str, size: tuple[float, float, float], mass_kg: float) -> dict[str, Any]:
+    pitch = size[1] * math.cos(math.radians(4.0))
+    return {
+        "product_class": "box",
+        "sku": f"BOX-{variant.upper()}",
+        "radius_m": size[1] / 2.0,
+        "height_m": size[2],
+        "size_xyz_m": size,
+        "mass_kg": mass_kg,
+        "friction": _BOX_FRICTION,
+        "rgba": [1.0, 1.0, 1.0, 1.0],
+        "lane_capacity": int((0.85 - 0.06) / pitch),
+    }
+
+
+BOX_CATALOGUE: dict[str, dict[str, Any]] = {
+    "box.carton_200": _box_entry("carton_200", (0.065, 0.040, 0.105), 0.215),
+    "box.carton_1000": _box_entry("carton_1000", (0.095, 0.060, 0.165), 1.030),
+    "box.slim_box": _box_entry("slim_box", (0.055, 0.025, 0.150), 0.345),
+}
+
+
+def product_entry(geometry_key: str) -> dict[str, Any]:
+    """The base-geometry entry for a cylinder or a box variant."""
+    return CATALOGUE[geometry_key] if geometry_key in CATALOGUE else BOX_CATALOGUE[geometry_key]
+
+
 # The shipped workcell, restated. test_lane_columns.py checks each value against
 # restocker_description/config/workcell_geometry.yaml.
 WORKCELL_POSE = [0.0, 0.55, 0.75, 0.0, 0.0, 0.0]
@@ -107,7 +144,7 @@ def column_pose_in_lane(geometry_key: str, index: int) -> tuple[float, float, fl
     """Return the lane-frame centre depth, centre height and roll of the index-th product."""
     # Index zero is the frontmost product, leaning on the retainer; each one after it sits one
     # contact diameter further back along the inclined bed.
-    entry = CATALOGUE[geometry_key]
+    entry = product_entry(geometry_key)
     radius = entry["radius_m"]
     height = entry["height_m"]
     pitch = 2.0 * radius * math.cos(LANE_INCLINE_RAD)
@@ -142,9 +179,9 @@ def lane_column_scenario(columns: list[LaneColumn]) -> dict[str, Any]:
     # may settle, roll, or merge into a heap.
     products: list[dict[str, Any]] = []
     for column in columns:
-        entry = CATALOGUE.get(column.geometry_key)
-        if entry is None:
+        if column.geometry_key not in CATALOGUE and column.geometry_key not in BOX_CATALOGUE:
             raise ValueError(f"unknown geometry {column.geometry_key}")
+        entry = product_entry(column.geometry_key)
         if column.count < 0 or column.count > entry["lane_capacity"]:
             raise ValueError(
                 f"{column.lane_id} cannot hold {column.count} of {column.geometry_key}: "
@@ -191,7 +228,7 @@ def ground_truth_available_depth_m(
     # camera.
     if count == 0:
         return usable_depth_m
-    entry = CATALOGUE[geometry_key]
+    entry = product_entry(geometry_key)
     radius = entry["radius_m"]
     height = entry["height_m"]
     center_depth, _, _ = column_pose_in_lane(geometry_key, count - 1)

@@ -4,6 +4,9 @@
 <robot name="restocker_product" xmlns:xacro="http://www.ros.org/wiki/xacro">
   <xacro:arg name="radius" default="0.033"/>
   <xacro:arg name="height" default="0.122"/>
+  <!-- A box product (CMB-119) sets `box_size` to "x y z" metres (width, depth, height); radius and
+       height are then unused. Empty keeps the cylinder. -->
+  <xacro:arg name="box_size" default=""/>
   <xacro:arg name="mass" default="0.355"/>
   <xacro:arg name="rgba" default="0.78 0.12 0.08 1.0"/>
   <xacro:arg name="friction" default="0.65"/>
@@ -17,44 +20,85 @@
        restocker_gazebo's installed materials/textures directory; a relative path would resolve
        against the Gazebo server's working directory. -->
   <xacro:arg name="label_texture" default=""/>
+  <!-- Absolute path to a visual-only mesh (a contoured bottle) drawn instead of the cylinder, or
+       empty. The collision is always the catalogue cylinder, so the mesh must sit inside it and
+       physics, grasp planning and the catalogue loaders never see the contour. -->
+  <xacro:arg name="visual_mesh" default=""/>
   <xacro:include filename="$(find restocker_description)/urdf/inertial_macros.xacro"/>
 
   <xacro:property name="product_radius" value="$(arg radius)"/>
   <xacro:property name="product_height" value="$(arg height)"/>
   <xacro:property name="product_mass" value="$(arg mass)"/>
+  <xacro:property name="box_size" value="$(arg box_size)"/>
+  <xacro:property name="is_box" value="${box_size != ''}"/>
+  <xacro:if value="${is_box}">
+    <xacro:property name="box_x" value="${float(box_size.split()[0])}"/>
+    <xacro:property name="box_y" value="${float(box_size.split()[1])}"/>
+    <xacro:property name="box_z" value="${float(box_size.split()[2])}"/>
+  </xacro:if>
   <xacro:property name="label_texture" value="$(arg label_texture)"/>
+  <xacro:property name="visual_mesh" value="$(arg visual_mesh)"/>
 
   <link name="product_body">
     <!-- The visual is named `product_body_visual` because sdformat's URDF parser only merges a
          `<gazebo reference>` extension into a visual whose generated SDF name contains
          `<link>_visual`. A visual named `product_visual` becomes
          `product_body_fixed_joint_lump__product_visual_visual`, the match fails, and the material
-         extension below is silently dropped (see `gz sdf -p`). The collision keeps its own name
-         deliberately; see the note on the extension block. -->
+         extension below is silently dropped (see `gz sdf -p`). The collision follows the same
+         rule: it must be `product_body_collision`, because that is the generated SDF name the
+         parser looks for when it merges `mu1`/`mu2`. It was named `product_collision` until
+         2026-09-29, so the friction never reached Gazebo; `test_simulation_description` now
+         asserts the converted SDF carries `<surface><friction>` for every shipped product. -->
     <visual name="product_body_visual">
-      <geometry><cylinder radius="${product_radius}" length="${product_height}"/></geometry>
+      <xacro:if value="${visual_mesh == '' and not is_box}">
+        <geometry><cylinder radius="${product_radius}" length="${product_height}"/></geometry>
+      </xacro:if>
+      <xacro:if value="${visual_mesh == '' and is_box}">
+        <geometry><box size="${box_x} ${box_y} ${box_z}"/></geometry>
+      </xacro:if>
+      <xacro:unless value="${visual_mesh == ''}">
+        <geometry><mesh filename="file://${visual_mesh}"/></geometry>
+      </xacro:unless>
       <material name="product_material"><color rgba="$(arg rgba)"/></material>
     </visual>
-    <collision name="product_collision">
-      <geometry><cylinder radius="${product_radius}" length="${product_height}"/></geometry>
+    <collision name="product_body_collision">
+      <xacro:unless value="${is_box}">
+        <geometry><cylinder radius="${product_radius}" length="${product_height}"/></geometry>
+      </xacro:unless>
+      <xacro:if value="${is_box}">
+        <geometry><box size="${box_x} ${box_y} ${box_z}"/></geometry>
+      </xacro:if>
     </collision>
-    <xacro:cylinder_inertial
-      mass="${product_mass}" radius="${product_radius}" length="${product_height}"
-      xyz="0 0 0" rpy="0 0 0"/>
+    <xacro:unless value="${is_box}">
+      <xacro:cylinder_inertial
+        mass="${product_mass}" radius="${product_radius}" length="${product_height}"
+        xyz="0 0 0" rpy="0 0 0"/>
+    </xacro:unless>
+    <xacro:if value="${is_box}">
+      <xacro:box_inertial
+        mass="${product_mass}" x="${box_x}" y="${box_y}" z="${box_z}" xyz="0 0 0" rpy="0 0 0"/>
+    </xacro:if>
   </link>
 
-  <!-- The friction and contact entries here have never reached Gazebo: sdformat drops them
-       because the collision is named `product_collision` and the parser looks for
-       `product_body_collision`. They are left as is because enabling them would change the
-       contact behaviour that every grasp, benchmark and attachment tolerance was measured
-       against. Renaming the collision is the whole fix. -->
+  <!-- These entries reach Gazebo as of 2026-09-29, once the collision above carries the name the
+       parser merges into. Only `mu1`/`mu2` do any work: DART's backend reads
+       `surface/friction/ode/mu` and combines it with the other body's by taking the smaller of
+       the two, so this value decides the contact whenever the other body's coefficient is at or
+       above it — the finger faces, the shelf (0.8) and the floor (0.9) all are — and the smaller
+       of two catalogued values decides product-to-product. `kp` and `kd` are emitted into
+       `surface/contact/ode` and then ignored: the DART backend never reads them (its contact
+       ERP/CFM are compiled in), so they are not a stiffness tuning surface and must not be
+       described as one. Before the rename the whole block was silently discarded, which is why
+       every grasp and attachment tolerance predating it has to be re-measured rather than cited
+       (Card 024). -->
   <gazebo reference="product_body">
     <mu1>$(arg friction)</mu1>
     <mu2>$(arg friction)</mu2>
     <kp>100000</kp>
     <kd>1</kd>
     <xacro:unless value="${label_texture == ''}">
-      <!-- Gazebo unwraps a cylinder's lateral surface with u once around the circumference and v
+      <!-- (A box's texture is the face atlas its mesh's UVs index; see tools/generate_box_meshes.py.)
+           Gazebo unwraps a cylinder's lateral surface with u once around the circumference and v
            along the axis, so a plain image is enough for a label and no mesh is needed. The metal
            workflow with zero metalness gives matte paper; the default metalness renders a mirror
            that reflects the tray. -->

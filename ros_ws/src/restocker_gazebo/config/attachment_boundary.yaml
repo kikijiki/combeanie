@@ -1,5 +1,10 @@
 schema_version: 1
 
+# NOTE: the hold mode is not here. `hold_mode`, `hold_interference_m` and the physical contact
+# band live in restocker_description/config/gripper_geometry.yaml under `attachment:`, because
+# that is the one file the simulator boundary and the task executor both read: the aperture a run
+# commands and the aperture it verifies must come from the same place (Card 057, spec 11.3).
+
 robot:
   model_name: restocker
   parent_link: gripper
@@ -34,6 +39,27 @@ tolerances:
   relative_angular_velocity_radps: 0.05
   post_attach_translation_drift_m: 0.001
   post_attach_rotation_drift_rad: 0.01
+  # Physical hold only (spec M10 section 11 D5 amendments). DART has no torsional friction
+  # (section 11.2 F13), so a side-held product swings in the grip about the jaw axis (the pads'
+  # common normal) after any carry acceleration -- a pendulum, not a loss of grip -- and the
+  # compliant pad rows let it lean a little between the pads. What these three bound is the loss
+  # of the grip itself, measured over the 15 holds of five passing campaigns on 2026-10-18 (flat-box pads)
+  # (cans, 0.5 kg and 1.1 kg bottles):
+  #   * held_slip_allowance_m: a pad's cumulative slip. Passing holds peaked at 0.4-3.2 mm; the
+  #     holds that lost the product slid 9.4 mm and more. 5 mm is 1.6 times the worst passing
+  #     hold and under half of the first loss.
+  #   * held_swing_allowance_m: the product origin's swing about the pad midpoint. Passing holds
+  #     peaked at 0.9-10.7 mm (a can gripped 50 mm, a bottle 65 mm above its centre of mass, so
+  #     a 0.2 rad pendulum); 20 mm only stops a runaway. Not yet re-derived: the physical hold is
+  #     not the shipped mode.
+  #   * held_tilt_allowance_rad: the lean of the product off the jaw axis, 0.05 rad -- the same
+  #     "upright" the executor's selection and transfer path constraints use
+  #     (selection.maximum_upright_tilt_rad), so a product held within it is one the rest of
+  #     the system still treats as upright. The attach-time rotation fidelity (expected_rotation_rad,
+  #     0.03) is a different quantity and stays as it was.
+  held_slip_allowance_m: 0.005
+  held_swing_allowance_m: 0.02
+  held_tilt_allowance_rad: 0.05
   # tolerance = fidelity_sigma_multiplier * sqrt(largest translational eigenvalue of the
   # authorizing observation's covariance) + fidelity_mechanical_margin_m, capped by the jaw-travel
   # ceiling the boundary derives per product. Three sigma is the usual reading of "the estimate

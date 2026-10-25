@@ -136,11 +136,30 @@ GripperGeometryResult<GripperStagingGeometry> load_gripper_staging_geometry(
       return failure<GripperStagingGeometry>(
         "maximum open target must lie within the jaw joint bounds");
     }
+    const std::string hold_mode = [&attachment]() -> std::string {
+      const YAML::Node node = attachment["hold_mode"];
+      if (!node || node.IsNull()) {
+        throw std::invalid_argument("attachment.hold_mode is required");
+      }
+      return node.as<std::string>();
+    }();
+    const bool physical_hold = hold_mode == "physical";
+    if (!physical_hold && hold_mode != "weld") {
+      return failure<GripperStagingGeometry>(
+        "attachment.hold_mode must be 'weld' or 'physical', got '" + hold_mode + "'");
+    }
+    const double hold_interference = nonnegative(
+      attachment["hold_interference_m"], "attachment.hold_interference_m");
+    if (physical_hold && hold_interference <= 0.0) {
+      return failure<GripperStagingGeometry>(
+        "physical hold mode requires a positive attachment.hold_interference_m");
+    }
 
     return GripperGeometryResult<GripperStagingGeometry>::success(
       GripperStagingGeometry{
         ParallelJawGeometry{inner_gap_at_zero, joint_lower, joint_upper},
-        tool0_from_grasp_center, hold_clearance, open_clearance, maximum_open_target});
+        tool0_from_grasp_center, hold_clearance, open_clearance, maximum_open_target,
+        physical_hold, hold_interference});
   } catch (const YAML::Exception & error) {
     return failure<GripperStagingGeometry>(
       "failed to parse gripper geometry: " + std::string(error.what()));

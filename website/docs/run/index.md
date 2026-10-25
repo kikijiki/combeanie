@@ -11,7 +11,7 @@ The supported operator surface is the root **`justfile`**.
 
 | Intent | Command | Display? |
 | --- | --- | --- |
-| Watch autonomous restock | [`just demo`](./demo.md) | Required |
+| Watch autonomous restock | [`just demo`](./demo.mdx) | Required |
 | Interactive full stack | [`just launch-baseline`](./scenarios.md) | Required by default |
 | Physics + controllers | [`just launch-sim`](./scenarios.md) | Required by default |
 | Robot model only | [`just launch-rviz`](./scenarios.md) | Required by default |
@@ -131,6 +131,6 @@ plugin fails within seconds and takes the composition down. Over SSH or in CI, p
 
 ## Next
 
-- [Demo](./demo.md): fastest way to watch the autonomous survey/restock campaign
+- [Demo](./demo.mdx): fastest way to watch the autonomous survey/restock campaign
 - [Scenarios and parameters](./scenarios.md): every launch mode and argument table
 - [Tests and benchmarks](./tests-and-benchmarks.md): acceptance tests and measurement

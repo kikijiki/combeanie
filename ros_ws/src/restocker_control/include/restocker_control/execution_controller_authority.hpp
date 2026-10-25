@@ -74,7 +74,8 @@ struct ExecutionControllerContract
   std::string moveit_controller_type{"FollowJointTrajectory"};
   std::string moveit_action_namespace{"follow_joint_trajectory"};
   // Command interface the arm and rail controllers must exclusively claim (velocity, so planned
-  // joint velocity is fed forward). The gripper keeps its position interface.
+  // joint velocity is fed forward). The gripper is outside this contract and claims effort (spec
+  // M10 §11 D10 item 5).
   std::string command_interface{"velocity"};
   std::chrono::nanoseconds maximum_age{std::chrono::milliseconds(250)};
   std::chrono::nanoseconds maximum_future_skew{std::chrono::milliseconds(25)};

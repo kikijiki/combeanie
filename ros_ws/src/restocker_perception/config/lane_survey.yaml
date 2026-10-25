@@ -90,6 +90,16 @@ lane_observation:
     minimum_accepted_returns: 200
     minimum_obstruction_returns: 40
 
+    # Range noise. A fixed 10 mm floor margin reads the bed as product once the depth camera's
+    # range noise reaches about 1 % (measured on the CMB-114 benchmark: at 1 % every lane failed, at
+    # 0.5 % an empty lane read as one product). The margin and the front inset therefore follow the
+    # noise of the frame itself: floor margin = max(10 mm, |bed offset| + 4 robust sigmas of the
+    # bed's height residuals), front inset = max(10 mm, 8 sigmas), and the nearest surface is moved
+    # back by 4 sigmas (the bias of the least of many noisy returns, measured at 3.6 to 4.4 sigmas).
+    # On an ideal frame sigma is about 1 mm and nothing changes; 0 restores the fixed behaviour.
+    floor_noise_sigma_factor: 4.0
+    edge_bias_sigma_factor: 4.0
+
 lane_depth_error_evaluator:
   ros__parameters:
     measurement_topic: /perception/lane_observations

@@ -209,6 +209,8 @@
           pkgs.pkg-config
           pkgs.protobuf
           pkgs.python3Packages.numpy
+          pkgs.python3Packages.opencv4
+          pkgs.python3Packages.pillow
           pkgs.python3Packages.pycollada
           pkgs.python3Packages.pyyaml
           pkgs.python3Packages.scipy

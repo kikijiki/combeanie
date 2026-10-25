@@ -47,7 +47,8 @@ def test_set_lane_policy_request_is_revision_fenced_with_full_policy() -> None:
         ShelfLane.PRODUCT_CLASS_CAN,
         ShelfLane.PRODUCT_CLASS_SMALL_BOTTLE,
         ShelfLane.PRODUCT_CLASS_LARGE_BOTTLE,
-    } == {1, 2, 3}
+        ShelfLane.PRODUCT_CLASS_BOX,
+    } == {1, 2, 3, 4}
 
 
 def test_set_lane_policy_response_matches_the_other_lane_mutation() -> None:

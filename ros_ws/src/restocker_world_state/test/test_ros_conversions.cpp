@@ -96,6 +96,40 @@ TEST(RosObservationConversion, RejectsStatusProvenanceConfidenceEnumsAndQuaterni
   EXPECT_FALSE(object_observation_from_message(non_finite, 0.5));
 }
 
+TEST(RosObservationConversion, AdmitsAnUnknownProductWithoutASkuAndRefusesAForcedOne)
+{
+  auto unknown = valid_message();
+  unknown.has_sku = false;
+  unknown.sku.clear();
+  unknown.identity_state = Message::IDENTITY_UNKNOWN_PRODUCT;
+  unknown.identity_evidence_kinds = {"embedding", "geometry"};
+  unknown.identity_evidence_scores = {0.31F, 0.9F};
+  const auto admitted = object_observation_from_message(unknown, 0.5);
+  ASSERT_TRUE(admitted) << admitted.error().detail;
+  EXPECT_FALSE(admitted.value().sku.has_value());
+
+  auto forced = unknown;
+  forced.has_sku = true;
+  forced.sku = "SIM-CAN";
+  EXPECT_FALSE(object_observation_from_message(forced, 0.5));
+
+  auto identified_without_sku = unknown;
+  identified_without_sku.identity_state = Message::IDENTITY_IDENTIFIED;
+  EXPECT_FALSE(object_observation_from_message(identified_without_sku, 0.5));
+
+  auto identified = valid_message();
+  identified.identity_state = Message::IDENTITY_IDENTIFIED;
+  EXPECT_TRUE(object_observation_from_message(identified, 0.5));
+
+  auto unknown_state = unknown;
+  unknown_state.identity_state = 77;
+  EXPECT_FALSE(object_observation_from_message(unknown_state, 0.5));
+
+  auto ragged = unknown;
+  ragged.identity_evidence_scores.pop_back();
+  EXPECT_FALSE(object_observation_from_message(ragged, 0.5));
+}
+
 LaneMessage valid_lane_message()
 {
   LaneMessage message;

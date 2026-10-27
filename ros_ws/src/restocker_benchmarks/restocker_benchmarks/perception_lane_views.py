@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from restocker_gazebo.lane_columns import LANE_CENTER_X_M, WORKCELL_POSE
@@ -27,7 +28,30 @@ CAMERA_HEIGHT_M = 0.55
 MID_LANE_DEPTH_M = 0.01 + 0.85 / 2.0
 
 
-def lane_views(truth: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+@dataclass(frozen=True)
+class LaneStationStress:
+    """Where the arm really stands compared with the nominal station (CMB-116), in metres.
+
+    ``dx_m`` moves the camera along the shelf (off the lane's centre line), ``dy_m`` changes the
+    setback (positive = farther from the shelf), ``dz_m`` the height. The camera keeps aiming at
+    mid-lane, as a station reached with a pose error would; the recorded camera pose is the one
+    the estimator is given, so the geometry stays exact.
+    """
+
+    dx_m: float = 0.0
+    dy_m: float = 0.0
+    dz_m: float = 0.0
+
+    def is_default(self) -> bool:
+        return self == LaneStationStress()
+
+    def to_dict(self) -> dict[str, float]:
+        return asdict(self)
+
+
+def lane_views(
+    truth: dict[str, Any] | None = None, stress: LaneStationStress | None = None
+) -> list[dict[str, Any]]:
     """One survey-station camera pose per lane; ``truth`` only picks each lane's rear product.
 
     Each view is ``{"name": "lane_NN", "lane_id", "kind": "lane_survey", "target_object_id",
@@ -43,12 +67,13 @@ def lane_views(truth: dict[str, Any] | None = None) -> list[dict[str, Any]]:
                 members.setdefault(obj["lane_id"], []).append(obj)
         for lane_id, objects in members.items():
             rear_of_lane[lane_id] = max(objects, key=lambda o: o["lane_order"])["object_id"]
+    stress = stress or LaneStationStress()
     views = []
     for lane_id, centre_x in LANE_CENTER_X_M.items():
         eye = [
-            centre_x + WORKCELL_POSE[0],
-            WORKCELL_POSE[1] - CAMERA_SETBACK_M,
-            WORKCELL_POSE[2] + CAMERA_HEIGHT_M,
+            centre_x + WORKCELL_POSE[0] + stress.dx_m,
+            WORKCELL_POSE[1] - CAMERA_SETBACK_M - stress.dy_m,
+            WORKCELL_POSE[2] + CAMERA_HEIGHT_M + stress.dz_m,
         ]
         target = [
             centre_x + WORKCELL_POSE[0],

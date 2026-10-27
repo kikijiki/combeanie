@@ -15,6 +15,7 @@ import sys
 
 import numpy as np
 
+from restocker_perception.identity import crop_stress
 from restocker_perception.identity import ladder_benchmark as lb
 from restocker_perception.identity.barcode import ZxingBarcodeBackend
 from restocker_perception.identity.benchmark import (
@@ -81,6 +82,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--splits", type=Path)
     s.add_argument("--offsets-out", required=True, type=Path)
     s.add_argument("--blind", action="store_true", help="ablation: fixed quarter turns")
+    s.add_argument(
+        "--stress",
+        type=Path,
+        help="CMB-116: JSON image-space stress (crop_stress) applied to every crop before the "
+        "ladder reads it; the same file for every round of a state",
+    )
     s.add_argument("--bounds", type=Path, help="required to read held_out")
     s.add_argument("--bounds-sha256", help="sha256 of the committed bounds file (held_out)")
     r = sub.add_parser("report", help="numbers, and the verdict against a bounds file")
@@ -123,6 +130,10 @@ def _step_command(args: argparse.Namespace) -> int:
             raise ProtocolError("held_out needs --bounds, --bounds-sha256 and --splits")
         if lb.file_sha256(args.bounds) != args.bounds_sha256:
             raise ProtocolError("bounds file differs from the committed one")
+    stress = json.loads(args.stress.read_text(encoding="utf-8")) if args.stress else None
+    stress_sha = lb.file_sha256(args.stress) if args.stress else None
+    if stress is not None:
+        crop_stress.validate_spec(stress)
     whitener = load_whitener(args.whitener)
     engine = make_engine(args, whitener)
     geometry = load_geometry_catalogue(args.geometry)
@@ -136,6 +147,7 @@ def _step_command(args: argparse.Namespace) -> int:
             "allow": list(allowed),
             "bounds_sha256": args.bounds_sha256,
             "guided": not args.blind,
+            "stress_sha256": stress_sha,
         }
     else:
         run = lb.LadderRun.load(args.state)
@@ -143,12 +155,16 @@ def _step_command(args: argparse.Namespace) -> int:
             raise ProtocolError("registry differs from the one the state was started with")
         if run.meta["allow"] != list(allowed) or run.meta["guided"] != (not args.blind):
             raise ProtocolError("splits or guidance mode differ from round 0")
+        if run.meta.get("stress_sha256") != stress_sha:
+            raise ProtocolError("the stress spec differs from round 0's")
     only = None
     if args.round > 0:
         only = {k for k, e in run.objects.items() if not e["closed"]}
     inputs = lb.round_inputs(args.dataset, geometry, allowed_splits=allowed, only=only)
     if args.splits:
         _check_seeds(args.splits, {k[0] for k in inputs}, allowed)
+    if stress is not None:
+        crop_stress.apply_stress(inputs, stress, look=args.round)
     offsets = lb.step(run, engine, inputs, round_index=args.round, guided=not args.blind)
     run.save(args.state)
     args.offsets_out.write_text(json.dumps(offsets, indent=1, sort_keys=True) + "\n")

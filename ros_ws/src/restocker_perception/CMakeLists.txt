@@ -353,6 +353,13 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_identity_ladder test/test_identity_ladder.py TIMEOUT 600)
   ament_add_pytest_test(test_ladder_benchmark test/test_ladder_benchmark.py TIMEOUT 300)
   ament_add_pytest_test(test_identity_escalation test/test_identity_escalation.py TIMEOUT 600)
+  # Robustness campaign (CMB-116): image-space crop stress, no model.
+  ament_add_pytest_test(test_crop_stress test/test_crop_stress.py TIMEOUT 120)
+  ament_add_pytest_test(test_robustness test/test_robustness.py TIMEOUT 120)
+  ament_add_pytest_test(
+    test_robustness_bounds_file test/test_robustness_bounds_file.py TIMEOUT 120
+  )
+  ament_add_pytest_test(test_stock_occlusion test/test_stock_occlusion.py TIMEOUT 120)
   ament_add_pytest_test(test_identify_object test/test_identify_object.py TIMEOUT 600)
   ament_add_pytest_test(test_identify_object_node test/test_identify_object_node.py TIMEOUT 300)
   ament_add_pytest_test(

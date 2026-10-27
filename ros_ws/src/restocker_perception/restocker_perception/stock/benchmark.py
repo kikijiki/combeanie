@@ -37,6 +37,8 @@ LANE_IDS = ("lane_01", "lane_02", "lane_03", "lane_04", "lane_05", "lane_06")
 # Share of lane frames degraded, and the band's share of the image height, when degrading.
 DEGRADE_PROBABILITY = 0.5
 DEGRADE_BAND = (0.30, 0.70)
+# Range an occluder in front of the lens returns (``occlude_depth``, kind ``near``).
+OCCLUDER_RANGE_M = 0.30
 
 
 def load_dataset(directory: str | Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -101,6 +103,27 @@ def perturb_depth(depth: np.ndarray, frame_id: str, noise: float, dropout: float
     return out
 
 
+def occlude_depth(
+    depth: np.ndarray, frame_id: str, fraction: float, kind: str
+) -> tuple[np.ndarray, tuple[str, int, int]]:
+    """Cover a full-height strip of ``fraction`` of the image width at a seeded edge (CMB-116).
+
+    ``near``: the strip returns a close surface (0.30 m: a gripper finger or a neighbour
+    in front of the lens), which is a wrong measurement, not a hole. ``hole``: the strip returns
+    nothing. Pure in the frame id. Returns the new depth and (side, first column, last column).
+    """
+    if kind not in ("near", "hole"):
+        raise ValueError("occlusion kind must be 'near' or 'hole'")
+    width = depth.shape[1]
+    span = max(1, round(fraction * width))
+    digest = hashlib.sha256(f"stock-occlude:{frame_id}".encode()).digest()
+    left = digest[0] < 128
+    first, last = (0, span) if left else (width - span, width)
+    out = depth.copy()
+    out[:, first:last] = OCCLUDER_RANGE_M if kind == "near" else 0.0
+    return out, ("left" if left else "right", first, last)
+
+
 def _oracle_reply(sku: str) -> dict[str, Any]:
     return {
         "status": 0,
@@ -125,6 +148,8 @@ def predict_frame(
     identity_mode: str = "safe",
     noise: float = 0.0,
     dropout: float = 0.0,
+    occlude: float = 0.0,
+    occlude_kind: str = "near",
 ) -> dict[str, Any]:
     """One lane survey frame -> one prediction row (the schema of perception_scorer plus stock)."""
     lane_id = row["viewpoint"]
@@ -139,6 +164,8 @@ def predict_frame(
         depth[masked[0] : masked[1], :] = 0.0
     if noise > 0 or dropout > 0:
         depth = perturb_depth(depth, row["frame_id"], noise, dropout)
+    if occlude > 0:
+        depth, _strip = occlude_depth(depth, row["frame_id"], occlude, occlude_kind)
     rgb = _read_png(dataset / "frames" / f"{row['frame_id']}.png", "RGB")
     camera = row["camera"]
     intr = camera["intrinsics"]
@@ -183,6 +210,8 @@ def predict_frame(
         "degraded": masked is not None,
         "noise": noise,
         "dropout": dropout,
+        "occlude": occlude,
+        "occlude_kind": occlude_kind if occlude > 0 else None,
         "state": "estimated" if answered else "cannot_tell",
         "reason": estimate.reason,
         "reason_detail": estimate.reason_detail,
@@ -232,6 +261,8 @@ def predict_datasets(
     seeds: Iterable[int] | None = None,
     noise: float = 0.0,
     dropout: float = 0.0,
+    occlude: float = 0.0,
+    occlude_kind: str = "near",
 ) -> list[dict[str, Any]]:
     """Predictions for every lane survey frame of every dataset (optionally only some seeds)."""
     if arm not in ARMS:
@@ -258,6 +289,8 @@ def predict_datasets(
                     identity_mode=identity_mode,
                     noise=noise,
                     dropout=dropout,
+                    occlude=occlude,
+                    occlude_kind=occlude_kind,
                 )
             )
     return out

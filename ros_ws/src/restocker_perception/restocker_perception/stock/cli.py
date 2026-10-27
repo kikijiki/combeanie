@@ -57,6 +57,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--degrade", action="store_true", help="blind a seeded depth band")
     parser.add_argument("--noise", type=float, default=0.0, help="depth noise, fraction of range")
     parser.add_argument("--dropout", type=float, default=0.0, help="share of depth pixels dropped")
+    parser.add_argument(
+        "--occlude",
+        type=float,
+        default=0.0,
+        help="CMB-116: cover this share of the image width with a full-height strip at an edge",
+    )
+    parser.add_argument(
+        "--occlude-kind",
+        choices=("near", "hole"),
+        default="near",
+        help="near: the strip returns a surface 0.30 m away; hole: it returns nothing",
+    )
     parser.add_argument("--seeds", type=int, nargs="*", help="only these seeds")
     parser.add_argument("--out", required=True)
     parser.add_argument("--config", help="lane_stock.yaml override")
@@ -91,6 +103,8 @@ def main(argv: list[str] | None = None) -> int:
         identity_mode=arguments.identity_mode,
         noise=arguments.noise,
         dropout=arguments.dropout,
+        occlude=arguments.occlude,
+        occlude_kind=arguments.occlude_kind,
     )
     Path(arguments.out).write_text(
         "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8"

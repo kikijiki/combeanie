@@ -67,7 +67,71 @@ INTENSITY_JITTER = 0.1
 # A seed turns the directional sun about the vertical axis by up to this many degrees.
 AZIMUTH_JITTER_DEG = 25.0
 
+# CMB-116 stress conditions, beyond the six above. They are never drawn by ``lighting_for_seed``
+# (a seed's condition, hence every recorded dataset, stays what it was); a recorder asks for one by
+# name. Gazebo refuses a colour above 1.0 (ambient or light), so the rendered brightest scene is
+# every light at the cap ("max_light"); an exposure that clips highlights is a gain on the image,
+# which ``crop_stress`` applies.
+STRESS_CONDITIONS: dict[str, dict[str, Any]] = {
+    "very_dim": {
+        "ambient": [0.04, 0.04, 0.045],
+        "diffuse": [0.08, 0.08, 0.09],
+        "specular": [0.02, 0.02, 0.02],
+        "direction": [-0.4, 0.2, -1.0],
+    },
+    "max_light": {
+        "ambient": [1.0, 1.0, 1.0],
+        "diffuse": [1.0, 1.0, 1.0],
+        "specular": [1.0, 1.0, 1.0],
+        "direction": [-0.4, 0.2, -1.0],
+    },
+    # A strong red-orange cast: the blue and green content of every label is mostly lost.
+    "colour_red": {
+        "ambient": [0.35, 0.10, 0.08],
+        "diffuse": [1.0, 0.22, 0.12],
+        "specular": [0.3, 0.06, 0.04],
+        "direction": [-0.4, 0.2, -1.0],
+    },
+    # Grazing sun and almost no fill: hard shadows across the tray, one side of a barrel dark.
+    "hard_directional": {
+        "ambient": [0.03, 0.03, 0.035],
+        "diffuse": [1.0, 0.97, 0.9],
+        "specular": [0.4, 0.4, 0.4],
+        "direction": [-0.95, 0.05, -0.12],
+    },
+}
+STRESS_NAMES = tuple(STRESS_CONDITIONS)
+
 _MASK64 = (1 << 64) - 1
+
+
+def lighting_named(name: str, seed: int) -> dict[str, Any]:
+    """The numbers of a named stress condition for a seed (same fields as ``lighting_for_seed``).
+
+    The seed only jitters the intensity and, for ``hard_directional``, the sun's azimuth, from a
+    stream of its own, so the condition never changes which products a scene holds.
+    """
+    if name not in STRESS_CONDITIONS and name not in CONDITIONS:
+        raise ValueError(f"unknown lighting condition {name!r}")
+    base = STRESS_CONDITIONS.get(name) or CONDITIONS[name]
+    stream = SplitMix64((seed * 0x9E3779B97F4A7C15 + 0x53545253 + LIGHTING_VERSION) & _MASK64)
+    stream.next_u64()
+    scale = 1.0 + (stream.next_unit() * 2.0 - 1.0) * INTENSITY_JITTER
+    turn = math.radians((stream.next_unit() * 2.0 - 1.0) * AZIMUTH_JITTER_DEG)
+    direction = list(base["direction"])
+    if name in ("directional", "hard_directional"):
+        x, y = direction[0], direction[1]
+        direction[0] = x * math.cos(turn) - y * math.sin(turn)
+        direction[1] = x * math.sin(turn) + y * math.cos(turn)
+    return {
+        "condition": name,
+        "version": LIGHTING_VERSION,
+        "intensity_scale": round(scale, 6),
+        "ambient": [round(min(1.0, value * scale), 6) for value in base["ambient"]],
+        "diffuse": [round(min(1.0, value * scale), 6) for value in base["diffuse"]],
+        "specular": [round(min(1.0, value * scale), 6) for value in base["specular"]],
+        "direction": [round(value, 6) for value in direction],
+    }
 
 
 def lighting_for_seed(seed: int) -> dict[str, Any]:

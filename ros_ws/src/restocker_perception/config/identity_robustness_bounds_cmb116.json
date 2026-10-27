@@ -1,0 +1,1234 @@
+{
+ "card": "CMB-116",
+ "phase": "1 (pre-declared; no held-out frame recorded)",
+ "declared_on": "2026-10-26",
+ "declared_before_any_held_out_frame_was_recorded": true,
+ "question": "Does the frozen identity ladder (strict headline arm `off`) keep its false-identity rate and its refusal of unregistered products under lighting, viewpoint, occlusion, blur, exposure, turn-error and fewer-view stress, and how much coverage does it keep?",
+ "decision_unit": "one tray object of a scene; denominators are the scene's tray objects, an object with no usable view is `unseen` and counts as not named",
+ "code_commit": "e578445105b836b3cd6412b37b00751962924df1",
+ "splits": {
+  "file": "ros_ws/src/restocker_benchmarks/config/perception_splits_v7.json",
+  "file_sha256": "4f101f1ced6202f18f21d59d5090eca968815bb27a604c02febbabf95573c453",
+  "embedded_sha256": "897ec163a269809c2836c75ca6a856897ca5e1cd440e34fecec76f527dc423ad",
+  "burned_through_seed": 786,
+  "fresh_held_out_seeds": [
+   787,
+   788,
+   789,
+   794,
+   795,
+   796,
+   799,
+   800,
+   802,
+   803,
+   804,
+   805,
+   806,
+   808,
+   809,
+   810,
+   811,
+   813,
+   814,
+   817,
+   818,
+   820,
+   821,
+   822,
+   823,
+   825,
+   826,
+   828,
+   829,
+   830,
+   831,
+   833,
+   834,
+   836,
+   837,
+   838,
+   840,
+   841,
+   842,
+   843,
+   845,
+   846,
+   847,
+   848,
+   849,
+   851,
+   853,
+   854,
+   855,
+   856,
+   858,
+   859,
+   860,
+   861,
+   862,
+   863,
+   864,
+   865,
+   866,
+   867,
+   868,
+   869,
+   870,
+   871,
+   872,
+   873,
+   875,
+   876,
+   878,
+   879,
+   880,
+   881,
+   882,
+   883,
+   884,
+   885,
+   886,
+   887,
+   888,
+   889,
+   891,
+   893,
+   894,
+   895,
+   898,
+   899,
+   901,
+   902,
+   903,
+   904,
+   905,
+   907,
+   908,
+   909,
+   910,
+   911,
+   913,
+   916,
+   917,
+   918,
+   921,
+   922,
+   924,
+   926,
+   927,
+   928,
+   929,
+   930,
+   931,
+   933,
+   934,
+   936,
+   937,
+   938,
+   939,
+   940,
+   941,
+   943,
+   944,
+   945
+  ],
+  "unregistered_products": [
+   "GEN-008",
+   "GEN-011",
+   "GEN-018",
+   "GEN-020"
+  ]
+ },
+ "registry": {
+  "built_with": "product_registry add-sim --use-mesh, one --sku per catalogue SKU except the unregistered ones",
+  "content_sha256": "e676c3d0b0b0f96c611a31065fec5e26893bd5f3e4349f930094d5b6df189c3d",
+  "reproduction_check": "the same build for round 4's roles gives round 4's 5d3d3cd7acdfe0ed96f1aeae2ac29efedd530451826d6cb5e5ba1197face3199"
+ },
+ "whitener_sha256": "06de62c1c94ab40a710bb95793690cabb35bb9516ca944838a6a393838d637aa",
+ "ladder_config": "ros_ws/src/restocker_perception/config/identity_ladder_config_r4.json",
+ "ladder_config_sha256": "89f8f9d32b475e34210a9250ab01c1543326010e3d5387c4cd09ddc805a77697",
+ "headline_arm": "off",
+ "training": "none",
+ "populations": {
+  "nominal": {
+   "seeds": [
+    787,
+    788,
+    789,
+    794,
+    795,
+    796,
+    799,
+    800,
+    802,
+    803,
+    804,
+    805,
+    806,
+    808,
+    809,
+    810,
+    811,
+    813,
+    814,
+    817,
+    818,
+    820,
+    821,
+    822,
+    823,
+    825,
+    826,
+    828,
+    829,
+    830,
+    831,
+    833,
+    834,
+    836,
+    837,
+    838,
+    840,
+    841,
+    842,
+    843,
+    845,
+    846,
+    847,
+    848,
+    849,
+    851,
+    853,
+    854,
+    855,
+    856,
+    858,
+    859,
+    860,
+    861,
+    862,
+    863,
+    864,
+    865,
+    866,
+    867,
+    868,
+    869,
+    870,
+    871,
+    872,
+    873,
+    875,
+    876,
+    878,
+    879,
+    880,
+    881,
+    882,
+    883,
+    884,
+    885,
+    886,
+    887,
+    888,
+    889,
+    891,
+    893,
+    894,
+    895,
+    898,
+    899,
+    901,
+    902,
+    903,
+    904,
+    905,
+    907,
+    908,
+    909,
+    910,
+    911,
+    913,
+    916,
+    917,
+    918,
+    921,
+    922,
+    924,
+    926,
+    927,
+    928,
+    929,
+    930,
+    931,
+    933,
+    934,
+    936,
+    937,
+    938,
+    939,
+    940,
+    941,
+    943,
+    944,
+    945
+   ],
+   "recording": "--close-views 6 --lighting-condition nominal",
+   "budget_relooks": 3
+  },
+  "stress": {
+   "seeds": [
+    787,
+    788,
+    789,
+    794,
+    795,
+    796,
+    799,
+    800,
+    802,
+    803,
+    804,
+    805,
+    806,
+    808,
+    809,
+    810,
+    811,
+    813,
+    814,
+    817,
+    818,
+    820,
+    821,
+    822,
+    823,
+    825,
+    826,
+    828,
+    829,
+    830,
+    831,
+    833,
+    834,
+    836,
+    837,
+    838,
+    840,
+    841,
+    842,
+    843
+   ],
+   "recording_common": "--close-views 6",
+   "conditions": {
+    "very_dim": "--lighting-condition very_dim",
+    "max_light": "--lighting-condition max_light",
+    "colour_red": "--lighting-condition colour_red",
+    "hard_directional": "--lighting-condition hard_directional",
+    "view_wide": "--lighting-condition nominal --view-stress {\"max_azimuth_deg\":60}",
+    "view_steep": "--lighting-condition nominal --view-stress {\"elevation_offset_deg\":15}",
+    "view_flat_far": "--lighting-condition nominal --view-stress {\"elevation_offset_deg\":-20,\"standoff_scale\":1.4}",
+    "view_partial": "--lighting-condition nominal --view-stress {\"pan_deg\":40}",
+    "turn_error_30": "--lighting-condition nominal --turn-error-deg 30 (re-looks only)"
+   },
+   "budget_relooks": 2,
+   "note": "every look of a state uses the same recorder options"
+  },
+  "image": {
+   "seeds": [
+    787,
+    788,
+    789,
+    794,
+    795,
+    796,
+    799,
+    800,
+    802,
+    803,
+    804,
+    805,
+    806,
+    808,
+    809,
+    810,
+    811,
+    813,
+    814,
+    817,
+    818,
+    820,
+    821,
+    822,
+    823,
+    825,
+    826,
+    828,
+    829,
+    830,
+    831,
+    833,
+    834,
+    836,
+    837,
+    838,
+    840,
+    841,
+    842,
+    843
+   ],
+   "source": "the nominal look-0 datasets of these seeds, no new recording",
+   "levels": {
+    "occ_bar25": {
+     "occlusion": {
+      "fraction": 0.25,
+      "kind": "bar"
+     }
+    },
+    "occ_bar50": {
+     "occlusion": {
+      "fraction": 0.5,
+      "kind": "bar"
+     }
+    },
+    "occ_disc35": {
+     "occlusion": {
+      "fraction": 0.35,
+      "kind": "disc"
+     }
+    },
+    "gain3": {
+     "gain": 3.0
+    },
+    "gain015": {
+     "gain": 0.15,
+     "noise_sigma": 3.0
+    },
+    "cast_blue": {
+     "cast": [
+      0.25,
+      0.5,
+      1.0
+     ]
+    },
+    "motion9_half": {
+     "motion_px": 9,
+     "every_nth": 2
+    },
+    "motion15": {
+     "motion_px": 15
+    },
+    "blur5": {
+     "blur_px": 5
+    },
+    "down2": {
+     "downscale": 2.0
+    },
+    "down3": {
+     "downscale": 3.0
+    },
+    "keep1": {
+     "keep_views": 1
+    },
+    "keep2": {
+     "keep_views": 2
+    },
+    "keep4": {
+     "keep_views": 4
+    }
+   },
+   "budget_relooks": 0,
+   "state_names": {
+    "img_occ_bar25": "occ_bar25",
+    "img_occ_bar50": "occ_bar50",
+    "img_occ_disc35": "occ_disc35",
+    "img_gain3": "gain3",
+    "img_gain015": "gain015",
+    "img_cast_blue": "cast_blue",
+    "img_motion9_half": "motion9_half",
+    "img_motion15": "motion15",
+    "img_blur5": "blur5",
+    "img_down2": "down2",
+    "img_down3": "down3",
+    "img_keep1": "keep1",
+    "img_keep2": "keep2",
+    "img_keep4": "keep4",
+    "img_nominal": "no stress"
+   }
+  }
+ },
+ "stress_conditions": [
+  "very_dim",
+  "max_light",
+  "colour_red",
+  "hard_directional",
+  "view_wide",
+  "view_steep",
+  "view_flat_far",
+  "view_partial",
+  "turn_error_30"
+ ],
+ "tables": "restocker_perception.identity.robustness_cli tables --condition NAME=STATE[,STATE]@LIST; verdict applies `bounds` below with robustness.evaluate",
+ "pass_rule": "max bound: fail if the point estimate is over it, pass only if the upper 95 % Wilson limit is at or under it and n >= n_required, otherwise inconclusive; min bound mirrors that on the lower limit. n is the denominator of the metric (named objects, known objects or unknown objects). Pooled bounds count each (object, condition) pair once and say so. One run; nothing re-run after a fail; a recording that fails six times is reported as missing.",
+ "reported_without_a_bound": [
+  "per-condition seen_known for the view conditions (a far, steep or panned view may leave an object unseen by design)",
+  "coverage by number of re-looks, per condition and for off_views and on",
+  "mean and p95 re-looks of named objects, by shape",
+  "facing error of the guidance (round bodies and boxes) per condition",
+  "paired difference of coverage against the nominal run on the same seeds",
+  "heavy-reader share and latency per machine (latency is not bounded here)",
+  "unknown named: per product, per rung, per look",
+  "which objects were ever wrongly named under any stress condition"
+ ],
+ "bounds": [
+  {
+   "id": "nominal_false_identity",
+   "conditions": [
+    "nominal"
+   ],
+   "budget": 3,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.02,
+   "n_required": 200,
+   "meaning": "named wrong over named known objects (round 4 used 1 % with 400 named; 354 known objects cannot reach that, so 2 % with 200 named)"
+  },
+  {
+   "id": "nominal_coverage_b3",
+   "conditions": [
+    "nominal"
+   ],
+   "budget": 3,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.6,
+   "n_required": 300,
+   "meaning": "correct names over all known tray objects of the scenes, three re-looks (round 4's floor)"
+  },
+  {
+   "id": "nominal_coverage_b2",
+   "conditions": [
+    "nominal"
+   ],
+   "budget": 2,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.45,
+   "n_required": 300,
+   "meaning": "the same after two re-looks (dev lower Wilson 0.49, rounded down)"
+  },
+  {
+   "id": "nominal_seen_known",
+   "conditions": [
+    "nominal"
+   ],
+   "budget": 0,
+   "metric": "seen_known",
+   "direction": "min",
+   "value": 0.97,
+   "n_required": 300,
+   "meaning": "harness check: every known tray object has a usable view at look 0 (six views per scene)"
+  },
+  {
+   "id": "unknown_bottle_named",
+   "conditions": [
+    "nominal"
+   ],
+   "budget": 3,
+   "metric": "unknown_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 40,
+   "meaning": "unregistered bottle twins (GEN-008, GEN-011) named as a registered SKU",
+   "group": {
+    "shape": "bottle"
+   }
+  },
+  {
+   "id": "unknown_box_named",
+   "conditions": [
+    "nominal"
+   ],
+   "budget": 3,
+   "metric": "unknown_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 100,
+   "meaning": "unregistered boxes (GEN-018, GEN-020) named as a registered SKU",
+   "group": {
+    "shape": "box"
+   }
+  },
+  {
+   "id": "unknown_box_twin_named",
+   "conditions": [
+    "nominal"
+   ],
+   "budget": 3,
+   "metric": "unknown_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 40,
+   "meaning": "GEN-018, whose look-alike GEN-017 is registered (the case the margin rule cannot protect)",
+   "group": {
+    "sku": "GEN-018"
+   }
+  },
+  {
+   "id": "unknown_box_novel_named",
+   "conditions": [
+    "nominal"
+   ],
+   "budget": 3,
+   "metric": "unknown_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 60,
+   "meaning": "GEN-020, a box with no look-alike at all",
+   "group": {
+    "sku": "GEN-020"
+   }
+  },
+  {
+   "id": "very_dim_coverage_b2",
+   "conditions": [
+    "very_dim"
+   ],
+   "budget": 2,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.3,
+   "n_required": 90,
+   "meaning": "correct names over all known tray objects after two re-looks; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "very_dim_false_identity_b2",
+   "conditions": [
+    "very_dim"
+   ],
+   "budget": 2,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 30,
+   "meaning": "named wrong over named known objects"
+  },
+  {
+   "id": "max_light_coverage_b2",
+   "conditions": [
+    "max_light"
+   ],
+   "budget": 2,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.45,
+   "n_required": 90,
+   "meaning": "correct names over all known tray objects after two re-looks; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "max_light_false_identity_b2",
+   "conditions": [
+    "max_light"
+   ],
+   "budget": 2,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 30,
+   "meaning": "named wrong over named known objects"
+  },
+  {
+   "id": "colour_red_coverage_b2",
+   "conditions": [
+    "colour_red"
+   ],
+   "budget": 2,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.4,
+   "n_required": 90,
+   "meaning": "correct names over all known tray objects after two re-looks; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "colour_red_false_identity_b2",
+   "conditions": [
+    "colour_red"
+   ],
+   "budget": 2,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 30,
+   "meaning": "named wrong over named known objects"
+  },
+  {
+   "id": "hard_directional_coverage_b2",
+   "conditions": [
+    "hard_directional"
+   ],
+   "budget": 2,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.3,
+   "n_required": 90,
+   "meaning": "correct names over all known tray objects after two re-looks; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "hard_directional_false_identity_b2",
+   "conditions": [
+    "hard_directional"
+   ],
+   "budget": 2,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 30,
+   "meaning": "named wrong over named known objects"
+  },
+  {
+   "id": "view_wide_coverage_b2",
+   "conditions": [
+    "view_wide"
+   ],
+   "budget": 2,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.55,
+   "n_required": 90,
+   "meaning": "correct names over all known tray objects after two re-looks; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "view_wide_false_identity_b2",
+   "conditions": [
+    "view_wide"
+   ],
+   "budget": 2,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 30,
+   "meaning": "named wrong over named known objects"
+  },
+  {
+   "id": "view_steep_coverage_b2",
+   "conditions": [
+    "view_steep"
+   ],
+   "budget": 2,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.2,
+   "n_required": 90,
+   "meaning": "correct names over all known tray objects after two re-looks; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "view_steep_false_identity_b2",
+   "conditions": [
+    "view_steep"
+   ],
+   "budget": 2,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 30,
+   "meaning": "named wrong over named known objects"
+  },
+  {
+   "id": "view_flat_far_coverage_b2",
+   "conditions": [
+    "view_flat_far"
+   ],
+   "budget": 2,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.55,
+   "n_required": 90,
+   "meaning": "correct names over all known tray objects after two re-looks; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "view_flat_far_false_identity_b2",
+   "conditions": [
+    "view_flat_far"
+   ],
+   "budget": 2,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 30,
+   "meaning": "named wrong over named known objects"
+  },
+  {
+   "id": "view_partial_coverage_b2",
+   "conditions": [
+    "view_partial"
+   ],
+   "budget": 2,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.4,
+   "n_required": 90,
+   "meaning": "correct names over all known tray objects after two re-looks; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "view_partial_false_identity_b2",
+   "conditions": [
+    "view_partial"
+   ],
+   "budget": 2,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 30,
+   "meaning": "named wrong over named known objects"
+  },
+  {
+   "id": "very_dim_seen_known",
+   "conditions": [
+    "very_dim"
+   ],
+   "budget": 0,
+   "metric": "seen_known",
+   "direction": "min",
+   "value": 0.95,
+   "n_required": 90,
+   "meaning": "lighting does not move the camera: the same objects must be seen"
+  },
+  {
+   "id": "max_light_seen_known",
+   "conditions": [
+    "max_light"
+   ],
+   "budget": 0,
+   "metric": "seen_known",
+   "direction": "min",
+   "value": 0.95,
+   "n_required": 90,
+   "meaning": "lighting does not move the camera: the same objects must be seen"
+  },
+  {
+   "id": "colour_red_seen_known",
+   "conditions": [
+    "colour_red"
+   ],
+   "budget": 0,
+   "metric": "seen_known",
+   "direction": "min",
+   "value": 0.95,
+   "n_required": 90,
+   "meaning": "lighting does not move the camera: the same objects must be seen"
+  },
+  {
+   "id": "hard_directional_seen_known",
+   "conditions": [
+    "hard_directional"
+   ],
+   "budget": 0,
+   "metric": "seen_known",
+   "direction": "min",
+   "value": 0.95,
+   "n_required": 90,
+   "meaning": "lighting does not move the camera: the same objects must be seen"
+  },
+  {
+   "id": "turn_error_30_coverage_b2",
+   "conditions": [
+    "turn_error_30"
+   ],
+   "budget": 2,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.4,
+   "n_required": 90,
+   "meaning": "re-looks whose turns carry a 30 degree sigma error (dev 24/42 = 0.57, lower Wilson 0.42, rounded down)"
+  },
+  {
+   "id": "turn_error_30_false_identity_b2",
+   "conditions": [
+    "turn_error_30"
+   ],
+   "budget": 2,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 30,
+   "meaning": "named wrong, as above"
+  },
+  {
+   "id": "stress_false_identity_pooled",
+   "conditions": "all_stress",
+   "budget": 2,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.02,
+   "n_required": 250,
+   "meaning": "all eight stress conditions pooled (the same objects recur under each, so the Wilson limit is optimistic; reported with a per-object count)"
+  },
+  {
+   "id": "stress_unknown_bottle_named",
+   "conditions": "all_stress",
+   "budget": 2,
+   "metric": "unknown_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 80,
+   "meaning": "pooled unknown bottle twins under stress",
+   "group": {
+    "shape": "bottle"
+   }
+  },
+  {
+   "id": "stress_unknown_box_named",
+   "conditions": "all_stress",
+   "budget": 2,
+   "metric": "unknown_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 300,
+   "meaning": "pooled unknown boxes under stress",
+   "group": {
+    "shape": "box"
+   }
+  },
+  {
+   "id": "stress_unknown_box_twin_named",
+   "conditions": "all_stress",
+   "budget": 2,
+   "metric": "unknown_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 60,
+   "meaning": "pooled GEN-018 under stress",
+   "group": {
+    "sku": "GEN-018"
+   }
+  },
+  {
+   "id": "img_occ_bar25_false_identity",
+   "conditions": [
+    "img_occ_bar25"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.12,
+   "n_required": 25,
+   "meaning": "named wrong over named known objects at look 0"
+  },
+  {
+   "id": "img_occ_bar50_false_identity",
+   "conditions": [
+    "img_occ_bar50"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.12,
+   "n_required": 25,
+   "meaning": "named wrong over named known objects at look 0"
+  },
+  {
+   "id": "img_occ_disc35_false_identity",
+   "conditions": [
+    "img_occ_disc35"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.12,
+   "n_required": 25,
+   "meaning": "named wrong over named known objects at look 0"
+  },
+  {
+   "id": "img_gain3_false_identity",
+   "conditions": [
+    "img_gain3"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.12,
+   "n_required": 25,
+   "meaning": "named wrong over named known objects at look 0"
+  },
+  {
+   "id": "img_gain015_false_identity",
+   "conditions": [
+    "img_gain015"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.12,
+   "n_required": 25,
+   "meaning": "named wrong over named known objects at look 0"
+  },
+  {
+   "id": "img_cast_blue_false_identity",
+   "conditions": [
+    "img_cast_blue"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.12,
+   "n_required": 25,
+   "meaning": "named wrong over named known objects at look 0"
+  },
+  {
+   "id": "img_motion9_half_false_identity",
+   "conditions": [
+    "img_motion9_half"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.12,
+   "n_required": 25,
+   "meaning": "named wrong over named known objects at look 0"
+  },
+  {
+   "id": "img_motion15_false_identity",
+   "conditions": [
+    "img_motion15"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.12,
+   "n_required": 25,
+   "meaning": "named wrong over named known objects at look 0"
+  },
+  {
+   "id": "img_blur5_false_identity",
+   "conditions": [
+    "img_blur5"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.12,
+   "n_required": 25,
+   "meaning": "named wrong over named known objects at look 0"
+  },
+  {
+   "id": "img_down2_false_identity",
+   "conditions": [
+    "img_down2"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.12,
+   "n_required": 25,
+   "meaning": "named wrong over named known objects at look 0"
+  },
+  {
+   "id": "img_down3_false_identity",
+   "conditions": [
+    "img_down3"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.12,
+   "n_required": 25,
+   "meaning": "named wrong over named known objects at look 0"
+  },
+  {
+   "id": "img_keep1_false_identity",
+   "conditions": [
+    "img_keep1"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.12,
+   "n_required": 25,
+   "meaning": "named wrong over named known objects at look 0"
+  },
+  {
+   "id": "img_keep2_false_identity",
+   "conditions": [
+    "img_keep2"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.12,
+   "n_required": 25,
+   "meaning": "named wrong over named known objects at look 0"
+  },
+  {
+   "id": "img_keep4_false_identity",
+   "conditions": [
+    "img_keep4"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.12,
+   "n_required": 25,
+   "meaning": "named wrong over named known objects at look 0"
+  },
+  {
+   "id": "img_occ_bar25_coverage",
+   "conditions": [
+    "img_occ_bar25"
+   ],
+   "budget": 0,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.25,
+   "n_required": 90,
+   "meaning": "correct names at look 0; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "img_occ_disc35_coverage",
+   "conditions": [
+    "img_occ_disc35"
+   ],
+   "budget": 0,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.15,
+   "n_required": 90,
+   "meaning": "correct names at look 0; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "img_gain3_coverage",
+   "conditions": [
+    "img_gain3"
+   ],
+   "budget": 0,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.2,
+   "n_required": 90,
+   "meaning": "correct names at look 0; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "img_cast_blue_coverage",
+   "conditions": [
+    "img_cast_blue"
+   ],
+   "budget": 0,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.2,
+   "n_required": 90,
+   "meaning": "correct names at look 0; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "img_motion9_half_coverage",
+   "conditions": [
+    "img_motion9_half"
+   ],
+   "budget": 0,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.15,
+   "n_required": 90,
+   "meaning": "correct names at look 0; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "img_keep1_coverage",
+   "conditions": [
+    "img_keep1"
+   ],
+   "budget": 0,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.15,
+   "n_required": 90,
+   "meaning": "correct names at look 0; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "img_keep2_coverage",
+   "conditions": [
+    "img_keep2"
+   ],
+   "budget": 0,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.25,
+   "n_required": 90,
+   "meaning": "correct names at look 0; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "img_keep4_coverage",
+   "conditions": [
+    "img_keep4"
+   ],
+   "budget": 0,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.25,
+   "n_required": 90,
+   "meaning": "correct names at look 0; floor = dev lower Wilson, rounded down to 0.05"
+  },
+  {
+   "id": "img_false_identity_pooled",
+   "conditions": [
+    "img_occ_bar25",
+    "img_occ_bar50",
+    "img_occ_disc35",
+    "img_gain3",
+    "img_gain015",
+    "img_cast_blue",
+    "img_motion9_half",
+    "img_motion15",
+    "img_blur5",
+    "img_down2",
+    "img_down3",
+    "img_keep1",
+    "img_keep2",
+    "img_keep4"
+   ],
+   "budget": 0,
+   "metric": "false_identity_named",
+   "direction": "max",
+   "value": 0.03,
+   "n_required": 250,
+   "meaning": "all fourteen levels pooled"
+  },
+  {
+   "id": "img_unknown_named_pooled",
+   "conditions": [
+    "img_occ_bar25",
+    "img_occ_bar50",
+    "img_occ_disc35",
+    "img_gain3",
+    "img_gain015",
+    "img_cast_blue",
+    "img_motion9_half",
+    "img_motion15",
+    "img_blur5",
+    "img_down2",
+    "img_down3",
+    "img_keep1",
+    "img_keep2",
+    "img_keep4"
+   ],
+   "budget": 0,
+   "metric": "unknown_named",
+   "direction": "max",
+   "value": 0.1,
+   "n_required": 200,
+   "meaning": "unregistered products named under image stress, pooled"
+  },
+  {
+   "id": "img_nominal_coverage",
+   "conditions": [
+    "img_nominal"
+   ],
+   "budget": 0,
+   "metric": "coverage_known",
+   "direction": "min",
+   "value": 0.2,
+   "n_required": 90,
+   "meaning": "the unperturbed look 0 of the same 40 seeds (dev lower Wilson 0.25, rounded down)"
+  }
+ ],
+ "caveats": "Gazebo cannot render a light above 1.0, so clipping exposure and blur exist only as image-space gain, box blur and motion blur on the crop; the occluder is a flat block; the wrist camera never sees a gripper; dev (8 seeds, 42 known objects per condition) is small, so every floor is a dev lower Wilson limit and the held-out lower limit will need a point estimate about ten points above it."
+}

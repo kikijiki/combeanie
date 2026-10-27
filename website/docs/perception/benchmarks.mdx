@@ -62,6 +62,16 @@ frame unless ground truth reports every product within 3 cm of its scenario pose
   `/identify_product` logic with the safe naming policy), `oracle` (an ablation: a perfect channel for
   whatever face is framed) and `degrade` (half the frames lose a seeded band of 30 to 70 % of the depth
   image rows).
+- **Stress options (robustness campaign).** The recorder accepts a named lighting condition beyond the six
+  seeded ones (`--lighting-condition very_dim | max_light | colour_red | hard_directional`; a seed never draws
+  these), a perturbation of the close-range viewpoints (`--view-stress`: wider azimuth, a steeper or flatter
+  approach, a longer standoff, or a pan that puts the product near the image edge) and an offset of the lane
+  survey stations (`--lane-stress`). Gazebo refuses a light or ambient colour above 1.0, so a clipping exposure
+  is not rendered; `ladder_benchmark step --stress` applies image-space stress to the crops the ladder reads
+  (gain, colour cast, noise, blur, motion blur, downscale, a flat occluder block, fewer views per look), and
+  `stock_benchmark --occlude` puts a full-height strip of a near surface or of dropped pixels over the lane depth.
+  Everything is off by default, the unperturbed paths are byte-identical, and the synthetic occluder, blur and
+  cast are proxies, not physical models.
 - **Rotation oracle.** The identity ladder asks for turns that no manipulation skill performs, so the
   recorder re-records each scene with the objects turned by the suggested cumulative angle and views
   drawn for look *k*.

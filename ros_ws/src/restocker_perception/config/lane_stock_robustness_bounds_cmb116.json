@@ -1,0 +1,264 @@
+{
+ "card": "CMB-116",
+ "phase": "1 (pre-declared; no held-out lane frame recorded)",
+ "declared_on": "2026-10-26",
+ "declared_before_any_held_out_frame_was_recorded": true,
+ "question": "Does the frozen lane stock estimator keep refusing rather than miscounting when the survey station is off nominal, when a strip of the depth image is a near surface or empty, and with noise?",
+ "decision_unit": "one lane survey frame, scored on the lane it was taken for (stock_scorer, as CMB-114)",
+ "code_commit": "e578445105b836b3cd6412b37b00751962924df1",
+ "splits": {
+  "file": "ros_ws/src/restocker_benchmarks/config/perception_splits_v7.json",
+  "file_sha256": "4f101f1ced6202f18f21d59d5090eca968815bb27a604c02febbabf95573c453",
+  "fresh_held_out_seeds": [
+   787,
+   788,
+   789,
+   794,
+   795,
+   796,
+   799,
+   800,
+   802,
+   803,
+   804,
+   805,
+   806,
+   808,
+   809,
+   810,
+   811,
+   813,
+   814,
+   817,
+   818,
+   820,
+   821,
+   822,
+   823,
+   825,
+   826,
+   828,
+   829,
+   830
+  ]
+ },
+ "recording": "tools/record_perception_dataset.py --lane-views --close-views 0 --frames 1 --lighting-condition nominal --lane-stress JSON, one dataset per station arm",
+ "arms": {
+  "station_nominal": {
+   "lane_stress": {},
+   "estimator": "stock_benchmark --arm abstain"
+  },
+  "station_near": {
+   "lane_stress": {
+    "dy_m": -0.15
+   },
+   "estimator": "stock_benchmark --arm abstain"
+  },
+  "station_far": {
+   "lane_stress": {
+    "dy_m": 0.15
+   },
+   "estimator": "stock_benchmark --arm abstain"
+  },
+  "station_high": {
+   "lane_stress": {
+    "dz_m": 0.1
+   },
+   "estimator": "stock_benchmark --arm abstain"
+  },
+  "station_lateral": {
+   "lane_stress": {
+    "dx_m": 0.1
+   },
+   "estimator": "stock_benchmark --arm abstain"
+  },
+  "station_nominal+noise0.01": {
+   "lane_stress": {},
+   "estimator": "--noise 0.01 --dropout 0.02"
+  },
+  "station_near+noise0.01": {
+   "lane_stress": {
+    "dy_m": -0.15
+   },
+   "estimator": "--noise 0.01 --dropout 0.02"
+  },
+  "station_far+noise0.01": {
+   "lane_stress": {
+    "dy_m": 0.15
+   },
+   "estimator": "--noise 0.01 --dropout 0.02"
+  },
+  "station_high+noise0.01": {
+   "lane_stress": {
+    "dz_m": 0.1
+   },
+   "estimator": "--noise 0.01 --dropout 0.02"
+  },
+  "station_lateral+noise0.01": {
+   "lane_stress": {
+    "dx_m": 0.1
+   },
+   "estimator": "--noise 0.01 --dropout 0.02"
+  },
+  "occ_near0.30": {
+   "dataset": "station_nominal",
+   "estimator": "--occlude 0.30 --occlude-kind near"
+  },
+  "occ_hole0.30": {
+   "dataset": "station_nominal",
+   "estimator": "--occlude 0.30 --occlude-kind hole"
+  },
+  "occ_near0.50": {
+   "dataset": "station_nominal",
+   "estimator": "--occlude 0.50 --occlude-kind near"
+  },
+  "occ_hole0.50": {
+   "dataset": "station_nominal",
+   "estimator": "--occlude 0.50 --occlude-kind hole"
+  }
+ },
+ "lighting": "not an axis: the estimator reads depth only (checked: 12 of 12 dev lane estimates identical under very_dim and nominal)",
+ "noise_model": "as lane_stock_acceptance_bounds_noise120.json (Gaussian range noise, 2 % dropout, synthetic; seeded by the frame id)",
+ "bounds": [
+  {
+   "id": "station_exact",
+   "arms": [
+    "station_nominal",
+    "station_near",
+    "station_high",
+    "station_lateral"
+   ],
+   "metric": "exact_on_sufficient",
+   "direction": "min",
+   "value": 0.9,
+   "required_n": 150,
+   "meaning": "lanes counted exactly, camera stood off the nominal station by 0.15 m setback, 0.10 m height or 0.10 m sideways (a refusal is a miss)"
+  },
+  {
+   "id": "station_far_exact",
+   "arms": [
+    "station_far"
+   ],
+   "metric": "exact_on_sufficient",
+   "direction": "min",
+   "value": 0.75,
+   "required_n": 150,
+   "meaning": "the same with the camera 0.15 m farther from the shelf (dev 0.89)"
+  },
+  {
+   "id": "station_answered_wrong",
+   "arms": [
+    "station_nominal",
+    "station_near",
+    "station_far",
+    "station_high",
+    "station_lateral",
+    "station_nominal+noise0.01",
+    "station_near+noise0.01",
+    "station_far+noise0.01",
+    "station_high+noise0.01",
+    "station_lateral+noise0.01"
+   ],
+   "metric": "answered_wrong",
+   "direction": "max",
+   "value": 0.03,
+   "required_n": 150,
+   "meaning": "a wrong count is answered: more than one product off, or a phantom"
+  },
+  {
+   "id": "station_box_answered_wrong",
+   "arms": [
+    "station_nominal",
+    "station_near",
+    "station_far",
+    "station_high",
+    "station_lateral",
+    "station_nominal+noise0.01",
+    "station_near+noise0.01",
+    "station_far+noise0.01",
+    "station_high+noise0.01",
+    "station_lateral+noise0.01"
+   ],
+   "metric": "answered_wrong",
+   "direction": "max",
+   "value": 0.1,
+   "required_n": 40,
+   "meaning": "the same, box lanes",
+   "group": "product_class=box"
+  },
+  {
+   "id": "station_noise_exact",
+   "arms": [
+    "station_nominal+noise0.01",
+    "station_near+noise0.01",
+    "station_far+noise0.01",
+    "station_high+noise0.01",
+    "station_lateral+noise0.01"
+   ],
+   "metric": "exact_on_sufficient",
+   "direction": "min",
+   "value": 0.8,
+   "required_n": 150,
+   "meaning": "station error together with 1 % range noise and 2 % dropout"
+  },
+  {
+   "id": "station_empty_read_empty",
+   "arms": [
+    "station_nominal",
+    "station_near",
+    "station_far",
+    "station_high",
+    "station_lateral"
+   ],
+   "metric": "empty_lane_read_empty",
+   "direction": "min",
+   "value": 0.75,
+   "required_n": 20,
+   "meaning": "regression: empty lanes read empty"
+  },
+  {
+   "id": "station_clean_false_alarm",
+   "arms": [
+    "station_nominal",
+    "station_near",
+    "station_far",
+    "station_high",
+    "station_lateral"
+   ],
+   "metric": "misplaced_false_alarm",
+   "direction": "max",
+   "value": 0.1,
+   "required_n": 100,
+   "meaning": "regression: conforming lanes not flagged misplaced"
+  },
+  {
+   "id": "occlusion30_answered",
+   "arms": [
+    "occ_near0.30",
+    "occ_hole0.30"
+   ],
+   "metric": "answered_on_sufficient",
+   "direction": "min",
+   "value": 0.9,
+   "required_n": 150,
+   "meaning": "a 30 % full-height strip at an image edge (near surface or no return) leaves the lane readable (dev 1.00)"
+  },
+  {
+   "id": "occlusion_answered_wrong",
+   "arms": [
+    "occ_near0.30",
+    "occ_hole0.30",
+    "occ_near0.50",
+    "occ_hole0.50"
+   ],
+   "metric": "answered_wrong",
+   "direction": "max",
+   "value": 0.03,
+   "required_n": 150,
+   "meaning": "an occluder makes the estimator refuse, never answer wrongly (dev: 50 % strips refuse half the lanes, 0 wrong)"
+  }
+ ],
+ "pass_rule": "as lane_stock_acceptance_bounds_noise120.json: a 'min' bound passes only if the lower 95 % Wilson limit is at or above the value, a 'max' bound only if the upper limit is at or below it, and the sample size is met; a bound with a 'group' is evaluated on that block (no such lane: inconclusive). A fail is recorded as a fail; nothing is re-run.",
+ "frozen": "estimator and lane_stock.yaml as committed at code_commit",
+ "training": "none"
+}

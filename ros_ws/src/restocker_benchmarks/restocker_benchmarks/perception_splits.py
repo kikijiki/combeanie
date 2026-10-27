@@ -43,6 +43,12 @@ SPLITS_SCHEMA_VERSION_IDENTITY = 5
 # identity-round registry roles and burns every held-out seed the previous identity round read
 # (those seeds decided a bound and can never decide another).
 SPLITS_SCHEMA_VERSION_IDENTITY_SEEDS = 6
+# Version 7 (CMB-116 robustness campaign) appends seeds to a version-6 file (or a version-7 one),
+# burns every held-out seed the previous round read and moves more products to the unregistered
+# list: a registered product may become unregistered (never the reverse), so the unknown-product
+# test also covers boxes. Train and validation scenes still draw only train and validation
+# products, so a dev run reads the old roles and the unknown test is a held-out one.
+SPLITS_SCHEMA_VERSION_IDENTITY_ROLES = 7
 SPLIT_NAMES = ("train", "validation", "held_out")
 # Product and seed fractions (train, validation, held-out). Held-out is never below one item.
 PRODUCT_FRACTIONS = (0.5, 0.25, 0.25)
@@ -537,6 +543,91 @@ def extend_identity_seeds(
     return document
 
 
+def extend_identity_roles(
+    base: dict[str, Any],
+    *,
+    last_seed: int,
+    seed_counts: tuple[int, int, int],
+    burn_held_out_through: int,
+    also_unregistered: Sequence[str],
+    round_name: str = "cmb116",
+) -> dict[str, Any]:
+    """Append seeds to a version-6 or version-7 file, burn what was read, unregister more products.
+
+    As :func:`extend_identity_seeds`, except that ``also_unregistered`` (registered in the base)
+    joins the unregistered list. Nothing the base assigns to a split changes; a product leaves the
+    registry roles' registered side only, so every earlier unknown product stays unknown.
+    """
+    problems = validate_splits(base)
+    if problems or base.get("schema_version") not in (
+        SPLITS_SCHEMA_VERSION_IDENTITY_SEEDS,
+        SPLITS_SCHEMA_VERSION_IDENTITY_ROLES,
+    ):
+        raise ValueError(
+            "identity roles extension needs a valid version-6 or version-7 split file: "
+            + "; ".join(problems)
+        )
+    roles = base["identity_round"]
+    moved = sorted(set(also_unregistered))
+    if not moved or not set(moved) <= set(roles["registered_products"]):
+        raise ValueError("also_unregistered must be a non-empty subset of the registered products")
+    generation = base["extension"]["generation"] + 1
+    first = max(seed for name in SPLIT_NAMES for seed in base["seeds"][name]) + 1
+    new_seeds = list(range(first, last_seed + 1))
+    if sum(seed_counts) != len(new_seeds) or min(seed_counts) < 0 or not new_seeds:
+        raise ValueError(f"seed_counts {seed_counts} must sum to {len(new_seeds)} added seeds")
+    if burn_held_out_through < roles["burned_through_seed"]:
+        raise ValueError("the burn line cannot move down")
+    order = _shuffled(new_seeds, SplitMix64((base["split_seed"] ^ SPLIT_SALT) + 1 + generation))
+    train_s, validation_s, _ = seed_counts
+    added = {
+        "train": sorted(order[:train_s]),
+        "validation": sorted(order[train_s : train_s + validation_s]),
+        "held_out": sorted(order[train_s + validation_s :]),
+    }
+    generations = base["held_out_generations"]
+    old_held = sorted(generations["burned"] + generations["fresh"])
+    burned = sorted(
+        set(generations["burned"]) | {x for x in old_held if x <= burn_held_out_through}
+    )
+    fresh = sorted((set(old_held) - set(burned)) | set(added["held_out"]))
+    document = {
+        "schema_version": SPLITS_SCHEMA_VERSION_IDENTITY_ROLES,
+        "split_seed": base["split_seed"],
+        "catalogue_sha256": base["catalogue_sha256"],
+        "catalogue_includes_boxes": True,
+        "box_seed_start": base["box_seed_start"],
+        "products": base["products"],
+        "seeds": {name: sorted(base["seeds"][name] + added[name]) for name in SPLIT_NAMES},
+        "lookalike_groups": base["lookalike_groups"],
+        "policy": base["policy"]
+        + "; round "
+        + round_name
+        + ": seeds appended, held-out seeds through "
+        + str(burn_held_out_through)
+        + " burned, "
+        + ", ".join(moved)
+        + " moved to the unregistered products",
+        "held_out_generations": {"burned": burned, "fresh": fresh},
+        "identity_round": {
+            "name": round_name,
+            "registered_products": sorted(set(roles["registered_products"]) - set(moved)),
+            "unregistered_products": sorted(set(roles["unregistered_products"]) | set(moved)),
+            "burned_through_seed": burn_held_out_through,
+        },
+        "extension": {
+            "generation": generation,
+            "base_sha256": base["sha256"],
+            "added_seed_range": [first, last_seed],
+            "seed_counts": list(seed_counts),
+            "also_unregistered": moved,
+            "base_document": base,
+        },
+    }
+    document["sha256"] = body_hash(document)
+    return document
+
+
 def scene_includes_boxes(document: dict[str, Any], seed: int) -> bool:
     """True when a seed's scene may draw boxes (version 3 only, from ``box_seed_start`` on)."""
     start = document.get("box_seed_start")
@@ -547,6 +638,17 @@ def reproduce_extension(document: dict[str, Any]) -> dict[str, Any]:
     """Re-derive an extension from its embedded base, recursively (the chain must reproduce)."""
     extension = document["extension"]
     base = extension["base_document"]
+    if document.get("schema_version") == SPLITS_SCHEMA_VERSION_IDENTITY_ROLES:
+        if reproduce_extension(base) != base:
+            raise ValueError("embedded base extension does not reproduce")
+        return extend_identity_roles(
+            base,
+            last_seed=extension["added_seed_range"][1],
+            seed_counts=tuple(extension["seed_counts"]),
+            burn_held_out_through=document["identity_round"]["burned_through_seed"],
+            also_unregistered=extension["also_unregistered"],
+            round_name=document["identity_round"]["name"],
+        )
     if document.get("schema_version") == SPLITS_SCHEMA_VERSION_IDENTITY_SEEDS:
         if base.get("schema_version") == SPLITS_SCHEMA_VERSION_IDENTITY_SEEDS and (
             reproduce_extension(base) != base
@@ -657,6 +759,7 @@ def validate_splits(document: dict[str, Any]) -> list[str]:
     if document.get("schema_version") in (
         SPLITS_SCHEMA_VERSION_IDENTITY,
         SPLITS_SCHEMA_VERSION_IDENTITY_SEEDS,
+        SPLITS_SCHEMA_VERSION_IDENTITY_ROLES,
     ):
         problems += _validate_identity_extension(document)
     groups = document.get("lookalike_groups", {})
@@ -751,14 +854,25 @@ def _validate_identity_extension(document: dict[str, Any]) -> list[str]:
         document["lookalike_groups"]
     ):
         problems.append("identity-round roles do not partition the catalogue products")
-    if document.get("schema_version") == SPLITS_SCHEMA_VERSION_IDENTITY_SEEDS:
+    if document.get("schema_version") in (
+        SPLITS_SCHEMA_VERSION_IDENTITY_SEEDS,
+        SPLITS_SCHEMA_VERSION_IDENTITY_ROLES,
+    ):
         line = roles.get("burned_through_seed", -1)
         if any(s <= line and s not in burned for s in document["seeds"]["held_out"]):
             problems.append("a held-out seed at or below the burn line is not burned")
         base_roles = base.get("identity_round", {})
-        for key in ("registered_products", "unregistered_products"):
-            if roles.get(key) != base_roles.get(key):
-                problems.append(f"{key} changed from the base file")
+        if document.get("schema_version") == SPLITS_SCHEMA_VERSION_IDENTITY_ROLES:
+            if not set(base_roles.get("unregistered_products", [])) <= unregistered:
+                problems.append("a product the base left unregistered is registered again")
+            if unregistered - set(base_roles.get("unregistered_products", [])) != set(
+                extension.get("also_unregistered", [])
+            ):
+                problems.append("the newly unregistered products are not the declared ones")
+        else:
+            for key in ("registered_products", "unregistered_products"):
+                if roles.get(key) != base_roles.get(key):
+                    problems.append(f"{key} changed from the base file")
         first, last = extension["added_seed_range"]
         added = set(range(first, last + 1))
         if any(s in burned for s in document["seeds"]["held_out"] if s in added):

@@ -149,6 +149,20 @@ manifest's per-scenario `lighting` (with the SHA-256 of that generated world) an
 It is a pure function of the seed and cannot change which products a scene holds.
 `--no-lighting` records the nominal world.
 
+**Stress options** (CMB-116, all off by default; the unperturbed seed, view and lane-view outputs are
+byte-identical, pinned by `test_perception_stress.py`). `--lighting-condition NAME` lights a scene with
+one of the six seeded conditions or a stress one (`very_dim`, `max_light`, `colour_red`,
+`hard_directional`, never drawn by a seed; Gazebo refuses any colour above 1.0, so `max_light` is every
+light at the cap). `--view-stress JSON` sets a `perception_views.ViewStress` (`max_azimuth_deg`,
+`elevation_offset_deg`, `standoff_scale`, `pan_deg`): the eye is capped at world z 1.0, so a longer standoff
+needs a flatter approach, and `pan_deg` turns the camera about its own vertical axis with the eye
+unchanged. With a stress the recorder records a view's range and in-view flag instead of asserting them
+(`RESTOCKER_BENCH_VIEW_CHECK=report`). `--lane-stress JSON` offsets the lane survey stations
+(`dx_m`, `dy_m`, `dz_m`). Image-space stress on the ladder's crops lives in
+`restocker_perception.identity.crop_stress`, the lane depth occluder in `stock.benchmark.occlude_depth`.
+Splits version 7 (`extend_identity_roles`) appends seeds, burns the held-out seeds the previous round
+read and can move more products to the unregistered list.
+
 **Close-range wrist views** (`perception_views.py`). At the home pose the wrist camera sees no
 product, so each scene that has tray products also gets up to three seeded viewpoints 0.28-0.45 m
 from a tray product (the aim is 5 cm up the barrel; the eye stays below world z 1.0 m, where the

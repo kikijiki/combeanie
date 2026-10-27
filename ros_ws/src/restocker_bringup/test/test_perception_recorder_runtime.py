@@ -21,6 +21,10 @@
 #   RESTOCKER_BENCH_FRAMES       frames per camera (default 2)
 #   RESTOCKER_BENCH_WORLD        world SDF to launch instead of the shipped one (seeded lighting)
 #   RESTOCKER_BENCH_LIGHTING_JSON  the lighting object written into every label row
+#   RESTOCKER_BENCH_VIEW_CHECK   "assert" (default): a close view must hold its target in range and
+#                                in the image, or the recording fails. "report" (CMB-116 stressed
+#                                viewpoints, which may deliberately be far or oblique): the result
+#                                of each view is written to part.json and nothing is asserted.
 #   RESTOCKER_BENCH_VIEWS        JSON list of close-range wrist viewpoints (perception_views):
 #                                the arm is sent to each through /survey_viewpoint, so the planner
 #                                and controllers move it, and one more wrist frame is recorded
@@ -65,6 +69,7 @@ PART_DIR = os.environ.get("RESTOCKER_BENCH_PART_DIR", "")
 FRAMES = int(os.environ.get("RESTOCKER_BENCH_FRAMES", "2") or "2")
 WORLD = os.environ.get("RESTOCKER_BENCH_WORLD", "")
 VIEWS = os.environ.get("RESTOCKER_BENCH_VIEWS", "")
+VIEW_CHECK = os.environ.get("RESTOCKER_BENCH_VIEW_CHECK", "assert")
 
 CAMERAS = {
     "overhead": ("/overhead_camera", "overhead_camera_optical_frame"),
@@ -439,6 +444,8 @@ class TestPerceptionRecorder(unittest.TestCase):
         for result in arrived:
             if not result["range_check"]:
                 continue  # a survey-station view (CMB-113) has no target product to range
+            if VIEW_CHECK == "report":
+                continue
             low, high = CLOSE_RANGE_M
             self.assertTrue(
                 result["target_in_view"] and low <= result["target_range_m"] <= high,

@@ -85,6 +85,12 @@ if(BUILD_TESTING)
     test/test_perception_splits_v6.py
     TIMEOUT 60
   )
+  # Version-7 split file (CMB-116): fresh seeds, round 4 burned, boxes unregistered too.
+  ament_add_pytest_test(
+    test_perception_splits_v7
+    test/test_perception_splits_v7.py
+    TIMEOUT 60
+  )
   # Proposal benchmark (Card 113): scenes, survey views, analytic ground truth, scoring, bounds
   # rule. The proposer-on-synthetic-depth cases need cv2 and skip without it.
   ament_add_pytest_test(
@@ -97,6 +103,8 @@ if(BUILD_TESTING)
   # Aimed barcode viewpoints (Card 112 round 2): geometry, reach filter, purity.
   ament_add_pytest_test(test_perception_barcode_views test/test_perception_barcode_views.py TIMEOUT 60)
   ament_add_pytest_test(test_perception_lane_views test/test_perception_lane_views.py TIMEOUT 60)
+  # Robustness campaign (CMB-116): named stress lighting and perturbed viewpoints.
+  ament_add_pytest_test(test_perception_stress test/test_perception_stress.py TIMEOUT 60)
   ament_add_pytest_test(test_perception_stock_scorer test/test_perception_stock_scorer.py TIMEOUT 60)
   # Predeclared paired UR10e transfer-reliability population, denominators, arm gate and
   # no-replacement policy: pure, no simulator, so the frozen statement is unit-testable offline.

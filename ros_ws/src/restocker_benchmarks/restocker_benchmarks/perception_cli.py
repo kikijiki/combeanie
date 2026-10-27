@@ -71,6 +71,19 @@ def _cmd_splits(args: argparse.Namespace) -> int:
         splits_module.write_splits(document, args.out)
         print(f"wrote {args.out} sha256={document['sha256']} (base {base['sha256']})")
         return 0
+    if args.extend_identity_roles:
+        base = splits_module.load_splits(args.extend_identity_roles)
+        document = splits_module.extend_identity_roles(
+            base,
+            last_seed=args.last_seed,
+            seed_counts=tuple(int(item) for item in args.counts.split(",")),
+            burn_held_out_through=args.burn_through,
+            also_unregistered=[item for item in args.unregistered.split(",") if item],
+            round_name=args.round_name,
+        )
+        splits_module.write_splits(document, args.out)
+        print(f"wrote {args.out} sha256={document['sha256']} (base {base['sha256']})")
+        return 0
     if args.extend_identity:
         base = splits_module.load_splits(args.extend_identity)
         document = splits_module.extend_identity_round(
@@ -115,6 +128,8 @@ def _cmd_splits(args: argparse.Namespace) -> int:
             splits_module.SPLITS_SCHEMA_VERSION_BOXES,
             splits_module.SPLITS_SCHEMA_VERSION_BOX_SEEDS,
             splits_module.SPLITS_SCHEMA_VERSION_IDENTITY,
+            splits_module.SPLITS_SCHEMA_VERSION_IDENTITY_SEEDS,
+            splits_module.SPLITS_SCHEMA_VERSION_IDENTITY_ROLES,
         ):
             fresh = splits_module.reproduce_extension(document)
         else:
@@ -340,7 +355,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="version-3 split file to extend with seeds and the identity round's registry roles "
         "into a version 4 (needs --last-seed, --counts, --unregistered, --burn-through)",
     )
-    p.add_argument("--unregistered", default="", help="with --extend-identity: SKUs left out")
+    p.add_argument(
+        "--extend-identity-roles",
+        help="version-6 or version-7 split file to extend with seeds and more unregistered "
+        "products into a version 7 (needs --last-seed, --counts, --unregistered, --burn-through)",
+    )
+    p.add_argument("--round-name", default="cmb116", help="with --extend-identity-roles")
+    p.add_argument(
+        "--unregistered",
+        default="",
+        help="with --extend-identity: SKUs left out; with --extend-identity-roles: SKUs added",
+    )
     p.add_argument(
         "--burn-through",
         type=int,

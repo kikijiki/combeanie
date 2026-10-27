@@ -72,6 +72,9 @@ def prepare_conditions(
     barcode_reach_deg: float | None = None,
     lane_views: bool = False,
     relook: tuple[int, int, list[str]] | None = None,
+    lighting_condition: str | None = None,
+    view_stress: views_module.ViewStress | None = None,
+    lane_stress: lane_views_module.LaneStationStress | None = None,
 ) -> dict:
     """Write the seeded world copy and viewpoint list for one scene; return what to record.
 
@@ -81,7 +84,11 @@ def prepare_conditions(
     scenario_id = scene["scenario_id"]
     prepared: dict = {"world": None, "lighting": None, "views": []}
     if lighting:
-        spec = lighting_module.lighting_for_seed(seed)
+        spec = (
+            lighting_module.lighting_named(lighting_condition, seed)
+            if lighting_condition
+            else lighting_module.lighting_for_seed(seed)
+        )
         shipped = GAZEBO / "worlds" / "restocking.sdf"
         world_path = work / f"{scenario_id}.world.sdf"
         world_path.write_text(
@@ -96,14 +103,14 @@ def prepare_conditions(
         # look number, so no earlier camera pose repeats.
         look, per_object, object_ids = relook
         prepared["views"] = views_module.relook_views(
-            seed, scene["truth"], object_ids, look=look, per_object=per_object
+            seed, scene["truth"], object_ids, look=look, per_object=per_object, stress=view_stress
         )
         return prepared
     if lane_views:
-        prepared["views"] = lane_views_module.lane_views(scene["truth"])
+        prepared["views"] = lane_views_module.lane_views(scene["truth"], lane_stress)
     if views:
         prepared["views"] = prepared["views"] + views_module.close_views(
-            seed, scene["truth"], views
+            seed, scene["truth"], views, stress=view_stress
         )
     if barcode_reach_deg is not None:
         prepared["views"] = prepared["views"] + barcode_module.barcode_views(
@@ -143,6 +150,7 @@ def record_seed(
     frames: int,
     timeout_s: float,
     prepared: dict | None = None,
+    view_check: str = "assert",
 ) -> Path:
     """Launch one seeded scene under the simulator slot; return its part directory."""
     prepared = prepared or {"world": None, "lighting": None, "views": []}
@@ -162,6 +170,7 @@ def record_seed(
             "RESTOCKER_BENCH_SPLIT": scene["seed_split"] or "",
             "RESTOCKER_BENCH_PART_DIR": str(part),
             "RESTOCKER_BENCH_FRAMES": str(frames),
+            "RESTOCKER_BENCH_VIEW_CHECK": view_check,
         }
     )
     if prepared["world"]:
@@ -229,6 +238,29 @@ def main() -> int:
         help="record under the shipped world's nominal lighting instead of the seeded condition",
     )
     parser.add_argument(
+        "--lighting-condition",
+        choices=(*lighting_module.CONDITION_NAMES, *lighting_module.STRESS_NAMES),
+        help="CMB-116: light every scene with this named condition instead of the seed's draw "
+        "(use the same value for every look of a run)",
+    )
+    parser.add_argument(
+        "--view-stress",
+        help="CMB-116: JSON of perception_views.ViewStress fields, e.g. "
+        '\'{"max_azimuth_deg": 60}\'; applies to close and re-look views alike',
+    )
+    parser.add_argument(
+        "--lane-stress",
+        help="CMB-116: JSON of perception_lane_views.LaneStationStress fields (dx_m, dy_m, dz_m) "
+        "moving every lane survey station off its nominal pose",
+    )
+    parser.add_argument(
+        "--turn-error-deg",
+        type=float,
+        default=0.0,
+        help="CMB-116: with --relook, add a seeded Gaussian error of this sigma (degrees) to each "
+        "turn the rotation oracle makes (a regrasp that does not turn exactly as asked)",
+    )
+    parser.add_argument(
         "--yaw-offsets",
         type=Path,
         help="JSON {seed: {object_id: degrees}}: turn those tray products in place before "
@@ -260,11 +292,29 @@ def main() -> int:
         if arguments.yaw_offsets
         else {}
     )
+    view_stress = (
+        views_module.ViewStress(**json.loads(arguments.view_stress))
+        if arguments.view_stress
+        else None
+    )
+    lane_stress = (
+        lane_views_module.LaneStationStress(**json.loads(arguments.lane_stress))
+        if arguments.lane_stress
+        else None
+    )
     work = Path(tempfile.mkdtemp(prefix="perception-record-"))
     builder = dataset.DatasetBuilder(work / "stage")
     for seed in sorted(set(seeds)):
         scene = cli.scene_for_seed(seed, products, document)
         turned = yaw_offsets.get(str(seed), {})
+        if arguments.turn_error_deg and arguments.relook:
+            turned = {
+                object_id: degrees
+                + views_module.turn_error_deg(
+                    seed, object_id, arguments.relook, arguments.turn_error_deg
+                )
+                for object_id, degrees in turned.items()
+            }
         scene = apply_yaw_offsets(scene, turned)
         if arguments.relook and not turned:
             continue  # nothing to look at again in this scene
@@ -279,8 +329,22 @@ def main() -> int:
             relook=(arguments.relook, arguments.relook_views, sorted(turned))
             if arguments.relook
             else None,
+            lighting_condition=arguments.lighting_condition,
+            view_stress=view_stress,
+            lane_stress=lane_stress,
         )
-        part = record_seed(seed, scene, work, arguments.frames, arguments.timeout, prepared)
+        part = record_seed(
+            seed,
+            scene,
+            work,
+            arguments.frames,
+            arguments.timeout,
+            prepared,
+            view_check="report"
+            if (view_stress and not view_stress.is_default())
+            or (lane_stress and not lane_stress.is_default())
+            else "assert",
+        )
         part_info = json.loads((part / "part.json").read_text(encoding="utf-8"))
         builder.add_scenario(
             scene["scenario_id"],
@@ -290,6 +354,8 @@ def main() -> int:
                 "seed_split": scene["seed_split"],
                 "lighting": prepared["lighting"],
                 "close_views": part_info.get("views", []),
+                "view_stress": view_stress.to_dict() if view_stress else None,
+                "lane_stress": lane_stress.to_dict() if lane_stress else None,
             },
         )
         for row in dataset.read_labels(part / "rows.jsonl"):
